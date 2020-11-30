@@ -1,0 +1,54 @@
+syntax = "proto3";
+
+package tunnel;
+
+option go_package = ".;tunnel";
+
+message PingRequest {
+    uint64 ts = 2;
+}
+
+message PingResponse {
+    uint64 ts = 2;
+    uint64 echoedTs = 3;
+}
+
+message SigninRequest {
+    string identity = 2;  // The client's identity
+    uint64 startTime = 3; // The time this client started running
+}
+
+message SigninResponse {
+    bool success = 2;
+}
+
+message CommandRequest {
+    string id = 1;
+    string body = 2;
+}
+
+message CommandResponse {
+    string id = 1;
+    string body = 2;
+}
+
+message EventWrapper {
+    oneof event {
+        PingRequest pingRequest = 1;
+        PingResponse pingResponse = 2;
+        SigninRequest signinRequest = 3;
+        SigninResponse signinResponse = 4;
+        CommandRequest commandRequest = 5;
+        CommandResponse commandResponse = 6;
+    }
+}
+
+message Message {
+    string target = 2;
+    string body = 3;
+}
+
+service TunnelService {
+    rpc EventTunnel(stream EventWrapper) returns (stream EventWrapper) {}
+    rpc SendToClient(Message) returns (Message) {}
+}
