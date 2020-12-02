@@ -16,7 +16,7 @@ import (
 )
 
 var (
-	port    = flag.Int("port", 9000, "The GRPC port to listen on")
+	port    = flag.Int("port", tunnel.DefaultPort, "The GRPC port to listen on")
 	clients = struct {
 		sync.RWMutex
 		m map[string]*clientState

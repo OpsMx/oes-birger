@@ -14,7 +14,7 @@ import (
 )
 
 var (
-	host     = flag.String("host", "localhost:9000", "Server and port to connect to")
+	host     = flag.String("host", tunnel.DefaultHostAndPort, "Server and port to connect to")
 	tickTime = flag.Int("tickTime", 30, "Time between sending Ping messages")
 	identity = flag.String("identity", "", "The client ID to send to the server")
 )

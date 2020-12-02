@@ -12,14 +12,14 @@ import (
 )
 
 var (
-	host   = flag.String("host", "localhost:9000", "Server and port to connect to")
+	host   = flag.String("host", tunnel.DefaultHostAndPort, "Server and port to connect to")
 	target = flag.String("target", "", "The client ID to send the request to")
 )
 
 func main() {
 	flag.Parse()
 	if *target == "" {
-		log.Fatal("Must specify an -identity")
+		log.Fatal("Must specify an -target")
 	}
 
 	var opts []grpc.DialOption
