@@ -6,11 +6,12 @@ As a warning, this is my first attempt at any Go code...
 
 # Prerequisites
 
-`go install google.golang.org/protobuf/cmd/protoc-gen-go`
+`go get google.golang.org/protobuf/cmd/protoc-gen-go \
+        google.golang.org/grpc/cmd/protoc-gen-go-grpc`
 
 # Building
 
-`protoc --proto_path=tunnel --go_out=tunnel --go_opt=paths=source_relative tunnel/tunnel.proto`
+`protoc --proto_path=tunnel --go_out=tunnel --go_opt=paths=source_relative --go-grpc_out=tunnel --go-grpc_opt=paths=source_relative tunnel/tunnel.proto`
 
 # Running
 
