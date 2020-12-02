@@ -4,9 +4,13 @@ This sample implements a bi-directional event stream using GRPC.
 
 As a warning, this is my first attempt at any Go code...
 
+# Prerequisites
+
+`go install google.golang.org/protobuf/cmd/protoc-gen-go`
+
 # Building
 
-`protoc --go_out=plugins=grpc:tunnel tunnel/tunnel.proto`
+`protoc --proto_path=tunnel --go_out=tunnel --go_opt=paths=source_relative tunnel/tunnel.proto`
 
 # Running
 
