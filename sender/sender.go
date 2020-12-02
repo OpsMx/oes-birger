@@ -12,13 +12,13 @@ import (
 )
 
 var (
-	host     = flag.String("host", "localhost:9000", "Server and port to connect to")
-	identity = flag.String("identity", "", "The client ID to send to the server")
+	host   = flag.String("host", "localhost:9000", "Server and port to connect to")
+	target = flag.String("target", "", "The client ID to send the request to")
 )
 
 func main() {
 	flag.Parse()
-	if *identity == "" {
+	if *target == "" {
 		log.Fatal("Must specify an -identity")
 	}
 
@@ -36,7 +36,7 @@ func main() {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	resp, err := client.SendToClient(ctx, &tunnel.Message{Target: *identity, Body: "testing"})
+	resp, err := client.SendToClient(ctx, &tunnel.Message{Target: *target, Body: "testing"})
 	if err != nil {
 		log.Fatalf("Got error: %v", err)
 	}
