@@ -2,10 +2,12 @@ package main
 
 import (
 	"bytes"
+	"crypto/tls"
 	"flag"
 	"io"
 	"io/ioutil"
 	"log"
+	"net/http"
 	"os"
 	"os/exec"
 	"strings"
@@ -20,6 +22,7 @@ import (
 
 var (
 	host     = flag.String("host", tunnel.DefaultHostAndPort, "Server and port to connect to")
+	rpcHost  = flag.String("rpcHost", "kubernetes.docker.internal:6443", "Host and port to connect to Kubernetes API")
 	tickTime = flag.Int("tickTime", 30, "Time between sending Ping messages")
 	identity = flag.String("identity", "", "The client ID to send to the server")
 )
@@ -41,6 +44,14 @@ func runCommand(args []string, stdin string) (stdout string, stderr string, exit
 	stdoutb, _ := ioutil.ReadAll(&outb)
 	stderrb, _ := ioutil.ReadAll(&errb)
 	return string(stdoutb), string(stderrb), 0, nil
+}
+
+func makeHeaders(headers map[string][]string) []*tunnel.HttpHeader {
+	ret := make([]*tunnel.HttpHeader, 0)
+	for name, values := range headers {
+		ret = append(ret, &tunnel.HttpHeader{Name: name, Values: values})
+	}
+	return ret
 }
 
 func runTunnel(client tunnel.TunnelServiceClient, ticker chan uint64, identity string) {
@@ -101,10 +112,50 @@ func runTunnel(client tunnel.TunnelServiceClient, ticker chan uint64, identity s
 				stdout, stderr, exitCode, err := runCommand(req.CmdlineArgs, req.Stdin)
 				if err != nil {
 					log.Printf("Command err: %v", err)
+					continue
 				}
 				resp := &tunnel.ASEventWrapper{
 					Event: &tunnel.ASEventWrapper_CommandResponse{
 						CommandResponse: &tunnel.CommandResponse{Id: req.Id, Target: req.Target, Stdout: stdout, Stderr: stderr, ExitCode: exitCode},
+					},
+				}
+				log.Printf("Sending %v", resp)
+				if err = stream.Send(resp); err != nil {
+					log.Fatalf("Unable to send: %v", err)
+				}
+			case *tunnel.SAEventWrapper_HttpRequest:
+				req := in.GetHttpRequest()
+				log.Printf("Got request: %v", req)
+				tr := &http.Transport{
+					MaxIdleConns:       10,
+					IdleConnTimeout:    30 * time.Second,
+					DisableCompression: true,
+					TLSClientConfig:    &tls.Config{InsecureSkipVerify: true},
+				}
+				client := &http.Client{Transport: tr}
+				httpRequest, _ := http.NewRequest(req.Method, "https://"+*rpcHost+req.URI, nil)
+				httpRequest.Proto = req.Protocol
+				for _, header := range req.Headers {
+					for _, value := range header.Values {
+						httpRequest.Header.Add(header.Name, value)
+					}
+				}
+				log.Printf("Sending HTTP request: %v", httpRequest)
+				get, err := client.Do(httpRequest)
+				if err != nil {
+					log.Printf("Failed to %s to %s: %v", req.Method, req.URI, err)
+					continue
+				}
+				body, _ := ioutil.ReadAll(get.Body)
+				resp := &tunnel.ASEventWrapper{
+					Event: &tunnel.ASEventWrapper_HttpResponse{
+						HttpResponse: &tunnel.HttpResponse{
+							Id:      req.Id,
+							Target:  req.Target,
+							Status:  int32(get.StatusCode),
+							Body:    string(body),
+							Headers: makeHeaders(get.Header),
+						},
 					},
 				}
 				log.Printf("Sending %v", resp)
