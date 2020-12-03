@@ -1,9 +1,14 @@
 package main
 
 import (
+	"bytes"
 	"flag"
 	"io"
+	"io/ioutil"
 	"log"
+	"os"
+	"os/exec"
+	"strings"
 	"time"
 
 	"golang.org/x/net/context"
@@ -19,16 +24,35 @@ var (
 	identity = flag.String("identity", "", "The client ID to send to the server")
 )
 
+func runCommand(args []string, stdin string) (stdout string, stderr string, exitCode int32, err error) {
+	var outb, errb bytes.Buffer
+	cmd := exec.Command("kubectl", args...)
+	cmd.Stdout = &outb
+	cmd.Stderr = &errb
+	cmd.Stdin = strings.NewReader(stdin)
+	cmd.Env = append(os.Environ(), "REMOTE=true")
+	if err := cmd.Run(); err != nil {
+		if exiterr, ok := err.(*exec.ExitError); ok {
+			stdoutb, _ := ioutil.ReadAll(&outb)
+			stderrb, _ := ioutil.ReadAll(&errb)
+			return string(stdoutb), string(stderrb), int32(exiterr.ExitCode()), nil
+		}
+	}
+	stdoutb, _ := ioutil.ReadAll(&outb)
+	stderrb, _ := ioutil.ReadAll(&errb)
+	return string(stdoutb), string(stderrb), 0, nil
+}
+
 func runTunnel(client tunnel.TunnelServiceClient, ticker chan uint64, identity string) {
 	ctx := context.Background()
 	stream, err := client.EventTunnel(ctx)
 	if err != nil {
-		log.Fatalf("%v.SayHello(_) = _, %v", client, err)
+		log.Fatalf("%v.EventTunnel(_) = _, %v", client, err)
 	}
 
 	// Sign in
-	req := &tunnel.EventWrapper{
-		Event: &tunnel.EventWrapper_SigninRequest{
+	req := &tunnel.ASEventWrapper{
+		Event: &tunnel.ASEventWrapper_SigninRequest{
 			SigninRequest: &tunnel.SigninRequest{Identity: identity, StartTime: tunnel.Now()},
 		},
 	}
@@ -41,8 +65,8 @@ func runTunnel(client tunnel.TunnelServiceClient, ticker chan uint64, identity s
 	go func() {
 		for {
 			ts := <-ticker
-			req := &tunnel.EventWrapper{
-				Event: &tunnel.EventWrapper_PingRequest{
+			req := &tunnel.ASEventWrapper{
+				Event: &tunnel.ASEventWrapper_PingRequest{
 					PingRequest: &tunnel.PingRequest{Ts: ts},
 				},
 			}
@@ -66,17 +90,21 @@ func runTunnel(client tunnel.TunnelServiceClient, ticker chan uint64, identity s
 				log.Fatalf("Failed to receive a message: %T: %v", err, err)
 			}
 			switch x := in.Event.(type) {
-			case *tunnel.EventWrapper_PingResponse:
+			case *tunnel.SAEventWrapper_PingResponse:
 				req := in.GetPingResponse()
 				log.Printf("Received: PingResponse: %v", req)
-			case *tunnel.EventWrapper_SigninResponse:
+			case *tunnel.SAEventWrapper_SigninResponse:
 				req := in.GetSigninResponse()
 				log.Printf("Succesfully signed in: %v", req)
-			case *tunnel.EventWrapper_CommandRequest:
+			case *tunnel.SAEventWrapper_CommandRequest:
 				req := in.GetCommandRequest()
-				resp := &tunnel.EventWrapper{
-					Event: &tunnel.EventWrapper_CommandResponse{
-						CommandResponse: &tunnel.CommandResponse{Id: req.Id, Body: "From the client!"},
+				stdout, stderr, exitCode, err := runCommand(req.CmdlineArgs, req.Stdin)
+				if err != nil {
+					log.Printf("Command err: %v", err)
+				}
+				resp := &tunnel.ASEventWrapper{
+					Event: &tunnel.ASEventWrapper_CommandResponse{
+						CommandResponse: &tunnel.CommandResponse{Id: req.Id, Target: req.Target, Stdout: stdout, Stderr: stderr, ExitCode: exitCode},
 					},
 				}
 				log.Printf("Sending %v", resp)

@@ -3,7 +3,9 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"log"
+	"os"
 	"time"
 
 	"google.golang.org/grpc"
@@ -17,6 +19,8 @@ var (
 )
 
 func main() {
+	cmdOpts := os.Args[3:]
+
 	flag.Parse()
 	if *target == "" {
 		log.Fatal("Must specify an -target")
@@ -36,9 +40,13 @@ func main() {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	resp, err := client.SendToClient(ctx, &tunnel.Message{Target: *target, Body: "testing"})
+	resp, err := client.SendToClient(ctx, &tunnel.CommandRequest{Target: *target, CmdlineArgs: cmdOpts, Stdin: ""})
 	if err != nil {
 		log.Fatalf("Got error: %v", err)
 	}
-	log.Printf("Received: %v", resp)
+	//log.Printf("Received: %v", resp)
+
+	fmt.Fprint(os.Stderr, resp.Stderr)
+	fmt.Fprint(os.Stdout, resp.Stdout)
+	os.Exit(int(resp.ExitCode))
 }

@@ -24,31 +24,38 @@ message SigninResponse {
 
 message CommandRequest {
     string id = 1;
-    string body = 2;
+    string target = 2;
+    repeated string cmdlineArgs = 3;
+    string stdin = 4;
 }
 
 message CommandResponse {
     string id = 1;
-    string body = 2;
+    string target = 2;
+    string stdout = 3;
+    string stderr = 4;
+    int32 exitCode = 5;
 }
 
-message EventWrapper {
+// Messages sent from server to agent
+message SAEventWrapper {
     oneof event {
-        PingRequest pingRequest = 1;
         PingResponse pingResponse = 2;
-        SigninRequest signinRequest = 3;
         SigninResponse signinResponse = 4;
         CommandRequest commandRequest = 5;
+    }
+}
+
+// Messages sent from agent to server
+message ASEventWrapper {
+    oneof event {
+        PingRequest pingRequest = 1;
+        SigninRequest signinRequest = 3;
         CommandResponse commandResponse = 6;
     }
 }
 
-message Message {
-    string target = 2;
-    string body = 3;
-}
-
 service TunnelService {
-    rpc EventTunnel(stream EventWrapper) returns (stream EventWrapper) {}
-    rpc SendToClient(Message) returns (Message) {}
+    rpc EventTunnel(stream ASEventWrapper) returns (stream SAEventWrapper) {}
+    rpc SendToClient(CommandRequest) returns (CommandResponse) {}
 }
