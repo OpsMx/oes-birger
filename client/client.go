@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/tls"
 	"flag"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
@@ -14,6 +15,7 @@ import (
 	"time"
 
 	"golang.org/x/net/context"
+	"gopkg.in/yaml.v2"
 
 	"google.golang.org/grpc"
 
@@ -26,6 +28,49 @@ var (
 	tickTime = flag.Int("tickTime", 30, "Time between sending Ping messages")
 	identity = flag.String("identity", "", "The client ID to send to the server")
 )
+
+type kubeConfig struct {
+	APIVersion string
+	Clusters   []struct {
+		Name    string
+		Cluster struct {
+			InsecureSkipTLSVerify    bool   `yaml:"insecure-skip-tls-verify"`
+			CertificateAuthorityData string `yaml:"certificate-authority-data"`
+			Server                   string
+		}
+	}
+	Contexts []struct {
+		Name    string
+		Context struct {
+			Cluster string
+			User    string
+		}
+	}
+	Users []struct {
+		Name string
+		User struct {
+			ClientCertificateData string `yaml:"client-certificate-data"`
+			ClientKeyData         string `yaml:"client-key-data"`
+		}
+	}
+}
+
+func readKubeConfig() (*kubeConfig, error) {
+	filename := os.Getenv("HOME") + "/.kube/config"
+
+	buf, err := ioutil.ReadFile(filename)
+	if err != nil {
+		return nil, err
+	}
+
+	c := &kubeConfig{}
+	err = yaml.Unmarshal(buf, c)
+	if err != nil {
+		return nil, fmt.Errorf("in file %q: %v", filename, err)
+	}
+
+	return c, nil
+}
 
 func runCommand(args []string, stdin string) (stdout string, stderr string, exitCode int32, err error) {
 	var outb, errb bytes.Buffer
@@ -189,6 +234,12 @@ func main() {
 	if *identity == "" {
 		log.Fatal("Must specify an -identity")
 	}
+
+	kconfig, err := readKubeConfig()
+	if err != nil {
+		log.Fatalf("Unable to read kubeconfig: %v", err)
+	}
+	log.Printf("Kube config: %v", *kconfig)
 
 	var opts []grpc.DialOption
 	opts = append(opts, grpc.WithInsecure())
