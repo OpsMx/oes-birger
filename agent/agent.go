@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"crypto/tls"
-	"encoding/json"
 	"flag"
 	"io"
 	"io/ioutil"
@@ -15,7 +14,6 @@ import (
 	"time"
 
 	"golang.org/x/net/context"
-	"gopkg.in/yaml.v2"
 
 	"google.golang.org/grpc"
 
@@ -197,10 +195,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Unable to read kubeconfig: %v", err)
 	}
-	js, _ := json.MarshalIndent(kconfig, "", "    ")
-	log.Printf("Kube config: %s", string(js))
-	ym, _ := yaml.Marshal(kconfig)
-	log.Printf("Kube config in YAML: %s", ym)
+	log.Printf("Using Kubernetes context: %s", kconfig.CurrentContext)
 
 	var opts []grpc.DialOption
 	opts = append(opts, grpc.WithInsecure())

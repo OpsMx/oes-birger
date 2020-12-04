@@ -52,5 +52,9 @@ func ReadKubeConfig() (*KubeConfig, error) {
 		return nil, fmt.Errorf("in file %q: %v", filename, err)
 	}
 
+	if c.APIVersion != "v1" || c.Kind != "Config" {
+		return nil, fmt.Errorf("APIVersion %s, kind %s is not 'v1' and 'Config'", c.APIVersion, c.Kind)
+	}
+
 	return c, nil
 }
