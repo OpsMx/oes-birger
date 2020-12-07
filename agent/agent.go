@@ -1,16 +1,15 @@
 package main
 
 import (
-	"bytes"
 	"crypto/tls"
+	"crypto/x509"
+	b64 "encoding/base64"
+	"encoding/pem"
 	"flag"
 	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
-	"os"
-	"os/exec"
-	"strings"
 	"time"
 
 	"golang.org/x/net/context"
@@ -28,25 +27,6 @@ var (
 	identity = flag.String("identity", "", "The client ID to send to the server")
 )
 
-func runCommand(args []string, stdin string) (stdout string, stderr string, exitCode int32, err error) {
-	var outb, errb bytes.Buffer
-	cmd := exec.Command("kubectl", args...)
-	cmd.Stdout = &outb
-	cmd.Stderr = &errb
-	cmd.Stdin = strings.NewReader(stdin)
-	cmd.Env = append(os.Environ(), "REMOTE=true")
-	if err := cmd.Run(); err != nil {
-		if exiterr, ok := err.(*exec.ExitError); ok {
-			stdoutb, _ := ioutil.ReadAll(&outb)
-			stderrb, _ := ioutil.ReadAll(&errb)
-			return string(stdoutb), string(stderrb), int32(exiterr.ExitCode()), nil
-		}
-	}
-	stdoutb, _ := ioutil.ReadAll(&outb)
-	stderrb, _ := ioutil.ReadAll(&errb)
-	return string(stdoutb), string(stderrb), 0, nil
-}
-
 func makeHeaders(headers map[string][]string) []*tunnel.HttpHeader {
 	ret := make([]*tunnel.HttpHeader, 0)
 	for name, values := range headers {
@@ -54,8 +34,7 @@ func makeHeaders(headers map[string][]string) []*tunnel.HttpHeader {
 	}
 	return ret
 }
-
-func runTunnel(client tunnel.TunnelServiceClient, ticker chan uint64, identity string) {
+func runTunnel(config *serverConfig, client tunnel.TunnelServiceClient, ticker chan uint64, identity string) {
 	ctx := context.Background()
 	stream, err := client.EventTunnel(ctx)
 	if err != nil {
@@ -108,43 +87,41 @@ func runTunnel(client tunnel.TunnelServiceClient, ticker chan uint64, identity s
 			case *tunnel.SAEventWrapper_SigninResponse:
 				req := in.GetSigninResponse()
 				log.Printf("Succesfully signed in: %v", req)
-			case *tunnel.SAEventWrapper_CommandRequest:
-				req := in.GetCommandRequest()
-				stdout, stderr, exitCode, err := runCommand(req.CmdlineArgs, req.Stdin)
-				if err != nil {
-					log.Printf("Command err: %v", err)
-					continue
-				}
-				resp := &tunnel.ASEventWrapper{
-					Event: &tunnel.ASEventWrapper_CommandResponse{
-						CommandResponse: &tunnel.CommandResponse{Id: req.Id, Target: req.Target, Stdout: stdout, Stderr: stderr, ExitCode: exitCode},
-					},
-				}
-				log.Printf("Sending %v", resp)
-				if err = stream.Send(resp); err != nil {
-					log.Fatalf("Unable to send: %v", err)
-				}
 			case *tunnel.SAEventWrapper_HttpRequest:
 				req := in.GetHttpRequest()
-				log.Printf("Got request: %v", req)
+				log.Printf("Processing HTTP request with id %s", req.Id)
+
+				c := config.contexts[config.defaultContext]
+
+				caCertPool := x509.NewCertPool()
+				caCertPool.AddCert(c.serverCA)
+
+				tlsConfig := &tls.Config{
+					Certificates: []tls.Certificate{*c.clientCert},
+					RootCAs:      caCertPool,
+				}
+				tlsConfig.BuildNameToCertificate()
 				tr := &http.Transport{
 					MaxIdleConns:       10,
 					IdleConnTimeout:    30 * time.Second,
 					DisableCompression: true,
-					TLSClientConfig:    &tls.Config{InsecureSkipVerify: true},
+					TLSClientConfig:    tlsConfig,
 				}
-				client := &http.Client{Transport: tr}
-				httpRequest, _ := http.NewRequest(req.Method, "https://"+*rpcHost+req.URI, nil)
-				httpRequest.Proto = req.Protocol
+				client := &http.Client{
+					Transport: tr,
+				}
+
+				httpRequest, _ := http.NewRequest(req.Method, c.serverURL+req.URI, nil)
 				for _, header := range req.Headers {
 					for _, value := range header.Values {
 						httpRequest.Header.Add(header.Name, value)
 					}
 				}
-				log.Printf("Sending HTTP request: %v", httpRequest)
+				//log.Printf("Sending HTTP request: %v", httpRequest)
 				get, err := client.Do(httpRequest)
 				if err != nil {
-					log.Printf("Failed to %s to %s: %v", req.Method, req.URI, err)
+					log.Printf("Failed to %s to %s: %v", req.Method, c.serverURL+req.URI, err)
+					// TODO: respond with an error so the other side doesn't have to time out
 					continue
 				}
 				body, _ := ioutil.ReadAll(get.Body)
@@ -154,19 +131,20 @@ func runTunnel(client tunnel.TunnelServiceClient, ticker chan uint64, identity s
 							Id:      req.Id,
 							Target:  req.Target,
 							Status:  int32(get.StatusCode),
-							Body:    string(body),
+							Body:    body,
 							Headers: makeHeaders(get.Header),
 						},
 					},
 				}
-				log.Printf("Sending %v", resp)
+				log.Printf("Responding to HTTP request with id %s", req.Id)
 				if err = stream.Send(resp); err != nil {
-					log.Fatalf("Unable to send: %v", err)
+					log.Printf("Unable to respond over GRPC for request ID: %s: %v", req.Id, err)
+					continue
 				}
 			case nil:
 				// ignore for now
 			default:
-				log.Printf("Received unknown message: %T: %v", x, in)
+				log.Printf("Received unknown message: %T", x)
 			}
 		}
 	}()
@@ -185,6 +163,80 @@ func runTicker(tickTime int, ticker chan uint64) {
 
 }
 
+type serverContext struct {
+	username   string
+	serverURL  string
+	serverCA   *x509.Certificate
+	clientCert *tls.Certificate
+	insecure   bool
+}
+
+type serverConfig struct {
+	defaultContext string
+	contexts       map[string]*serverContext
+}
+
+func makeServerConfig(kconfig *kubeconfig.KubeConfig) *serverConfig {
+
+	contexts := make(map[string]*serverContext)
+
+	names := kconfig.GetContextNames()
+	for _, name := range names {
+		user, cluster, err := kconfig.FindContext(name)
+		if err != nil {
+			log.Fatalf("Unable to retrieve cluster and user info for context %s: %v", name)
+		}
+
+		certData, err := b64.StdEncoding.DecodeString(user.User.ClientCertificateData)
+		if err != nil {
+			log.Fatalf("Error decoding user cert from base64 (%s): %v", user.Name, err)
+		}
+		keyData, err := b64.StdEncoding.DecodeString(user.User.ClientKeyData)
+		if err != nil {
+			log.Fatalf("Error decoding user key from base64 (%s): %v", user.Name, err)
+		}
+
+		clientKeypair, err := tls.X509KeyPair(certData, keyData)
+		if err != nil {
+			log.Fatalf("Error loading client cert/key: %v", err)
+		}
+
+		sa := &serverContext{
+			username:   user.Name,
+			clientCert: &clientKeypair,
+			serverURL:  cluster.Cluster.Server,
+			insecure:   cluster.Cluster.InsecureSkipTLSVerify,
+		}
+
+		if len(cluster.Cluster.CertificateAuthorityData) > 0 {
+			serverCA, err := b64.StdEncoding.DecodeString(cluster.Cluster.CertificateAuthorityData)
+			if err != nil {
+				log.Fatalf("Error decoding server CA cert from base64 (%s): %v", cluster.Name, err)
+			}
+			pemBlock, _ := pem.Decode(serverCA)
+			serverCert, err := x509.ParseCertificate(pemBlock.Bytes)
+			if err != nil {
+				log.Fatalf("Error parsing server certificate: %v", err)
+			}
+			// This may be needed if the certificate isn't a proper CA, but it seems to work in my testing
+			// without it.
+			//serverCert.BasicConstraintsValid = true
+			//serverCert.IsCA = true
+			//serverCert.KeyUsage = x509.KeyUsageCertSign
+
+			sa.serverCA = serverCert
+		}
+
+		contexts[name] = sa
+	}
+
+	config := &serverConfig{
+		defaultContext: kconfig.CurrentContext,
+		contexts:       contexts,
+	}
+	return config
+}
+
 func main() {
 	flag.Parse()
 	if *identity == "" {
@@ -195,7 +247,8 @@ func main() {
 	if err != nil {
 		log.Fatalf("Unable to read kubeconfig: %v", err)
 	}
-	log.Printf("Using Kubernetes context: %s", kconfig.CurrentContext)
+	config := makeServerConfig(kconfig)
+	log.Printf("Kubernetes context: %s", config.defaultContext)
 
 	var opts []grpc.DialOption
 	opts = append(opts, grpc.WithInsecure())
@@ -213,6 +266,6 @@ func main() {
 	runTicker(*tickTime, ticker)
 
 	log.Printf("Starting tunnel.")
-	runTunnel(client, ticker, *identity)
+	runTunnel(config, client, ticker, *identity)
 	log.Printf("Done.")
 }

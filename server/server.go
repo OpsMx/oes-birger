@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"flag"
 	"fmt"
 	"io"
@@ -27,11 +26,6 @@ var (
 	}{m: make(map[string]*clientState)}
 )
 
-type commandMessage struct {
-	out chan *tunnel.CommandResponse
-	cmd *tunnel.CommandRequest
-}
-
 type httpMessage struct {
 	out chan *tunnel.HttpResponse
 	cmd *tunnel.HttpRequest
@@ -39,13 +33,12 @@ type httpMessage struct {
 
 type clientState struct {
 	identity      string
-	inRequest     chan *commandMessage
 	inHTTPRequest chan *httpMessage
 }
 
-func addClient(identity string, inRequest chan *commandMessage, inHTTPRequest chan *httpMessage) {
+func addClient(identity string, inHTTPRequest chan *httpMessage) {
 	clients.Lock()
-	clients.m[identity] = &clientState{identity: identity, inRequest: inRequest, inHTTPRequest: inHTTPRequest}
+	clients.m[identity] = &clientState{identity: identity, inHTTPRequest: inHTTPRequest}
 	clients.Unlock()
 }
 
@@ -56,34 +49,18 @@ func removeClient(identity string) {
 	clients.Unlock()
 
 	if client != nil {
-		close(client.inRequest)
 		close(client.inHTTPRequest)
 	}
 }
 
-func (s *tunnelServer) SendToClient(ctx context.Context, req *tunnel.CommandRequest) (*tunnel.CommandResponse, error) {
-	clients.RLock()
-	commandMessage := &commandMessage{out: make(chan *tunnel.CommandResponse), cmd: req}
-	client := clients.m[req.Target]
-	if client == nil {
-		clients.RUnlock()
-		return nil, fmt.Errorf("Unknown target: %s", req.Target)
-	}
-	client.inRequest <- commandMessage
-	clients.RUnlock()
-	resp := <-commandMessage.out
-	return resp, nil
-}
-
 func forwardHTTP(req *tunnel.HttpRequest) (*tunnel.HttpResponse, error) {
-	log.Printf("Forwarding HTTP request to 'skan1', content: %v", req)
 	clients.RLock()
-	message := &httpMessage{out: make(chan *tunnel.HttpResponse), cmd: req}
 	client := clients.m[req.Target]
 	if client == nil {
 		clients.RUnlock()
 		return nil, fmt.Errorf("Unknown target: %s", req.Target)
 	}
+	message := &httpMessage{out: make(chan *tunnel.HttpResponse), cmd: req}
 	client.inHTTPRequest <- message
 	clients.RUnlock()
 	resp := <-message.out
@@ -120,35 +97,9 @@ func makeSigninResponse(req *tunnel.SigninRequest, success bool) *tunnel.SAEvent
 func (s *tunnelServer) EventTunnel(stream tunnel.TunnelService_EventTunnelServer) error {
 	var clientIdentity string
 
-	inRequest := make(chan *commandMessage)
 	inHTTPRequest := make(chan *httpMessage)
 
-	ids := make(map[string]chan *tunnel.CommandResponse)
 	httpids := make(map[string]chan *tunnel.HttpResponse)
-
-	go func() {
-		ulidContext := ulid.NewContext()
-
-		for {
-			request, more := <-inRequest
-			if more {
-				log.Printf("Got command request: %v", request)
-				requestID := ulid.Ulid(ulidContext)
-				request.cmd.Id = requestID
-				ids[requestID] = request.out
-				resp := &tunnel.SAEventWrapper{
-					Event: &tunnel.SAEventWrapper_CommandRequest{
-						CommandRequest: request.cmd,
-					},
-				}
-				if err := stream.Send(resp); err != nil {
-					return
-				}
-			} else {
-				return
-			}
-		}
-	}()
 
 	go func() {
 		ulidContext := ulid.NewContext()
@@ -156,7 +107,6 @@ func (s *tunnelServer) EventTunnel(stream tunnel.TunnelService_EventTunnelServer
 		for {
 			request, more := <-inHTTPRequest
 			if more {
-				log.Printf("Got command request: %v", request)
 				requestID := ulid.Ulid(ulidContext)
 				request.cmd.Id = requestID
 				httpids[requestID] = request.out
@@ -165,10 +115,13 @@ func (s *tunnelServer) EventTunnel(stream tunnel.TunnelService_EventTunnelServer
 						HttpRequest: request.cmd,
 					},
 				}
+				log.Printf("Sending HTTP request to %s id %s", clientIdentity, requestID)
 				if err := stream.Send(resp); err != nil {
+					log.Printf("Unable to send to client %s for HTTP request %s", clientIdentity, requestID)
 					return
 				}
 			} else {
+				log.Printf("Request channel closed for %s", clientIdentity)
 				return
 			}
 		}
@@ -182,35 +135,30 @@ func (s *tunnelServer) EventTunnel(stream tunnel.TunnelService_EventTunnelServer
 			return nil
 		}
 		if err != nil {
-			removeClient(clientIdentity)
 			log.Printf("Client closed connection: %s", clientIdentity)
+			removeClient(clientIdentity)
 			return err
 		}
 
-		log.Printf("Received: %s: %v", clientIdentity, in)
 		switch x := in.Event.(type) {
 		case *tunnel.ASEventWrapper_PingRequest:
 			req := in.GetPingRequest()
+			log.Printf("Received: %s: %v", clientIdentity, in)
 			if err := stream.Send(makePingResponse(req)); err != nil {
+				log.Printf("Unable to respond to %s with ping response: %v", clientIdentity, err)
 				removeClient(clientIdentity)
 				return err
 			}
 		case *tunnel.ASEventWrapper_SigninRequest:
 			req := in.GetSigninRequest()
 			if err := stream.Send(makeSigninResponse(req, true)); err != nil {
+				log.Printf("Unable to respond to %s with signin response: %v", clientIdentity, err)
 				removeClient(clientIdentity)
 				return err
 			}
 			clientIdentity = req.Identity
-			addClient(clientIdentity, inRequest, inHTTPRequest)
-		case *tunnel.ASEventWrapper_CommandResponse:
-			resp := in.GetCommandResponse()
-			dest := ids[resp.Id]
-			if dest != nil {
-				dest <- resp
-				close(dest)
-				delete(ids, resp.Id)
-			}
+			addClient(clientIdentity, inHTTPRequest)
+			log.Printf("Client %s signed in", clientIdentity)
 		case *tunnel.ASEventWrapper_HttpResponse:
 			resp := in.GetHttpResponse()
 			dest := httpids[resp.Id]
@@ -218,11 +166,14 @@ func (s *tunnelServer) EventTunnel(stream tunnel.TunnelService_EventTunnelServer
 				dest <- resp
 				close(dest)
 				delete(httpids, resp.Id)
+				log.Printf("closed HTTP request id %s from %s", resp.Id, clientIdentity)
+			} else {
+				log.Printf("Got response to unknown HTTP request id %s from %s", resp.Id, clientIdentity)
 			}
 		case nil:
 			// ignore for now
 		default:
-			log.Printf("Received unknown message: %s: %T: %v", clientIdentity, x, in)
+			log.Printf("Received unknown message: %s: %T", clientIdentity, x)
 		}
 	}
 }
@@ -236,32 +187,23 @@ func makeHeaders(headers map[string][]string) []*tunnel.HttpHeader {
 }
 
 func handler(w http.ResponseWriter, r *http.Request) {
-	log.Println()
-
-	log.Printf("Method: %s, URI: %v", r.Method, r.RequestURI)
-	log.Printf("Protocol: %s", r.Proto)
-	for key, element := range r.Header {
-		log.Printf("Header: %s -> %v", key, element)
-	}
-
+	log.Printf("Got HTTP request for server name %s", r.TLS.ServerName)
 	body, _ := ioutil.ReadAll(r.Body)
 	req := &tunnel.HttpRequest{
-		Target:   "skan1",
-		Protocol: r.Proto,
-		Method:   r.Method,
-		URI:      r.RequestURI,
-		Headers:  makeHeaders(r.Header),
-		Body:     string(body),
+		Target:  "skan1", // TODO: find a way to know where this should be sent...
+		Method:  r.Method,
+		URI:     r.RequestURI,
+		Headers: makeHeaders(r.Header),
+		Body:    body,
 	}
 
 	resp, err := forwardHTTP(req)
 	if err != nil {
+		log.Printf("Got an error from forwardHTTP, returning HTTP status 500")
 		w.WriteHeader(500)
 		w.Write([]byte{})
 		return
 	}
-
-	log.Printf("HTTP repsonse: %v", resp)
 
 	for name := range w.Header() {
 		r.Header.Del(name)
@@ -273,7 +215,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	w.WriteHeader(int(resp.Status))
-	fmt.Fprintf(w, resp.Body)
+	w.Write(resp.Body)
 }
 
 func main() {

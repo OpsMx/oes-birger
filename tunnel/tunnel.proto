@@ -22,21 +22,6 @@ message SigninResponse {
     bool success = 2;
 }
 
-message CommandRequest {
-    string id = 1;
-    string target = 2;
-    repeated string cmdlineArgs = 3;
-    string stdin = 4;
-}
-
-message CommandResponse {
-    string id = 1;
-    string target = 2;
-    string stdout = 3;
-    string stderr = 4;
-    int32 exitCode = 5;
-}
-
 message HttpHeader {
     string name = 1;
     repeated string values = 2;
@@ -45,11 +30,10 @@ message HttpHeader {
 message HttpRequest {
     string id = 1;
     string target = 2;
-    string protocol = 3;
     string method = 4;
     string URI = 5;
     repeated HttpHeader headers = 6;
-    string body = 7;
+    bytes body = 7;
 }
 
 message HttpResponse {
@@ -57,7 +41,7 @@ message HttpResponse {
     string target = 2;
     int32 status = 3;
     repeated HttpHeader headers = 4;
-    string body = 5;
+    bytes body = 5;
 }
 
 // Messages sent from server to agent
@@ -65,7 +49,6 @@ message SAEventWrapper {
     oneof event {
         PingResponse pingResponse = 2;
         SigninResponse signinResponse = 4;
-        CommandRequest commandRequest = 5;
         HttpRequest httpRequest = 7;
     }
 }
@@ -75,12 +58,10 @@ message ASEventWrapper {
     oneof event {
         PingRequest pingRequest = 1;
         SigninRequest signinRequest = 3;
-        CommandResponse commandResponse = 6;
         HttpResponse httpResponse = 7;
     }
 }
 
 service TunnelService {
     rpc EventTunnel(stream ASEventWrapper) returns (stream SAEventWrapper) {}
-    rpc SendToClient(CommandRequest) returns (CommandResponse) {}
 }
