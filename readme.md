@@ -18,8 +18,8 @@ As a warning, this is my first attempt at any Go code...
 Start the server:
 `go run server/server.go`
 
-Start a client:
-`go run client/client.go -identity skan1`
+Start a agent:
+`go run agent/agent.go -identity skan1`
 
 Send a request:
 `go run sender/sender.go -identity skan1`
