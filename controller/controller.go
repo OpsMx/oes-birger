@@ -89,8 +89,8 @@ func removeClient(identity string) {
 
 func forwardHTTP(req *tunnel.HttpRequest) (*tunnel.HttpResponse, error) {
 	clients.RLock()
-	client := clients.m[req.Target]
-	if client == nil {
+	client, ok := clients.m[req.Target]
+	if !ok {
 		clients.RUnlock()
 		return nil, fmt.Errorf("Unknown target: %s", req.Target)
 	}
@@ -144,7 +144,7 @@ func (s *tunnelServer) EventTunnel(stream tunnel.TunnelService_EventTunnelServer
 	}
 	log.Printf("Registered agent: %s", clientIdentity)
 
-	inHTTPRequest := make(chan *httpMessage)
+	inHTTPRequest := make(chan *httpMessage, 1)
 	httpids := struct {
 		sync.RWMutex
 		m map[string]chan *tunnel.HttpResponse
