@@ -186,7 +186,7 @@ func makeServerConfig(kconfig *kubeconfig.KubeConfig) *serverConfig {
 	for _, name := range names {
 		user, cluster, err := kconfig.FindContext(name)
 		if err != nil {
-			log.Fatalf("Unable to retrieve cluster and user info for context %s: %v", name)
+			log.Fatalf("Unable to retrieve cluster and user info for context %s: %v", name, err)
 		}
 
 		certData, err := b64.StdEncoding.DecodeString(user.User.ClientCertificateData)
