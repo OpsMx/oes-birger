@@ -25,7 +25,7 @@ FROM buildmod AS build-controller
 COPY . .
 ARG TARGETOS
 ARG TARGETARCH
-RUN GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o /build/controller server/server.go
+RUN GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o /build/controller controller/controller.go
 
 #
 # Build the agent image.  This should be a --target on docker build.
