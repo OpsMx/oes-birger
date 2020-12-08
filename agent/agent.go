@@ -82,7 +82,10 @@ func runTunnel(config *serverConfig, client tunnel.TunnelServiceClient, ticker c
 				c := config.contexts[config.defaultContext]
 
 				// TODO: A ServerCA is technically optional, but we might want to fail if it's not present...
-				tlsConfig := &tls.Config{}
+				tlsConfig := &tls.Config{
+					MinVersion:         tls.VersionTLS12,
+					InsecureSkipVerify: c.insecure,
+				}
 				if c.clientCert != nil {
 					caCertPool := x509.NewCertPool()
 					caCertPool.AddCert(c.serverCA)
@@ -90,7 +93,6 @@ func runTunnel(config *serverConfig, client tunnel.TunnelServiceClient, ticker c
 					tlsConfig.RootCAs = caCertPool
 					tlsConfig.BuildNameToCertificate()
 				}
-				tlsConfig.InsecureSkipVerify = c.insecure
 				tr := &http.Transport{
 					MaxIdleConns:       10,
 					IdleConnTimeout:    30 * time.Second,

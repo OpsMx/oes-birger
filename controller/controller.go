@@ -287,6 +287,7 @@ func main() {
 	tlsConfig := &tls.Config{
 		ClientCAs:  caCertPool,
 		ClientAuth: tls.RequireAndVerifyClientCert,
+		MinVersion: tls.VersionTLS12,
 	}
 	tlsConfig.BuildNameToCertificate()
 
@@ -323,6 +324,7 @@ func main() {
 		ClientAuth:   tls.RequireAndVerifyClientCert,
 		Certificates: []tls.Certificate{certificate},
 		ClientCAs:    certPool,
+		MinVersion:   tls.VersionTLS12,
 	})
 	grpcServer := grpc.NewServer(grpc.Creds(creds))
 	tunnel.RegisterTunnelServiceServer(grpcServer, newServer())
