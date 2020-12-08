@@ -11,6 +11,7 @@ import (
 	"sync"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 
 	"github.com/rocketlaunchr/https-go"
 	"github.com/skandragon/grpc-bidir/tunnel"
@@ -18,9 +19,12 @@ import (
 )
 
 var (
-	port     = flag.Int("port", tunnel.DefaultPort, "The GRPC port to listen on")
-	httpPort = flag.Int("httpPort", 9002, "The HTTP port to listen for API requests on")
-	clients  = struct {
+	port           = flag.Int("port", tunnel.DefaultPort, "The GRPC port to listen on")
+	httpPort       = flag.Int("httpPort", 9002, "The HTTP port to listen for API requests on")
+	serverCertFile = flag.String("certFile", "/app/cert.pem", "The file containing the certificate for the server")
+	serverKeyFile  = flag.String("keyFile", "/app/key.pem", "The file containing the certificate for the server")
+	caCertFile     = flag.String("caCertFile", "/app/ca.pem", "The file containing the CA certificate we will use to verify the client's cert")
+	clients        = struct {
 		sync.RWMutex
 		m map[string]*clientState
 	}{m: make(map[string]*clientState)}
@@ -225,8 +229,7 @@ func main() {
 	http.HandleFunc("/", handler)
 	// Configure the port
 	httpServer, _ := https.Server("9002", https.GenerateOptions{Host: "kubernetes.docker.internal"})
-
-	go httpServer.ListenAndServeTLS("", "")
+	go httpServer.ListenAndServeTLS(*serverCertFile, *serverKeyFile)
 
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", *port))
 	if err != nil {
@@ -235,7 +238,11 @@ func main() {
 
 	log.Printf("Starting GRPC server on port %d...", *port)
 
-	grpcServer := grpc.NewServer()
+	creds, err := credentials.NewServerTLSFromFile(*serverCertFile, *serverKeyFile)
+	if err != nil {
+		log.Fatalf("Failed to setup TLS: %v", err)
+	}
+	grpcServer := grpc.NewServer(grpc.Creds(creds))
 
 	tunnel.RegisterTunnelServiceServer(grpcServer, newServer())
 	if err := grpcServer.Serve(lis); err != nil {

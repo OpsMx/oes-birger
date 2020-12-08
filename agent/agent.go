@@ -15,16 +15,19 @@ import (
 	"golang.org/x/net/context"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 
 	"github.com/skandragon/grpc-bidir/kubeconfig"
 	"github.com/skandragon/grpc-bidir/tunnel"
 )
 
 var (
-	host     = flag.String("host", tunnel.DefaultHostAndPort, "Server and port to connect to")
-	rpcHost  = flag.String("rpcHost", "kubernetes.docker.internal:6443", "Host and port to connect to Kubernetes API")
-	tickTime = flag.Int("tickTime", 30, "Time between sending Ping messages")
-	identity = flag.String("identity", "", "The client ID to send to the server")
+	host          = flag.String("host", tunnel.DefaultHostAndPort, "Server and port to connect to")
+	rpcHost       = flag.String("rpcHost", "kubernetes.docker.internal:6443", "Host and port to connect to Kubernetes API")
+	tickTime      = flag.Int("tickTime", 30, "Time between sending Ping messages")
+	agentCertFile = flag.String("certFile", "/app/cert.pem", "The file containing the certificate used to connect to the controller")
+	agentKeyFile  = flag.String("keyFile", "/app/key.pem", "The file containing the certificate used to connect to the controller")
+	caCertFile    = flag.String("caCertFile", "/app/ca.pem", "The file containing the CA certificate we will use to verify the controller's cert")
 )
 
 func makeHeaders(headers map[string][]string) []*tunnel.HttpHeader {
@@ -241,8 +244,20 @@ func makeServerConfig(kconfig *kubeconfig.KubeConfig) *serverConfig {
 
 func main() {
 	flag.Parse()
-	if *identity == "" {
-		log.Fatal("Must specify an -identity")
+
+	creds, err := credentials.NewClientTLSFromFile(*caCertFile, "")
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	agentCertPEM, err := ioutil.ReadFile(*agentCertFile)
+	if err != nil {
+		log.Fatalf("Unable to read agent certificate file: %v", err)
+	}
+
+	agentKeyPEM, err := ioutil.ReadFile(*agentKeyFile)
+	if err != nil {
+		log.Fatalf("Unable to read agent key file: %v", err)
 	}
 
 	kconfig, err := kubeconfig.ReadKubeConfig()
@@ -252,9 +267,10 @@ func main() {
 	config := makeServerConfig(kconfig)
 	log.Printf("Kubernetes context: %s", config.defaultContext)
 
-	var opts []grpc.DialOption
-	opts = append(opts, grpc.WithInsecure())
-	opts = append(opts, grpc.WithBlock())
+	opts := []grpc.DialOption{
+		grpc.WithTransportCredentials(creds),
+		grpc.WithBlock(),
+	}
 
 	conn, err := grpc.Dial(*host, opts...)
 	if err != nil {
