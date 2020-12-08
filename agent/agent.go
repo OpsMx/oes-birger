@@ -209,12 +209,6 @@ func makeServerConfig(kconfig *kubeconfig.KubeConfig) *serverConfig {
 			if err != nil {
 				log.Fatalf("Error parsing server certificate: %v", err)
 			}
-			// This may be needed if the certificate isn't a proper CA, but it seems to work in my testing
-			// without it.
-			//serverCert.BasicConstraintsValid = true
-			//serverCert.IsCA = true
-			//serverCert.KeyUsage = x509.KeyUsageCertSign
-
 			sa.serverCA = serverCert
 		}
 
