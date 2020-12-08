@@ -268,8 +268,11 @@ func handler(w http.ResponseWriter, r *http.Request) {
 			w.Header().Add(header.Name, value)
 		}
 	}
+	w.Header().Set("Content-Length", fmt.Sprintf("%d", resp.ContentLength))
 	w.WriteHeader(int(resp.Status))
 	w.Write(resp.Body)
+
+	log.Printf("Got %d bytes, content-length reported as %d", len(resp.Body), resp.ContentLength)
 }
 
 func main() {

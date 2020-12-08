@@ -120,11 +120,12 @@ func runTunnel(config *serverConfig, client tunnel.TunnelServiceClient, ticker c
 				resp := &tunnel.ASEventWrapper{
 					Event: &tunnel.ASEventWrapper_HttpResponse{
 						HttpResponse: &tunnel.HttpResponse{
-							Id:      req.Id,
-							Target:  req.Target,
-							Status:  int32(get.StatusCode),
-							Body:    body,
-							Headers: makeHeaders(get.Header),
+							Id:            req.Id,
+							Target:        req.Target,
+							Status:        int32(get.StatusCode),
+							Body:          body,
+							ContentLength: get.ContentLength,
+							Headers:       makeHeaders(get.Header),
 						},
 					},
 				}
