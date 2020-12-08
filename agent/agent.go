@@ -76,9 +76,6 @@ func runTunnel(config *serverConfig, client tunnel.TunnelServiceClient, ticker c
 			case *tunnel.SAEventWrapper_PingResponse:
 				req := in.GetPingResponse()
 				log.Printf("Received: PingResponse: %v", req)
-			case *tunnel.SAEventWrapper_SigninResponse:
-				req := in.GetSigninResponse()
-				log.Printf("Succesfully signed in: %v", req)
 			case *tunnel.SAEventWrapper_HttpRequest:
 				req := in.GetHttpRequest()
 				log.Printf("Processing HTTP request with id %s", req.Id)

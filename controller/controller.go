@@ -18,6 +18,7 @@ import (
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/peer"
 	"google.golang.org/grpc/status"
+	"gopkg.in/yaml.v2"
 
 	"github.com/skandragon/grpc-bidir/tunnel"
 	"github.com/skandragon/grpc-bidir/ulid"
@@ -29,11 +30,35 @@ var (
 	serverCertFile = flag.String("certFile", "/app/cert.pem", "The file containing the certificate for the server")
 	serverKeyFile  = flag.String("keyFile", "/app/key.pem", "The file containing the certificate for the server")
 	caCertFile     = flag.String("caCertFile", "/app/ca.pem", "The file containing the CA certificate we will use to verify the client's cert")
+	configFile     = flag.String("configFile", "/app/config.yaml", "The file with the controller config")
 	clients        = struct {
 		sync.RWMutex
 		m map[string]*clientState
 	}{m: make(map[string]*clientState)}
+	config *controllerConfig
 )
+
+type controllerConfig struct {
+	Clients map[string]*clientConfig `yaml:"clients"`
+}
+
+type clientConfig struct {
+	Identity string `yaml:"identity"`
+}
+
+func loadConfig() *controllerConfig {
+	buf, err := ioutil.ReadFile(*configFile)
+	if err != nil {
+		log.Fatalf("Unable to load config file: %v", err)
+	}
+
+	config := &controllerConfig{}
+	err = yaml.Unmarshal(buf, config)
+	if err != nil {
+		log.Fatalf("Unable to read config file: %v", err)
+	}
+	return config
+}
 
 type httpMessage struct {
 	out chan *tunnel.HttpResponse
@@ -89,15 +114,6 @@ func makePingResponse(req *tunnel.PingRequest) *tunnel.SAEventWrapper {
 	resp := &tunnel.SAEventWrapper{
 		Event: &tunnel.SAEventWrapper_PingResponse{
 			PingResponse: &tunnel.PingResponse{Ts: tunnel.Now(), EchoedTs: req.Ts},
-		},
-	}
-	return resp
-}
-
-func makeSigninResponse(req *tunnel.SigninRequest, success bool) *tunnel.SAEventWrapper {
-	resp := &tunnel.SAEventWrapper{
-		Event: &tunnel.SAEventWrapper_SigninResponse{
-			SigninResponse: &tunnel.SigninResponse{Success: success},
 		},
 	}
 	return resp
@@ -205,10 +221,15 @@ func makeHeaders(headers map[string][]string) []*tunnel.HttpHeader {
 }
 
 func handler(w http.ResponseWriter, r *http.Request) {
-	log.Printf("Got HTTP request for server name %s", r.TLS.ServerName)
+	hostname := r.TLS.ServerName
+	log.Printf("Got HTTP request for server name %s", hostname)
+	target, ok := config.Clients[hostname]
+	if !ok {
+		log.Printf("No mapping for server name %s", hostname)
+	}
 	body, _ := ioutil.ReadAll(r.Body)
 	req := &tunnel.HttpRequest{
-		Target:  "skan1", // TODO: find a way to know where this should be sent...
+		Target:  target.Identity,
 		Method:  r.Method,
 		URI:     r.RequestURI,
 		Headers: makeHeaders(r.Header),
@@ -238,6 +259,8 @@ func handler(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 	flag.Parse()
+
+	config = loadConfig()
 
 	//
 	// Set up HTTP server
