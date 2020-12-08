@@ -26,7 +26,7 @@ import (
 
 var (
 	port           = flag.Int("port", tunnel.DefaultPort, "The GRPC port to listen on")
-	httpPort       = flag.Int("httpPort", 9002, "The HTTP port to listen for API requests on")
+	httpPort       = flag.Int("httpPort", 9002, "The HTTP port to listen for Kubernetes API requests on")
 	serverCertFile = flag.String("certFile", "/app/cert.pem", "The file containing the certificate for the server")
 	serverKeyFile  = flag.String("keyFile", "/app/key.pem", "The file containing the certificate for the server")
 	caCertFile     = flag.String("caCertFile", "/app/ca.pem", "The file containing the CA certificate we will use to verify the client's cert")
@@ -97,7 +97,10 @@ func forwardHTTP(req *tunnel.HttpRequest) (*tunnel.HttpResponse, error) {
 	message := &httpMessage{out: make(chan *tunnel.HttpResponse), cmd: req}
 	client.inHTTPRequest <- message
 	clients.RUnlock()
-	resp := <-message.out
+	resp, more := <-message.out
+	if !more {
+		return nil, fmt.Errorf("Request timed out sending to agent %s", req.Target)
+	}
 	return resp, nil
 }
 
@@ -142,7 +145,11 @@ func (s *tunnelServer) EventTunnel(stream tunnel.TunnelService_EventTunnelServer
 	log.Printf("Registered agent: %s", clientIdentity)
 
 	inHTTPRequest := make(chan *httpMessage)
-	httpids := make(map[string]chan *tunnel.HttpResponse)
+	httpids := struct {
+		sync.RWMutex
+		m map[string]chan *tunnel.HttpResponse
+	}{m: make(map[string]chan *tunnel.HttpResponse)}
+
 	addClient(clientIdentity, inHTTPRequest)
 
 	go func() {
@@ -153,7 +160,9 @@ func (s *tunnelServer) EventTunnel(stream tunnel.TunnelService_EventTunnelServer
 			if more {
 				requestID := ulid.Ulid(ulidContext)
 				request.cmd.Id = requestID
-				httpids[requestID] = request.out
+				httpids.Lock()
+				httpids.m[requestID] = request.out
+				httpids.Unlock()
 				resp := &tunnel.SAEventWrapper{
 					Event: &tunnel.SAEventWrapper_HttpRequest{
 						HttpRequest: request.cmd,
@@ -195,15 +204,17 @@ func (s *tunnelServer) EventTunnel(stream tunnel.TunnelService_EventTunnelServer
 			}
 		case *tunnel.ASEventWrapper_HttpResponse:
 			resp := in.GetHttpResponse()
-			dest := httpids[resp.Id]
+			httpids.Lock()
+			dest := httpids.m[resp.Id]
 			if dest != nil {
 				dest <- resp
 				close(dest)
-				delete(httpids, resp.Id)
+				delete(httpids.m, resp.Id)
 				log.Printf("closed HTTP request id %s from %s", resp.Id, clientIdentity)
 			} else {
 				log.Printf("Got response to unknown HTTP request id %s from %s", resp.Id, clientIdentity)
 			}
+			httpids.Unlock()
 		case nil:
 			// ignore for now
 		default:
@@ -222,7 +233,9 @@ func makeHeaders(headers map[string][]string) []*tunnel.HttpHeader {
 
 func handler(w http.ResponseWriter, r *http.Request) {
 	hostname := r.TLS.ServerName
+	clientname := r.TLS.PeerCertificates[0].Subject.CommonName
 	log.Printf("Got HTTP request for server name %s", hostname)
+	log.Printf("Client: %v", clientname)
 	target, ok := config.Clients[hostname]
 	if !ok {
 		log.Printf("No mapping for server name %s", hostname)
@@ -238,8 +251,8 @@ func handler(w http.ResponseWriter, r *http.Request) {
 
 	resp, err := forwardHTTP(req)
 	if err != nil {
-		log.Printf("Got an error from forwardHTTP, returning HTTP status 500")
-		w.WriteHeader(500)
+		log.Print("Got an error from forwardHTTP, responding with Bad Gateway")
+		w.WriteHeader(http.StatusBadGateway)
 		w.Write([]byte{})
 		return
 	}
@@ -266,9 +279,25 @@ func main() {
 	// Set up HTTP server
 	//
 	log.Printf("Running HTTP listener on port %d", *httpPort)
+
+	caCert, _ := ioutil.ReadFile(*caCertFile)
+	caCertPool := x509.NewCertPool()
+	caCertPool.AppendCertsFromPEM(caCert)
+
+	tlsConfig := &tls.Config{
+		ClientCAs:  caCertPool,
+		ClientAuth: tls.RequireAndVerifyClientCert,
+	}
+	tlsConfig.BuildNameToCertificate()
+
+	server := &http.Server{
+		Addr:      fmt.Sprintf(":%d", *httpPort),
+		TLSConfig: tlsConfig,
+	}
+
 	http.HandleFunc("/", handler)
 	// Configure the port
-	go http.ListenAndServeTLS("9002", *serverCertFile, *serverKeyFile, nil)
+	go server.ListenAndServeTLS(*serverCertFile, *serverKeyFile)
 
 	//
 	// Set up GRPC server

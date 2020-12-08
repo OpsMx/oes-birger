@@ -1,0 +1,3 @@
+clients:
+  localhost:
+    identity: skan1.client

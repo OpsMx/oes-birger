@@ -22,8 +22,8 @@ import (
 )
 
 var (
-	host          = flag.String("host", tunnel.DefaultHostAndPort, "Server and port to connect to")
 	tickTime      = flag.Int("tickTime", 30, "Time between sending Ping messages")
+	host          = flag.String("host", tunnel.DefaultHostAndPort, "Server and port to connect to")
 	agentCertFile = flag.String("certFile", "/app/cert.pem", "The file containing the certificate used to connect to the controller")
 	agentKeyFile  = flag.String("keyFile", "/app/key.pem", "The file containing the certificate used to connect to the controller")
 	caCertFile    = flag.String("caCertFile", "/app/ca.pem", "The file containing the CA certificate we will use to verify the controller's cert")
