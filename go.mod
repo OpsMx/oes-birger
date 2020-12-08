@@ -7,7 +7,6 @@ require (
 	github.com/google/go-cmp v0.5.4 // indirect
 	github.com/kr/text v0.2.0 // indirect
 	github.com/oklog/ulid/v2 v2.0.2
-	github.com/rocketlaunchr/https-go v0.0.0-20200218083740-ba6c48f29f4d
 	golang.org/x/net v0.0.0-20201207224615-747e23833adb
 	golang.org/x/sys v0.0.0-20201207223542-d4d67f95c62d // indirect
 	golang.org/x/text v0.3.4 // indirect

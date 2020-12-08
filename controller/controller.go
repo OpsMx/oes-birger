@@ -1,6 +1,9 @@
 package main
 
 import (
+	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"flag"
 	"fmt"
 	"io"
@@ -11,9 +14,11 @@ import (
 	"sync"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/peer"
+	"google.golang.org/grpc/status"
 
-	"github.com/rocketlaunchr/https-go"
 	"github.com/skandragon/grpc-bidir/tunnel"
 	"github.com/skandragon/grpc-bidir/ulid"
 )
@@ -98,12 +103,31 @@ func makeSigninResponse(req *tunnel.SigninRequest, success bool) *tunnel.SAEvent
 	return resp
 }
 
+func getClientNameFromContext(ctx context.Context) (string, error) {
+	p, ok := peer.FromContext(ctx)
+	if !ok {
+		return "", status.Error(codes.Unauthenticated, "no peer found")
+	}
+	tlsAuth, ok := p.AuthInfo.(credentials.TLSInfo)
+	if !ok {
+		return "", status.Error(codes.Unauthenticated, "unexpected peer transport credentials")
+	}
+	if len(tlsAuth.State.VerifiedChains) == 0 || len(tlsAuth.State.VerifiedChains[0]) == 0 {
+		return "", status.Error(codes.Unauthenticated, "could not verify peer certificate")
+	}
+	return tlsAuth.State.VerifiedChains[0][0].Subject.CommonName, nil
+}
+
 func (s *tunnelServer) EventTunnel(stream tunnel.TunnelService_EventTunnelServer) error {
-	var clientIdentity string
+	clientIdentity, err := getClientNameFromContext(stream.Context())
+	if err != nil {
+		return err
+	}
+	log.Printf("Registered agent: %s", clientIdentity)
 
 	inHTTPRequest := make(chan *httpMessage)
-
 	httpids := make(map[string]chan *tunnel.HttpResponse)
+	addClient(clientIdentity, inHTTPRequest)
 
 	go func() {
 		ulidContext := ulid.NewContext()
@@ -153,16 +177,6 @@ func (s *tunnelServer) EventTunnel(stream tunnel.TunnelService_EventTunnelServer
 				removeClient(clientIdentity)
 				return err
 			}
-		case *tunnel.ASEventWrapper_SigninRequest:
-			req := in.GetSigninRequest()
-			if err := stream.Send(makeSigninResponse(req, true)); err != nil {
-				log.Printf("Unable to respond to %s with signin response: %v", clientIdentity, err)
-				removeClient(clientIdentity)
-				return err
-			}
-			clientIdentity = req.Identity
-			addClient(clientIdentity, inHTTPRequest)
-			log.Printf("Client %s signed in", clientIdentity)
 		case *tunnel.ASEventWrapper_HttpResponse:
 			resp := in.GetHttpResponse()
 			dest := httpids[resp.Id]
@@ -225,25 +239,40 @@ func handler(w http.ResponseWriter, r *http.Request) {
 func main() {
 	flag.Parse()
 
+	//
+	// Set up HTTP server
+	//
 	log.Printf("Running HTTP listener on port %d", *httpPort)
 	http.HandleFunc("/", handler)
 	// Configure the port
-	httpServer, _ := https.Server("9002", https.GenerateOptions{Host: "kubernetes.docker.internal"})
-	go httpServer.ListenAndServeTLS(*serverCertFile, *serverKeyFile)
+	go http.ListenAndServeTLS("9002", *serverCertFile, *serverKeyFile, nil)
 
+	//
+	// Set up GRPC server
+	//
+	log.Printf("Starting GRPC server on port %d...", *port)
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", *port))
 	if err != nil {
 		log.Fatalf("Failed to listen: %v", err)
 	}
-
-	log.Printf("Starting GRPC server on port %d...", *port)
-
-	creds, err := credentials.NewServerTLSFromFile(*serverCertFile, *serverKeyFile)
+	certificate, err := tls.LoadX509KeyPair(*serverCertFile, *serverKeyFile)
 	if err != nil {
-		log.Fatalf("Failed to setup TLS: %v", err)
+		log.Fatalf("could not load server key pair: %s", err)
 	}
+	certPool := x509.NewCertPool()
+	ca, err := ioutil.ReadFile(*caCertFile)
+	if err != nil {
+		log.Fatalf("could not read ca certificate: %s", err)
+	}
+	if ok := certPool.AppendCertsFromPEM(ca); !ok {
+		log.Fatalf("failed to append client certs")
+	}
+	creds := credentials.NewTLS(&tls.Config{
+		ClientAuth:   tls.RequireAndVerifyClientCert,
+		Certificates: []tls.Certificate{certificate},
+		ClientCAs:    certPool,
+	})
 	grpcServer := grpc.NewServer(grpc.Creds(creds))
-
 	tunnel.RegisterTunnelServiceServer(grpcServer, newServer())
 	if err := grpcServer.Serve(lis); err != nil {
 		log.Fatalf("Failed to start GRPC server: %v", err)

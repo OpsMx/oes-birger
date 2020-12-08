@@ -13,15 +13,6 @@ message PingResponse {
     uint64 echoedTs = 3;
 }
 
-message SigninRequest {
-    string identity = 2;  // The client's identity
-    uint64 startTime = 3; // The time this client started running
-}
-
-message SigninResponse {
-    bool success = 2;
-}
-
 message HttpHeader {
     string name = 1;
     repeated string values = 2;
@@ -47,9 +38,8 @@ message HttpResponse {
 // Messages sent from server to agent
 message SAEventWrapper {
     oneof event {
-        PingResponse pingResponse = 2;
-        SigninResponse signinResponse = 4;
-        HttpRequest httpRequest = 7;
+        PingResponse pingResponse = 1;
+        HttpRequest httpRequest = 2;
     }
 }
 
@@ -57,8 +47,7 @@ message SAEventWrapper {
 message ASEventWrapper {
     oneof event {
         PingRequest pingRequest = 1;
-        SigninRequest signinRequest = 3;
-        HttpResponse httpResponse = 7;
+        HttpResponse httpResponse = 2;
     }
 }
 

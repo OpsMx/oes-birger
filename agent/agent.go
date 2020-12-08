@@ -44,17 +44,6 @@ func runTunnel(config *serverConfig, client tunnel.TunnelServiceClient, ticker c
 		log.Fatalf("%v.EventTunnel(_) = _, %v", client, err)
 	}
 
-	// Sign in
-	req := &tunnel.ASEventWrapper{
-		Event: &tunnel.ASEventWrapper_SigninRequest{
-			SigninRequest: &tunnel.SigninRequest{Identity: identity, StartTime: tunnel.Now()},
-		},
-	}
-	log.Printf("Sending: %v", req)
-	if err = stream.Send(req); err != nil {
-		log.Fatalf("Unable to send a SigninRequest: %v", err)
-	}
-
 	// Handle periodic pings from the ticker.
 	go func() {
 		for {
@@ -245,20 +234,24 @@ func makeServerConfig(kconfig *kubeconfig.KubeConfig) *serverConfig {
 func main() {
 	flag.Parse()
 
-	creds, err := credentials.NewClientTLSFromFile(*caCertFile, "")
+	// load client cert/key, cacert
+	clcert, err := tls.LoadX509KeyPair(*agentCertFile, *agentKeyFile)
 	if err != nil {
-		log.Fatalln(err)
+		log.Fatalf("Unable to load agent certificate or key: %v", err)
+	}
+	srvcert, err := ioutil.ReadFile(*caCertFile)
+	if err != nil {
+		log.Fatalf("Unable to load CA certificate: %v", err)
+	}
+	caCertPool := x509.NewCertPool()
+	if ok := caCertPool.AppendCertsFromPEM(srvcert); !ok {
+		log.Fatalf("Unable to append certificat to pool: %v", err)
 	}
 
-	agentCertPEM, err := ioutil.ReadFile(*agentCertFile)
-	if err != nil {
-		log.Fatalf("Unable to read agent certificate file: %v", err)
-	}
-
-	agentKeyPEM, err := ioutil.ReadFile(*agentKeyFile)
-	if err != nil {
-		log.Fatalf("Unable to read agent key file: %v", err)
-	}
+	ta := credentials.NewTLS(&tls.Config{
+		Certificates: []tls.Certificate{clcert},
+		RootCAs:      caCertPool,
+	})
 
 	kconfig, err := kubeconfig.ReadKubeConfig()
 	if err != nil {
@@ -268,7 +261,7 @@ func main() {
 	log.Printf("Kubernetes context: %s", config.defaultContext)
 
 	opts := []grpc.DialOption{
-		grpc.WithTransportCredentials(creds),
+		grpc.WithTransportCredentials(ta),
 		grpc.WithBlock(),
 	}
 
@@ -284,6 +277,6 @@ func main() {
 	runTicker(*tickTime, ticker)
 
 	log.Printf("Starting tunnel.")
-	runTunnel(config, client, ticker, *identity)
+	runTunnel(config, client, ticker, "skan")
 	log.Printf("Done.")
 }
