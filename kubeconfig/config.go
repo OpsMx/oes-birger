@@ -3,7 +3,6 @@ package kubeconfig
 import (
 	"fmt"
 	"io/ioutil"
-	"os"
 
 	"gopkg.in/yaml.v2"
 )
@@ -58,9 +57,7 @@ type UserDetails struct {
 }
 
 // ReadKubeConfig will read in the YAML config located in $HOME/.kube/config
-func ReadKubeConfig() (*KubeConfig, error) {
-	filename := os.Getenv("HOME") + "/.kube/config"
-
+func ReadKubeConfig(filename string) (*KubeConfig, error) {
 	buf, err := ioutil.ReadFile(filename)
 	if err != nil {
 		return nil, err

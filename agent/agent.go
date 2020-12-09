@@ -23,11 +23,12 @@ import (
 )
 
 var (
-	tickTime      = flag.Int("tickTime", 30, "Time between sending Ping messages")
-	host          = flag.String("host", tunnel.DefaultHostAndPort, "Server and port to connect to")
-	agentCertFile = flag.String("certFile", "/app/cert.pem", "The file containing the certificate used to connect to the controller")
-	agentKeyFile  = flag.String("keyFile", "/app/key.pem", "The file containing the certificate used to connect to the controller")
-	caCertFile    = flag.String("caCertFile", "/app/ca.pem", "The file containing the CA certificate we will use to verify the controller's cert")
+	tickTime           = flag.Int("tickTime", 30, "Time between sending Ping messages")
+	host               = flag.String("host", tunnel.DefaultHostAndPort, "The address:port of the controller to connect to")
+	agentCertFile      = flag.String("certFile", "/app/cert.pem", "The file containing the certificate used to connect to the controller")
+	agentKeyFile       = flag.String("keyFile", "/app/key.pem", "The file containing the certificate used to connect to the controller")
+	caCertFile         = flag.String("caCertFile", "/app/ca.pem", "The file containing the CA certificate we will use to verify the controller's cert")
+	kubeConfigFilename = flag.String("kubeconfig", "/app/kubeconfig.yaml", "The location of a kubeconfig file to define endpoints and kube API auth")
 )
 
 func makeHeaders(headers map[string][]string) []*tunnel.HttpHeader {
@@ -379,7 +380,7 @@ func main() {
 		RootCAs:      caCertPool,
 	})
 
-	kconfig, err := kubeconfig.ReadKubeConfig()
+	kconfig, err := kubeconfig.ReadKubeConfig(*kubeConfigFilename)
 	if err != nil {
 		log.Fatalf("Unable to read kubeconfig: %v", err)
 	}
