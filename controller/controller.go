@@ -251,6 +251,8 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		Body:    body,
 	}
 
+	flusher := w.(http.Flusher)
+
 	resp, err := forwardHTTP(req)
 	if err != nil {
 		log.Print("Got an error from forwardHTTP, responding with Bad Gateway")
@@ -268,9 +270,12 @@ func handler(w http.ResponseWriter, r *http.Request) {
 			w.Header().Add(header.Name, value)
 		}
 	}
-	w.Header().Set("Content-Length", fmt.Sprintf("%d", resp.ContentLength))
 	w.WriteHeader(int(resp.Status))
-	w.Write(resp.Body)
+	flusher.Flush()
+	w.Write(resp.Body[0:1])
+	flusher.Flush()
+	w.Write(resp.Body[1:])
+	flusher.Flush()
 
 	log.Printf("Got %d bytes, content-length reported as %d", len(resp.Body), resp.ContentLength)
 }
