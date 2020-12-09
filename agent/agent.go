@@ -123,7 +123,6 @@ func executeRequest(dataflow chan *tunnel.ASEventWrapper, c *serverContext, req 
 			httpRequest.Header.Add(header.Name, value)
 		}
 	}
-	httpRequest.Body = bytes.NewBuffer(req.Body)
 	//log.Printf("Sending HTTP request: %v", httpRequest)
 	get, err := client.Do(httpRequest)
 	if err != nil {
