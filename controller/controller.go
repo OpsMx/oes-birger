@@ -27,10 +27,10 @@ import (
 var (
 	port           = flag.Int("port", tunnel.DefaultPort, "The GRPC port to listen on")
 	httpPort       = flag.Int("httpPort", 9002, "The HTTP port to listen for Kubernetes API requests on")
-	serverCertFile = flag.String("certFile", "/app/cert.pem", "The file containing the certificate for the server")
-	serverKeyFile  = flag.String("keyFile", "/app/key.pem", "The file containing the certificate for the server")
-	caCertFile     = flag.String("caCertFile", "/app/ca.pem", "The file containing the CA certificate we will use to verify the client's cert")
-	configFile     = flag.String("configFile", "/app/config.yaml", "The file with the controller config")
+	serverCertFile = flag.String("certFile", "/app/config/cert.pem", "The file containing the certificate for the server")
+	serverKeyFile  = flag.String("keyFile", "/app/config/key.pem", "The file containing the certificate for the server")
+	caCertFile     = flag.String("caCertFile", "/app/config/ca.pem", "The file containing the CA certificate we will use to verify the client's cert")
+	configFile     = flag.String("configFile", "/app/config/config.yaml", "The file with the controller config")
 
 	clients = struct {
 		sync.RWMutex
@@ -273,6 +273,8 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	target, ok := config.Clients[hostname]
 	if !ok {
 		log.Printf("No mapping for server name %s", hostname)
+		w.WriteHeader(http.StatusBadGateway)
+		return
 	}
 	body, _ := ioutil.ReadAll(r.Body)
 	req := &tunnel.HttpRequest{

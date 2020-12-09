@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"crypto/tls"
 	"crypto/x509"
 	b64 "encoding/base64"
@@ -25,10 +26,10 @@ import (
 var (
 	tickTime           = flag.Int("tickTime", 30, "Time between sending Ping messages")
 	host               = flag.String("host", tunnel.DefaultHostAndPort, "The address:port of the controller to connect to")
-	agentCertFile      = flag.String("certFile", "/app/cert.pem", "The file containing the certificate used to connect to the controller")
-	agentKeyFile       = flag.String("keyFile", "/app/key.pem", "The file containing the certificate used to connect to the controller")
-	caCertFile         = flag.String("caCertFile", "/app/ca.pem", "The file containing the CA certificate we will use to verify the controller's cert")
-	kubeConfigFilename = flag.String("kubeconfig", "/app/kubeconfig.yaml", "The location of a kubeconfig file to define endpoints and kube API auth")
+	agentCertFile      = flag.String("certFile", "/app/config/cert.pem", "The file containing the certificate used to connect to the controller")
+	agentKeyFile       = flag.String("keyFile", "/app/config/key.pem", "The file containing the certificate used to connect to the controller")
+	caCertFile         = flag.String("caCertFile", "/app/config/ca.pem", "The file containing the CA certificate we will use to verify the controller's cert")
+	kubeConfigFilename = flag.String("kubeconfig", "/app/config/kubeconfig.yaml", "The location of a kubeconfig file to define endpoints and kube API auth")
 )
 
 func makeHeaders(headers map[string][]string) []*tunnel.HttpHeader {
@@ -101,9 +102,9 @@ func executeRequest(dataflow chan *tunnel.ASEventWrapper, c *serverContext, req 
 		unregisterCancelFunction(req.Id)
 	}()
 
-	httpRequest, err := http.NewRequestWithContext(ctx, req.Method, c.serverURL+req.URI, nil)
+	httpRequest, err := http.NewRequestWithContext(ctx, req.Method, c.serverURL+req.URI, bytes.NewBuffer(req.Body))
 	if err != nil {
-		log.Printf("Failed to %s to %s: %v", req.Method, c.serverURL+req.URI, err)
+		log.Printf("Failed to build request for %s to %s: %v", req.Method, c.serverURL+req.URI, err)
 		resp := &tunnel.ASEventWrapper{
 			Event: &tunnel.ASEventWrapper_HttpResponse{
 				HttpResponse: &tunnel.HttpResponse{
@@ -122,10 +123,11 @@ func executeRequest(dataflow chan *tunnel.ASEventWrapper, c *serverContext, req 
 			httpRequest.Header.Add(header.Name, value)
 		}
 	}
+	httpRequest.Body = bytes.NewBuffer(req.Body)
 	//log.Printf("Sending HTTP request: %v", httpRequest)
 	get, err := client.Do(httpRequest)
 	if err != nil {
-		log.Printf("Failed to %s to %s: %v", req.Method, c.serverURL+req.URI, err)
+		log.Printf("Failed to execute request for %s to %s: %v", req.Method, c.serverURL+req.URI, err)
 		resp := &tunnel.ASEventWrapper{
 			Event: &tunnel.ASEventWrapper_HttpResponse{
 				HttpResponse: &tunnel.HttpResponse{
@@ -390,6 +392,7 @@ func main() {
 	opts := []grpc.DialOption{
 		grpc.WithTransportCredentials(ta),
 		grpc.WithBlock(),
+		grpc.WithTimeout(10 * time.Second),
 	}
 
 	conn, err := grpc.Dial(*host, opts...)
