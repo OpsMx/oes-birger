@@ -35,7 +35,6 @@ WORKDIR /app
 COPY --from=build-agent /build/agent /app
 CMD ["/app/agent"]
 
-
 #
 # Build the controller image.  This should be a --target on docker build.
 #
