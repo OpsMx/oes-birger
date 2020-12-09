@@ -2,6 +2,7 @@
 2. Break down which agent to talk to based on hostname.
 3. Dockerize fully
 4. Build deployment YAML
+5. Implement chunked transfer (for streams, used for 'watch')
 
 # later
 

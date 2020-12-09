@@ -35,7 +35,3 @@ Start the controller:
 
 Start a agent:
 `go run agent/agent.go -identity skan1`
-
-# Todo
-
-* Implement chunked transfer encoding, so we can support "watch"
