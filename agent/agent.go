@@ -36,6 +36,58 @@ func makeHeaders(headers map[string][]string) []*tunnel.HttpHeader {
 	}
 	return ret
 }
+
+func executeRequest(dataflow chan *tunnel.ASEventWrapper, c *serverContext, req *tunnel.HttpRequest) {
+	// TODO: A ServerCA is technically optional, but we might want to fail if it's not present...
+	tlsConfig := &tls.Config{
+		MinVersion:         tls.VersionTLS12,
+		InsecureSkipVerify: c.insecure,
+	}
+	if c.clientCert != nil {
+		caCertPool := x509.NewCertPool()
+		caCertPool.AddCert(c.serverCA)
+		tlsConfig.Certificates = []tls.Certificate{*c.clientCert}
+		tlsConfig.RootCAs = caCertPool
+		tlsConfig.BuildNameToCertificate()
+	}
+	tr := &http.Transport{
+		MaxIdleConns:       10,
+		IdleConnTimeout:    30 * time.Second,
+		DisableCompression: true,
+		TLSClientConfig:    tlsConfig,
+	}
+	client := &http.Client{
+		Transport: tr,
+	}
+
+	httpRequest, _ := http.NewRequest(req.Method, c.serverURL+req.URI, nil)
+	for _, header := range req.Headers {
+		for _, value := range header.Values {
+			httpRequest.Header.Add(header.Name, value)
+		}
+	}
+	//log.Printf("Sending HTTP request: %v", httpRequest)
+	get, err := client.Do(httpRequest)
+	if err != nil {
+		log.Printf("Failed to %s to %s: %v", req.Method, c.serverURL+req.URI, err)
+		// TODO: respond with an error so the other side doesn't have to time out
+	}
+	body, _ := ioutil.ReadAll(get.Body)
+	resp := &tunnel.ASEventWrapper{
+		Event: &tunnel.ASEventWrapper_HttpResponse{
+			HttpResponse: &tunnel.HttpResponse{
+				Id:            req.Id,
+				Target:        req.Target,
+				Status:        int32(get.StatusCode),
+				Body:          body,
+				ContentLength: get.ContentLength,
+				Headers:       makeHeaders(get.Header),
+			},
+		},
+	}
+	dataflow <- resp
+}
+
 func runTunnel(config *serverConfig, client tunnel.TunnelServiceClient, ticker chan uint64, identity string) {
 	ctx := context.Background()
 	stream, err := client.EventTunnel(ctx)
@@ -43,10 +95,15 @@ func runTunnel(config *serverConfig, client tunnel.TunnelServiceClient, ticker c
 		log.Fatalf("%v.EventTunnel(_) = _, %v", client, err)
 	}
 
+	dataflow := make(chan *tunnel.ASEventWrapper, 20)
+
 	// Handle periodic pings from the ticker.
 	go func() {
 		for {
-			ts := <-ticker
+			ts, more := <-ticker
+			if !more {
+				return
+			}
 			req := &tunnel.ASEventWrapper{
 				Event: &tunnel.ASEventWrapper_PingRequest{
 					PingRequest: &tunnel.PingRequest{Ts: ts},
@@ -55,6 +112,20 @@ func runTunnel(config *serverConfig, client tunnel.TunnelServiceClient, ticker c
 			log.Printf("Sending %v", req)
 			if err = stream.Send(req); err != nil {
 				log.Fatalf("Unable to send a PingRequest: %v", err)
+			}
+		}
+	}()
+
+	// Handle HTTP fetch responses
+	go func() {
+		for {
+			resp, more := <-dataflow
+			if !more {
+				return
+			}
+			log.Printf("Responding to HTTP request with id %s", resp.Id)
+			if err = stream.Send(resp); err != nil {
+				log.Printf("Unable to respond over GRPC for request ID: %s: %v", resp.Id, err)
 			}
 		}
 	}()
@@ -81,59 +152,7 @@ func runTunnel(config *serverConfig, client tunnel.TunnelServiceClient, ticker c
 
 				c := config.contexts[config.defaultContext]
 
-				// TODO: A ServerCA is technically optional, but we might want to fail if it's not present...
-				tlsConfig := &tls.Config{
-					MinVersion:         tls.VersionTLS12,
-					InsecureSkipVerify: c.insecure,
-				}
-				if c.clientCert != nil {
-					caCertPool := x509.NewCertPool()
-					caCertPool.AddCert(c.serverCA)
-					tlsConfig.Certificates = []tls.Certificate{*c.clientCert}
-					tlsConfig.RootCAs = caCertPool
-					tlsConfig.BuildNameToCertificate()
-				}
-				tr := &http.Transport{
-					MaxIdleConns:       10,
-					IdleConnTimeout:    30 * time.Second,
-					DisableCompression: true,
-					TLSClientConfig:    tlsConfig,
-				}
-				client := &http.Client{
-					Transport: tr,
-				}
-
-				httpRequest, _ := http.NewRequest(req.Method, c.serverURL+req.URI, nil)
-				for _, header := range req.Headers {
-					for _, value := range header.Values {
-						httpRequest.Header.Add(header.Name, value)
-					}
-				}
-				//log.Printf("Sending HTTP request: %v", httpRequest)
-				get, err := client.Do(httpRequest)
-				if err != nil {
-					log.Printf("Failed to %s to %s: %v", req.Method, c.serverURL+req.URI, err)
-					// TODO: respond with an error so the other side doesn't have to time out
-					continue
-				}
-				body, _ := ioutil.ReadAll(get.Body)
-				resp := &tunnel.ASEventWrapper{
-					Event: &tunnel.ASEventWrapper_HttpResponse{
-						HttpResponse: &tunnel.HttpResponse{
-							Id:            req.Id,
-							Target:        req.Target,
-							Status:        int32(get.StatusCode),
-							Body:          body,
-							ContentLength: get.ContentLength,
-							Headers:       makeHeaders(get.Header),
-						},
-					},
-				}
-				log.Printf("Responding to HTTP request with id %s", req.Id)
-				if err = stream.Send(resp); err != nil {
-					log.Printf("Unable to respond over GRPC for request ID: %s: %v", req.Id, err)
-					continue
-				}
+				go executeRequest(dataflow, c, req)
 			case nil:
 				// ignore for now
 			default:
@@ -142,6 +161,7 @@ func runTunnel(config *serverConfig, client tunnel.TunnelServiceClient, ticker c
 		}
 	}()
 	<-waitc
+	close(dataflow)
 	stream.CloseSend()
 }
 
