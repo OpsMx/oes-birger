@@ -2,15 +2,18 @@ package ulid
 
 import (
 	"math/rand"
+	"sync"
 	"time"
 
 	"github.com/oklog/ulid/v2"
 	"github.com/skandragon/grpc-bidir/tunnel"
 )
 
-// Context holds the state needed to generate a ULID using random values.
-// Not thread safe.
+// Context holds the state needed to generate a ULID using random values.  This
+// is a locked structure, so should not be used by a lot of threads if IDs are
+// generated at a high rate.
 type Context struct {
+	sync.Mutex
 	entropy *ulid.MonotonicEntropy
 }
 
@@ -23,5 +26,8 @@ func NewContext() *Context {
 
 // Ulid - return a new ULID as a string.
 func Ulid(context *Context) string {
-	return ulid.MustNew(tunnel.Now(), context.entropy).String()
+	context.Lock()
+	id := ulid.MustNew(tunnel.Now(), context.entropy).String()
+	context.Unlock()
+	return id
 }

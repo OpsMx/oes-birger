@@ -10,6 +10,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"sync"
 	"time"
 
 	"golang.org/x/net/context"
@@ -37,6 +38,38 @@ func makeHeaders(headers map[string][]string) []*tunnel.HttpHeader {
 	return ret
 }
 
+type cancelState struct {
+	id     string
+	cancel context.CancelFunc
+}
+
+var cancelRegistry = struct {
+	sync.Mutex
+	m map[string]context.CancelFunc
+}{m: make(map[string]context.CancelFunc)}
+
+func registerCancelFunction(id string, cancel context.CancelFunc) {
+	cancelRegistry.Lock()
+	cancelRegistry.m[id] = cancel
+	cancelRegistry.Unlock()
+}
+
+func unregisterCancelFunction(id string) {
+	cancelRegistry.Lock()
+	delete(cancelRegistry.m, id)
+	cancelRegistry.Unlock()
+}
+
+func callCancelFunction(id string) {
+	cancelRegistry.Lock()
+	cancel, ok := cancelRegistry.m[id]
+	if ok {
+		cancel()
+		log.Printf("Cancelling request %s", id)
+	}
+	cancelRegistry.Unlock()
+}
+
 func executeRequest(dataflow chan *tunnel.ASEventWrapper, c *serverContext, req *tunnel.HttpRequest) {
 	// TODO: A ServerCA is technically optional, but we might want to fail if it's not present...
 	tlsConfig := &tls.Config{
@@ -60,7 +93,29 @@ func executeRequest(dataflow chan *tunnel.ASEventWrapper, c *serverContext, req 
 		Transport: tr,
 	}
 
-	httpRequest, _ := http.NewRequest(req.Method, c.serverURL+req.URI, nil)
+	ctx, cancel := context.WithCancel(context.Background())
+
+	registerCancelFunction(req.Id, cancel)
+	defer func() {
+		unregisterCancelFunction(req.Id)
+	}()
+
+	httpRequest, err := http.NewRequestWithContext(ctx, req.Method, c.serverURL+req.URI, nil)
+	if err != nil {
+		log.Printf("Failed to %s to %s: %v", req.Method, c.serverURL+req.URI, err)
+		resp := &tunnel.ASEventWrapper{
+			Event: &tunnel.ASEventWrapper_HttpResponse{
+				HttpResponse: &tunnel.HttpResponse{
+					Id:            req.Id,
+					Target:        req.Target,
+					Status:        http.StatusBadGateway,
+					ContentLength: 0,
+				},
+			},
+		}
+		dataflow <- resp
+		return
+	}
 	for _, header := range req.Headers {
 		for _, value := range header.Values {
 			httpRequest.Header.Add(header.Name, value)
@@ -70,22 +125,83 @@ func executeRequest(dataflow chan *tunnel.ASEventWrapper, c *serverContext, req 
 	get, err := client.Do(httpRequest)
 	if err != nil {
 		log.Printf("Failed to %s to %s: %v", req.Method, c.serverURL+req.URI, err)
-		// TODO: respond with an error so the other side doesn't have to time out
+		resp := &tunnel.ASEventWrapper{
+			Event: &tunnel.ASEventWrapper_HttpResponse{
+				HttpResponse: &tunnel.HttpResponse{
+					Id:            req.Id,
+					Target:        req.Target,
+					Status:        http.StatusBadGateway,
+					ContentLength: 0,
+				},
+			},
+		}
+		dataflow <- resp
+		return
 	}
-	body, _ := ioutil.ReadAll(get.Body)
+
+	// First, send the headers.
 	resp := &tunnel.ASEventWrapper{
 		Event: &tunnel.ASEventWrapper_HttpResponse{
 			HttpResponse: &tunnel.HttpResponse{
 				Id:            req.Id,
 				Target:        req.Target,
 				Status:        int32(get.StatusCode),
-				Body:          body,
 				ContentLength: get.ContentLength,
 				Headers:       makeHeaders(get.Header),
 			},
 		},
 	}
 	dataflow <- resp
+
+	// Now, send one or more data packet.
+	for {
+		buf := make([]byte, 10240)
+		n, err := get.Body.Read(buf)
+		if n > 0 {
+			resp := &tunnel.ASEventWrapper{
+				Event: &tunnel.ASEventWrapper_HttpChunkedResponse{
+					HttpChunkedResponse: &tunnel.HttpChunkedResponse{
+						Id:     req.Id,
+						Target: req.Target,
+						Body:   buf[:n],
+					},
+				},
+			}
+			dataflow <- resp
+		}
+		if err == io.EOF {
+			resp := &tunnel.ASEventWrapper{
+				Event: &tunnel.ASEventWrapper_HttpChunkedResponse{
+					HttpChunkedResponse: &tunnel.HttpChunkedResponse{
+						Id:     req.Id,
+						Target: req.Target,
+						Body:   []byte(""),
+					},
+				},
+			}
+			dataflow <- resp
+			return
+		}
+		if err == context.Canceled {
+			log.Printf("Context cancelled, request ID %s", req.Id)
+			return
+		}
+		if err != nil {
+			log.Printf("Got error on HTTP read: %v", err)
+			// todo: send an error message somehow.  For now, just send EOF
+			resp := &tunnel.ASEventWrapper{
+				Event: &tunnel.ASEventWrapper_HttpChunkedResponse{
+					HttpChunkedResponse: &tunnel.HttpChunkedResponse{
+						Id:     req.Id,
+						Target: req.Target,
+						Body:   []byte(""),
+					},
+				},
+			}
+			dataflow <- resp
+			return
+		}
+	}
 }
 
 func runTunnel(config *serverConfig, client tunnel.TunnelServiceClient, ticker chan uint64, identity string) {
@@ -109,7 +225,6 @@ func runTunnel(config *serverConfig, client tunnel.TunnelServiceClient, ticker c
 					PingRequest: &tunnel.PingRequest{Ts: ts},
 				},
 			}
-			log.Printf("Sending %v", req)
 			if err = stream.Send(req); err != nil {
 				log.Fatalf("Unable to send a PingRequest: %v", err)
 			}
@@ -119,13 +234,12 @@ func runTunnel(config *serverConfig, client tunnel.TunnelServiceClient, ticker c
 	// Handle HTTP fetch responses
 	go func() {
 		for {
-			resp, more := <-dataflow
+			ew, more := <-dataflow
 			if !more {
 				return
 			}
-			log.Printf("Responding to HTTP request with id %s", resp.Id)
-			if err = stream.Send(resp); err != nil {
-				log.Printf("Unable to respond over GRPC for request ID: %s: %v", resp.Id, err)
+			if err = stream.Send(ew); err != nil {
+				log.Printf("Unable to respond over GRPC: %v", err)
 			}
 		}
 	}()
@@ -144,17 +258,16 @@ func runTunnel(config *serverConfig, client tunnel.TunnelServiceClient, ticker c
 			}
 			switch x := in.Event.(type) {
 			case *tunnel.SAEventWrapper_PingResponse:
-				req := in.GetPingResponse()
-				log.Printf("Received: PingResponse: %v", req)
+				continue
+			case *tunnel.SAEventWrapper_HttpRequestCancel:
+				req := in.GetHttpRequestCancel()
+				callCancelFunction(req.Id)
 			case *tunnel.SAEventWrapper_HttpRequest:
 				req := in.GetHttpRequest()
-				log.Printf("Processing HTTP request with id %s", req.Id)
-
 				c := config.contexts[config.defaultContext]
-
 				go executeRequest(dataflow, c, req)
 			case nil:
-				// ignore for now
+				continue
 			default:
 				log.Printf("Received unknown message: %T", x)
 			}

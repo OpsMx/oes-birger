@@ -1,6 +1,5 @@
 1. Dockerize fully
 1. Build deployment YAML
-1. Implement chunked transfer (for streams, used for 'watch')
 
 # later
 

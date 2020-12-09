@@ -27,15 +27,19 @@ message HttpRequest {
     bytes body = 7;
 }
 
-// This is the initial response sent to the controller from the agent.  If contentLength == len(body),
-// the transmission is complete.  Otherwise, the controller should expect to see following
-// HttpChunkedResponse messages, where EOF is indicated with a body length of zero.
+message HttpRequestCancel {
+    string id = 1;
+    string target = 2;
+}
+
+// This is the initial response sent to the controller from the agent.
+// The body is sent back in a series of HttpChunkedResponse messages,
+// with a zero length meaning EOF.
 message HttpResponse {
     string id = 1;
     string target = 2;
     int32 status = 3;
     repeated HttpHeader headers = 4;
-    bytes body = 5;
     int64 contentLength = 6;
 }
 
@@ -50,6 +54,7 @@ message SAEventWrapper {
     oneof event {
         PingResponse pingResponse = 1;
         HttpRequest httpRequest = 2;
+        HttpRequestCancel httpRequestCancel = 3;
     }
 }
 
