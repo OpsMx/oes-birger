@@ -1,13 +1,13 @@
 TARGETS=forwarder-controller forwarder-agent
 
-PLATFORM=linux
+PLATFORM=linux/amd64,linux/arm64,linux/arm/v7
 
-build=DOCKER_BUILDKIT=1 docker build . --platform ${PLATFORM}
+build=docker buildx build --platform ${PLATFORM}
 
 all: ${TARGETS}
 
 forwarder-controller:
-	@${build} --tag forwarder-controller:latest --target controller
+	@${build} --tag docker.flame.org/library/forwarder-controller:latest --target controller . --push
 
 forwarder-agent:
-	@${build} --tag forwarder-agent:latest --target agent
+	@${build} --tag docker.flame.org/library/forwarder-agent:latest --target agent . --push
