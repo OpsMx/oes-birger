@@ -1,4 +1,4 @@
-TARGETS=forwarder-controller forwarder-agent
+TARGETS=test forwarder-controller forwarder-agent
 
 PLATFORM=linux/amd64,linux/arm64,linux/arm/v7
 
@@ -11,3 +11,6 @@ forwarder-controller:
 
 forwarder-agent:
 	@${build} --tag docker.flame.org/library/forwarder-agent:latest --target agent . --push
+
+test:
+	go test -p 1 ./...
