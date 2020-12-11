@@ -2,6 +2,7 @@ package kubeconfig
 
 import (
 	"fmt"
+	"io"
 	"io/ioutil"
 
 	"gopkg.in/yaml.v2"
@@ -57,8 +58,8 @@ type UserDetails struct {
 }
 
 // ReadKubeConfig will read in the YAML config located in $HOME/.kube/config
-func ReadKubeConfig(filename string) (*KubeConfig, error) {
-	buf, err := ioutil.ReadFile(filename)
+func ReadKubeConfig(contents io.Reader) (*KubeConfig, error) {
+	buf, err := ioutil.ReadAll(contents)
 	if err != nil {
 		return nil, err
 	}
@@ -66,11 +67,15 @@ func ReadKubeConfig(filename string) (*KubeConfig, error) {
 	c := &KubeConfig{}
 	err = yaml.Unmarshal(buf, c)
 	if err != nil {
-		return nil, fmt.Errorf("in file %q: %v", filename, err)
+		return nil, fmt.Errorf("Unable to unmarshal from YAML: %v", err)
 	}
 
-	if c.APIVersion != "v1" || c.Kind != "Config" {
-		return nil, fmt.Errorf("APIVersion %s, kind %s is not 'v1' and 'Config'", c.APIVersion, c.Kind)
+	if c.APIVersion != "v1" {
+		return nil, fmt.Errorf("apiVersion '%s' is not 'v1'", c.APIVersion)
+	}
+
+	if c.Kind != "Config" {
+		return nil, fmt.Errorf("kind '%s' is not 'Config'", c.Kind)
 	}
 
 	return c, nil

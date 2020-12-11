@@ -11,6 +11,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
 	"sync"
 	"time"
 
@@ -381,7 +382,11 @@ func main() {
 		RootCAs:      caCertPool,
 	})
 
-	kconfig, err := kubeconfig.ReadKubeConfig(*kubeConfigFilename)
+	yaml, err := os.Open(*kubeConfigFilename)
+	if err != nil {
+		log.Fatalf("Unable to open kubeconfig '%s': %v", *kubeConfigFilename, err)
+	}
+	kconfig, err := kubeconfig.ReadKubeConfig(yaml)
 	if err != nil {
 		log.Fatalf("Unable to read kubeconfig: %v", err)
 	}
