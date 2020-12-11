@@ -2,7 +2,7 @@ TARGETS=forwarder-controller forwarder-agent
 
 PLATFORM=linux/amd64,linux/arm64,linux/arm/v7
 
-build=docker buildx build --platform ${PLATFORM}
+build=docker buildx build --pull --platform ${PLATFORM}
 
 all: ${TARGETS}
 

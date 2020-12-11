@@ -28,9 +28,15 @@ ARG TARGETARCH
 RUN GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o /build/controller controller/controller.go
 
 #
+# Base OS image for both published images
+#
+FROM alpine AS base
+RUN apk update && apk upgrade
+
+#
 # Build the agent image.  This should be a --target on docker build.
 #
-FROM alpine AS agent
+FROM base AS agent
 WORKDIR /app
 COPY --from=build-agent /build/agent /app
 CMD ["/app/agent"]
@@ -38,7 +44,7 @@ CMD ["/app/agent"]
 #
 # Build the controller image.  This should be a --target on docker build.
 #
-FROM alpine AS controller
+FROM base AS controller
 WORKDIR /app
 COPY --from=build-controller /build/controller /app
 EXPOSE 9001-9002
