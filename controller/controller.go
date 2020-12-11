@@ -278,7 +278,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	}
 	body, _ := ioutil.ReadAll(r.Body)
 	req := &tunnel.HttpRequest{
-		Id:      ulid.Ulid(ulidContext),
+		Id:      ulidContext.Ulid(),
 		Target:  target.Identity,
 		Method:  r.Method,
 		URI:     r.RequestURI,
