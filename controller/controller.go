@@ -34,8 +34,8 @@ var (
 
 	clients = struct {
 		sync.RWMutex
-		m map[string]*clientState
-	}{m: make(map[string]*clientState)}
+		m map[string][]*clientState
+	}{m: make(map[string][]*clientState)}
 
 	config *controllerConfig
 
@@ -73,32 +73,69 @@ type cancelRequest struct {
 	id string
 }
 
+func SliceIndex(limit int, predicate func(i int) bool) int {
+	for i := 0; i < limit; i++ {
+		if predicate(i) {
+			return i
+		}
+	}
+	return -1
+}
+
 type clientState struct {
 	identity        string
+	sessionIdentity string
 	inHTTPRequest   chan *httpMessage
 	inCancelRequest chan *cancelRequest
+	connectedAt     uint64
+	lastPing        uint64
+	lastUse         uint64
 }
 
-func addClient(identity string, inHTTPRequest chan *httpMessage, inCancelRequest chan *cancelRequest) {
+func addClient(state *clientState) {
 	clients.Lock()
-	clients.m[identity] = &clientState{
-		identity:        identity,
-		inHTTPRequest:   inHTTPRequest,
-		inCancelRequest: inCancelRequest,
+	defer clients.Unlock()
+	clientList, ok := clients.m[state.identity]
+	if !ok {
+		clientList = make([]*clientState, 0)
 	}
-	clients.Unlock()
+	clientList = append(clientList, state)
+	clients.m[state.identity] = clientList
+	log.Printf("Session %s added for agent %s, now at %d endpoints", state.sessionIdentity, state.identity, len(clientList))
 }
 
-func removeClient(identity string) {
+func removeClient(state *clientState) {
 	clients.Lock()
-	client := clients.m[identity]
-	delete(clients.m, identity)
-	clients.Unlock()
-
-	if client != nil {
-		close(client.inHTTPRequest)
-		close(client.inCancelRequest)
+	defer clients.Unlock()
+	clientList, ok := clients.m[state.identity]
+	if !ok {
+		return
 	}
+
+	// TODO: We should always find our entry...
+	i := SliceIndex(len(clientList), func(i int) bool { return clientList[i] == state })
+	if i != -1 {
+		clientList[i] = clientList[len(clientList)-1]
+		clientList[len(clientList)-1] = nil
+		clientList = clientList[:len(clientList)-1]
+		clients.m[state.identity] = clientList
+		log.Printf("Session %s removed for agent %s, now at %d endpoints", state.sessionIdentity, state.identity, len(clientList))
+	}
+
+	close(state.inHTTPRequest)
+	close(state.inCancelRequest)
+}
+
+func updateClientPingtime(state *clientState) {
+	clients.Lock()
+	defer clients.Unlock()
+	state.lastPing = tunnel.Now()
+}
+
+func updateClientUsetime(state *clientState) {
+	clients.Lock()
+	defer clients.Unlock()
+	state.lastUse = tunnel.Now()
 }
 
 type tunnelServer struct {
@@ -139,7 +176,9 @@ func (s *tunnelServer) EventTunnel(stream tunnel.TunnelService_EventTunnelServer
 	if err != nil {
 		return err
 	}
-	log.Printf("Registered agent: %s", clientIdentity)
+
+	sessionIdentity := ulidContext.Ulid()
+	log.Printf("Registered agent: %s, session id %s", clientIdentity, sessionIdentity)
 
 	inHTTPRequest := make(chan *httpMessage, 1)
 	inCancelRequest := make(chan *cancelRequest, 1)
@@ -148,7 +187,17 @@ func (s *tunnelServer) EventTunnel(stream tunnel.TunnelService_EventTunnelServer
 		m map[string]chan *tunnel.ASEventWrapper
 	}{m: make(map[string]chan *tunnel.ASEventWrapper)}
 
-	addClient(clientIdentity, inHTTPRequest, inCancelRequest)
+	state := &clientState{
+		identity:        clientIdentity,
+		sessionIdentity: sessionIdentity,
+		inHTTPRequest:   inHTTPRequest,
+		inCancelRequest: inCancelRequest,
+		lastPing:        0,
+		lastUse:         0,
+		connectedAt:     tunnel.Now(),
+	}
+
+	addClient(state)
 
 	go func() {
 		for {
@@ -157,6 +206,7 @@ func (s *tunnelServer) EventTunnel(stream tunnel.TunnelService_EventTunnelServer
 				log.Printf("Request channel closed for %s", clientIdentity)
 				return
 			}
+			updateClientUsetime(state)
 			httpids.Lock()
 			httpids.m[request.cmd.Id] = request.out
 			httpids.Unlock()
@@ -201,7 +251,7 @@ func (s *tunnelServer) EventTunnel(stream tunnel.TunnelService_EventTunnelServer
 				close(v)
 			}
 			httpids.Unlock()
-			removeClient(clientIdentity)
+			removeClient(state)
 			return nil
 		}
 		if err != nil {
@@ -211,20 +261,22 @@ func (s *tunnelServer) EventTunnel(stream tunnel.TunnelService_EventTunnelServer
 				close(v)
 			}
 			httpids.Unlock()
-			removeClient(clientIdentity)
+			removeClient(state)
 			return err
 		}
 
 		switch x := in.Event.(type) {
 		case *tunnel.ASEventWrapper_PingRequest:
 			req := in.GetPingRequest()
+			updateClientPingtime(state)
 			if err := stream.Send(makePingResponse(req)); err != nil {
 				log.Printf("Unable to respond to %s with ping response: %v", clientIdentity, err)
-				removeClient(clientIdentity)
+				removeClient(state)
 				return err
 			}
 		case *tunnel.ASEventWrapper_HttpResponse:
 			resp := in.GetHttpResponse()
+			updateClientUsetime(state)
 			httpids.Lock()
 			dest := httpids.m[resp.Id]
 			if dest != nil {
@@ -238,6 +290,7 @@ func (s *tunnelServer) EventTunnel(stream tunnel.TunnelService_EventTunnelServer
 			httpids.Unlock()
 		case *tunnel.ASEventWrapper_HttpChunkedResponse:
 			resp := in.GetHttpChunkedResponse()
+			updateClientUsetime(state)
 			httpids.Lock()
 			dest := httpids.m[resp.Id]
 			if dest != nil {
@@ -286,13 +339,17 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		Body:    body,
 	}
 	clients.RLock()
-	client, ok := clients.m[req.Target]
+	clientList, ok := clients.m[req.Target]
 	if !ok {
 		clients.RUnlock()
-		log.Printf("Unknown target: %s", req.Target)
+		log.Printf("No agents connected for: %s", req.Target)
 		w.WriteHeader(http.StatusBadGateway)
 		return
 	}
+	if len(clientList) == 0 {
+		log.Printf("No agents connected for: %s", req.Target)
+	}
+	client := clientList[0] // TODO: Should we round robin, or randomize selection?
 	message := &httpMessage{out: make(chan *tunnel.ASEventWrapper), cmd: req}
 	client.inHTTPRequest <- message
 	clients.RUnlock()
