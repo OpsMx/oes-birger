@@ -1,4 +1,5 @@
-serverName: controller.demo.opsmx.com
+serverNames:
+  - controller.demo.opsmx.com
 clients:
   randomName:
     identity: skan1.client

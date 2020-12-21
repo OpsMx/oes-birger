@@ -44,8 +44,8 @@ var (
 )
 
 type controllerConfig struct {
-	Agents     map[string]*agentConfig `yaml:"agents"`
-	ServerName string                  `yaml:"serverName"`
+	Agents      map[string]*agentConfig `yaml:"agents"`
+	ServerNames []string                `yaml:"serverNames"`
 }
 
 type agentConfig struct {
@@ -433,6 +433,7 @@ func main() {
 	flag.Parse()
 
 	config = loadConfig()
+	log.Printf("Server names for generated certificate: %v", config.ServerNames)
 
 	//
 	// Set up HTTP server
