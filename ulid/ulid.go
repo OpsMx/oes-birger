@@ -27,7 +27,6 @@ func NewContext() *Context {
 // Ulid - return a new ULID as a string.
 func (ctx *Context) Ulid() string {
 	ctx.Lock()
-	id := ulid.MustNew(tunnel.Now(), ctx.entropy).String()
-	ctx.Unlock()
-	return id
+	defer ctx.Unlock()
+	return ulid.MustNew(tunnel.Now(), ctx.entropy).String()
 }
