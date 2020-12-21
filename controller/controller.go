@@ -158,6 +158,10 @@ func makePingResponse(req *tunnel.PingRequest) *tunnel.SAEventWrapper {
 	return resp
 }
 
+func firstLabel(name string) string {
+	return strings.Split(name, ".")[0]
+}
+
 func getAgentNameFromContext(ctx context.Context) (string, error) {
 	p, ok := peer.FromContext(ctx)
 	if !ok {
@@ -336,7 +340,7 @@ func mapTarget(name string) string {
 }
 
 func handler(w http.ResponseWriter, r *http.Request) {
-	agentname := r.TLS.PeerCertificates[0].Subject.CommonName
+	agentname := firstLabel(r.TLS.PeerCertificates[0].Subject.CommonName)
 	target := mapTarget(agentname)
 
 	body, _ := ioutil.ReadAll(r.Body)
