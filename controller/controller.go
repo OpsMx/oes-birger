@@ -11,6 +11,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"strings"
 	"sync"
 
 	"google.golang.org/grpc"
@@ -29,13 +30,13 @@ var (
 	httpPort       = flag.Int("httpPort", 9002, "The HTTP port to listen for Kubernetes API requests on")
 	serverCertFile = flag.String("certFile", "/app/config/cert.pem", "The file containing the certificate for the server")
 	serverKeyFile  = flag.String("keyFile", "/app/config/key.pem", "The file containing the certificate for the server")
-	caCertFile     = flag.String("caCertFile", "/app/config/ca.pem", "The file containing the CA certificate we will use to verify the client's cert")
+	caCertFile     = flag.String("caCertFile", "/app/config/ca.pem", "The file containing the CA certificate we will use to verify the agent's cert")
 	configFile     = flag.String("configFile", "/app/config/config.yaml", "The file with the controller config")
 
-	clients = struct {
+	agents = struct {
 		sync.RWMutex
-		m map[string][]*clientState
-	}{m: make(map[string][]*clientState)}
+		m map[string][]*agentState
+	}{m: make(map[string][]*agentState)}
 
 	config *controllerConfig
 
@@ -43,10 +44,11 @@ var (
 )
 
 type controllerConfig struct {
-	Clients map[string]*clientConfig `yaml:"clients"`
+	Agents     map[string]*agentConfig `yaml:"agents"`
+	ServerName string                  `yaml:"serverName"`
 }
 
-type clientConfig struct {
+type agentConfig struct {
 	Identity string `yaml:"identity"`
 }
 
@@ -73,7 +75,7 @@ type cancelRequest struct {
 	id string
 }
 
-func SliceIndex(limit int, predicate func(i int) bool) int {
+func sliceIndex(limit int, predicate func(i int) bool) int {
 	for i := 0; i < limit; i++ {
 		if predicate(i) {
 			return i
@@ -82,7 +84,7 @@ func SliceIndex(limit int, predicate func(i int) bool) int {
 	return -1
 }
 
-type clientState struct {
+type agentState struct {
 	identity        string
 	sessionIdentity string
 	inHTTPRequest   chan *httpMessage
@@ -92,49 +94,49 @@ type clientState struct {
 	lastUse         uint64
 }
 
-func addClient(state *clientState) {
-	clients.Lock()
-	defer clients.Unlock()
-	clientList, ok := clients.m[state.identity]
+func addAgent(state *agentState) {
+	agents.Lock()
+	defer agents.Unlock()
+	agentList, ok := agents.m[state.identity]
 	if !ok {
-		clientList = make([]*clientState, 0)
+		agentList = make([]*agentState, 0)
 	}
-	clientList = append(clientList, state)
-	clients.m[state.identity] = clientList
-	log.Printf("Session %s added for agent %s, now at %d endpoints", state.sessionIdentity, state.identity, len(clientList))
+	agentList = append(agentList, state)
+	agents.m[state.identity] = agentList
+	log.Printf("Session %s added for agent %s, now at %d endpoints", state.sessionIdentity, state.identity, len(agentList))
 }
 
-func removeClient(state *clientState) {
-	clients.Lock()
-	defer clients.Unlock()
-	clientList, ok := clients.m[state.identity]
+func removeAgent(state *agentState) {
+	agents.Lock()
+	defer agents.Unlock()
+	agentList, ok := agents.m[state.identity]
 	if !ok {
 		return
 	}
 
 	// TODO: We should always find our entry...
-	i := SliceIndex(len(clientList), func(i int) bool { return clientList[i] == state })
+	i := sliceIndex(len(agentList), func(i int) bool { return agentList[i] == state })
 	if i != -1 {
-		clientList[i] = clientList[len(clientList)-1]
-		clientList[len(clientList)-1] = nil
-		clientList = clientList[:len(clientList)-1]
-		clients.m[state.identity] = clientList
-		log.Printf("Session %s removed for agent %s, now at %d endpoints", state.sessionIdentity, state.identity, len(clientList))
+		agentList[i] = agentList[len(agentList)-1]
+		agentList[len(agentList)-1] = nil
+		agentList = agentList[:len(agentList)-1]
+		agents.m[state.identity] = agentList
+		log.Printf("Session %s removed for agent %s, now at %d endpoints", state.sessionIdentity, state.identity, len(agentList))
 	}
 
 	close(state.inHTTPRequest)
 	close(state.inCancelRequest)
 }
 
-func updateClientPingtime(state *clientState) {
-	clients.Lock()
-	defer clients.Unlock()
+func updateAgentPingtime(state *agentState) {
+	agents.Lock()
+	defer agents.Unlock()
 	state.lastPing = tunnel.Now()
 }
 
-func updateClientUsetime(state *clientState) {
-	clients.Lock()
-	defer clients.Unlock()
+func updateAgentUsetime(state *agentState) {
+	agents.Lock()
+	defer agents.Unlock()
 	state.lastUse = tunnel.Now()
 }
 
@@ -156,7 +158,7 @@ func makePingResponse(req *tunnel.PingRequest) *tunnel.SAEventWrapper {
 	return resp
 }
 
-func getClientNameFromContext(ctx context.Context) (string, error) {
+func getAgentNameFromContext(ctx context.Context) (string, error) {
 	p, ok := peer.FromContext(ctx)
 	if !ok {
 		return "", status.Error(codes.Unauthenticated, "no peer found")
@@ -168,17 +170,18 @@ func getClientNameFromContext(ctx context.Context) (string, error) {
 	if len(tlsAuth.State.VerifiedChains) == 0 || len(tlsAuth.State.VerifiedChains[0]) == 0 {
 		return "", status.Error(codes.Unauthenticated, "could not verify peer certificate")
 	}
-	return tlsAuth.State.VerifiedChains[0][0].Subject.CommonName, nil
+	shortName := strings.Split(tlsAuth.State.VerifiedChains[0][0].Subject.CommonName, ".")
+	return shortName[0], nil
 }
 
 func (s *tunnelServer) EventTunnel(stream tunnel.TunnelService_EventTunnelServer) error {
-	clientIdentity, err := getClientNameFromContext(stream.Context())
+	agentIdentity, err := getAgentNameFromContext(stream.Context())
 	if err != nil {
 		return err
 	}
 
 	sessionIdentity := ulidContext.Ulid()
-	log.Printf("Registered agent: %s, session id %s", clientIdentity, sessionIdentity)
+	log.Printf("Registered agent: %s, session id %s", agentIdentity, sessionIdentity)
 
 	inHTTPRequest := make(chan *httpMessage, 1)
 	inCancelRequest := make(chan *cancelRequest, 1)
@@ -187,8 +190,8 @@ func (s *tunnelServer) EventTunnel(stream tunnel.TunnelService_EventTunnelServer
 		m map[string]chan *tunnel.ASEventWrapper
 	}{m: make(map[string]chan *tunnel.ASEventWrapper)}
 
-	state := &clientState{
-		identity:        clientIdentity,
+	state := &agentState{
+		identity:        agentIdentity,
 		sessionIdentity: sessionIdentity,
 		inHTTPRequest:   inHTTPRequest,
 		inCancelRequest: inCancelRequest,
@@ -197,16 +200,16 @@ func (s *tunnelServer) EventTunnel(stream tunnel.TunnelService_EventTunnelServer
 		connectedAt:     tunnel.Now(),
 	}
 
-	addClient(state)
+	addAgent(state)
 
 	go func() {
 		for {
 			request, more := <-inHTTPRequest
 			if !more {
-				log.Printf("Request channel closed for %s", clientIdentity)
+				log.Printf("Request channel closed for %s", agentIdentity)
 				return
 			}
-			updateClientUsetime(state)
+			updateAgentUsetime(state)
 			httpids.Lock()
 			httpids.m[request.cmd.Id] = request.out
 			httpids.Unlock()
@@ -216,7 +219,7 @@ func (s *tunnelServer) EventTunnel(stream tunnel.TunnelService_EventTunnelServer
 				},
 			}
 			if err := stream.Send(resp); err != nil {
-				log.Printf("Unable to send to client %s for HTTP request %s", clientIdentity, request.cmd.Id)
+				log.Printf("Unable to send to agent %s for HTTP request %s", agentIdentity, request.cmd.Id)
 			}
 		}
 	}()
@@ -225,7 +228,7 @@ func (s *tunnelServer) EventTunnel(stream tunnel.TunnelService_EventTunnelServer
 		for {
 			request, more := <-inCancelRequest
 			if !more {
-				log.Printf("cancel channel closed for agent %s", clientIdentity)
+				log.Printf("cancel channel closed for agent %s", agentIdentity)
 				return
 			}
 			httpids.Lock()
@@ -233,11 +236,11 @@ func (s *tunnelServer) EventTunnel(stream tunnel.TunnelService_EventTunnelServer
 			httpids.Unlock()
 			resp := &tunnel.SAEventWrapper{
 				Event: &tunnel.SAEventWrapper_HttpRequestCancel{
-					HttpRequestCancel: &tunnel.HttpRequestCancel{Id: request.id, Target: clientIdentity},
+					HttpRequestCancel: &tunnel.HttpRequestCancel{Id: request.id, Target: agentIdentity},
 				},
 			}
 			if err := stream.Send(resp); err != nil {
-				log.Printf("Unable to send to client %s for cancel request %s", clientIdentity, request.id)
+				log.Printf("Unable to send to agent %s for cancel request %s", agentIdentity, request.id)
 			}
 		}
 	}()
@@ -245,38 +248,38 @@ func (s *tunnelServer) EventTunnel(stream tunnel.TunnelService_EventTunnelServer
 	for {
 		in, err := stream.Recv()
 		if err == io.EOF {
-			log.Printf("Closing %s", clientIdentity)
+			log.Printf("Closing %s", agentIdentity)
 			httpids.Lock()
 			for _, v := range httpids.m {
 				close(v)
 			}
 			httpids.Unlock()
-			removeClient(state)
+			removeAgent(state)
 			return nil
 		}
 		if err != nil {
-			log.Printf("Client closed connection: %s", clientIdentity)
+			log.Printf("Agent closed connection: %s", agentIdentity)
 			httpids.Lock()
 			for _, v := range httpids.m {
 				close(v)
 			}
 			httpids.Unlock()
-			removeClient(state)
+			removeAgent(state)
 			return err
 		}
 
 		switch x := in.Event.(type) {
 		case *tunnel.ASEventWrapper_PingRequest:
 			req := in.GetPingRequest()
-			updateClientPingtime(state)
+			updateAgentPingtime(state)
 			if err := stream.Send(makePingResponse(req)); err != nil {
-				log.Printf("Unable to respond to %s with ping response: %v", clientIdentity, err)
-				removeClient(state)
+				log.Printf("Unable to respond to %s with ping response: %v", agentIdentity, err)
+				removeAgent(state)
 				return err
 			}
 		case *tunnel.ASEventWrapper_HttpResponse:
 			resp := in.GetHttpResponse()
-			updateClientUsetime(state)
+			updateAgentUsetime(state)
 			httpids.Lock()
 			dest := httpids.m[resp.Id]
 			if dest != nil {
@@ -285,12 +288,12 @@ func (s *tunnelServer) EventTunnel(stream tunnel.TunnelService_EventTunnelServer
 					delete(httpids.m, resp.Id)
 				}
 			} else {
-				log.Printf("Got response to unknown HTTP request id %s from %s", resp.Id, clientIdentity)
+				log.Printf("Got response to unknown HTTP request id %s from %s", resp.Id, agentIdentity)
 			}
 			httpids.Unlock()
 		case *tunnel.ASEventWrapper_HttpChunkedResponse:
 			resp := in.GetHttpChunkedResponse()
-			updateClientUsetime(state)
+			updateAgentUsetime(state)
 			httpids.Lock()
 			dest := httpids.m[resp.Id]
 			if dest != nil {
@@ -299,13 +302,13 @@ func (s *tunnelServer) EventTunnel(stream tunnel.TunnelService_EventTunnelServer
 					delete(httpids.m, resp.Id)
 				}
 			} else {
-				log.Printf("Got response to unknown HTTP request id %s from %s", resp.Id, clientIdentity)
+				log.Printf("Got response to unknown HTTP request id %s from %s", resp.Id, agentIdentity)
 			}
 			httpids.Unlock()
 		case nil:
 			// ignore for now
 		default:
-			log.Printf("Received unknown message: %s: %T", clientIdentity, x)
+			log.Printf("Received unknown message: %s: %T", agentIdentity, x)
 		}
 	}
 }
@@ -320,39 +323,46 @@ func makeHeaders(headers map[string][]string) []*tunnel.HttpHeader {
 	return ret
 }
 
-func handler(w http.ResponseWriter, r *http.Request) {
-	hostname := r.TLS.ServerName
-	clientname := r.TLS.PeerCertificates[0].Subject.CommonName
-	target, ok := config.Clients[hostname]
+//
+// Look up the target name we are given in our config.  If it doesn't exist,
+// use the name provided as the target.
+//
+func mapTarget(name string) string {
+	target, ok := config.Agents[name]
 	if !ok {
-		log.Printf("No mapping for server name %s", hostname)
-		w.WriteHeader(http.StatusBadGateway)
-		return
+		return name
 	}
+	return target.Identity
+}
+
+func handler(w http.ResponseWriter, r *http.Request) {
+	agentname := r.TLS.PeerCertificates[0].Subject.CommonName
+	target := mapTarget(agentname)
+
 	body, _ := ioutil.ReadAll(r.Body)
 	req := &tunnel.HttpRequest{
 		Id:      ulidContext.Ulid(),
-		Target:  target.Identity,
+		Target:  target,
 		Method:  r.Method,
 		URI:     r.RequestURI,
 		Headers: makeHeaders(r.Header),
 		Body:    body,
 	}
-	clients.RLock()
-	clientList, ok := clients.m[req.Target]
+	agents.RLock()
+	agentList, ok := agents.m[req.Target]
 	if !ok {
-		clients.RUnlock()
+		agents.RUnlock()
 		log.Printf("No agents connected for: %s", req.Target)
 		w.WriteHeader(http.StatusBadGateway)
 		return
 	}
-	if len(clientList) == 0 {
+	if len(agentList) == 0 {
 		log.Printf("No agents connected for: %s", req.Target)
 	}
-	client := clientList[0] // TODO: Should we round robin, or randomize selection?
+	agent := agentList[0] // TODO: Should we round robin, or randomize selection?
 	message := &httpMessage{out: make(chan *tunnel.ASEventWrapper), cmd: req}
-	client.inHTTPRequest <- message
-	clients.RUnlock()
+	agent.inHTTPRequest <- message
+	agents.RUnlock()
 
 	cleanClose := false
 
@@ -360,7 +370,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	go func() {
 		<-notify
 		if !cleanClose {
-			client.inCancelRequest <- &cancelRequest{id: req.Id}
+			agent.inCancelRequest <- &cancelRequest{id: req.Id}
 		}
 	}()
 
@@ -414,7 +424,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		case nil:
 			// ignore for now
 		default:
-			log.Printf("Received unknown message: %s: %T", clientname, x)
+			log.Printf("Received unknown message: %s: %T", agentname, x)
 		}
 	}
 }
@@ -467,7 +477,7 @@ func main() {
 		log.Fatalf("could not read ca certificate: %s", err)
 	}
 	if ok := certPool.AppendCertsFromPEM(ca); !ok {
-		log.Fatalf("failed to append client certs")
+		log.Fatalf("failed to append agent certs")
 	}
 	creds := credentials.NewTLS(&tls.Config{
 		ClientAuth:   tls.RequireAndVerifyClientCert,

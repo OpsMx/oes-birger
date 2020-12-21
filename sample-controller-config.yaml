@@ -1,3 +1,4 @@
+serverName: controller.demo.opsmx.com
 clients:
-  localhost:
+  randomName:
     identity: skan1.client
