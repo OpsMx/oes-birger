@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -99,6 +100,7 @@ func addAgent(state *agentState) {
 	defer agents.Unlock()
 	agentList, ok := agents.m[state.identity]
 	if !ok {
+		log.Printf("No previous agent for id %s found, creating a new list", state.identity)
 		agentList = make([]*agentState, 0)
 	}
 	agentList = append(agentList, state)
@@ -111,8 +113,12 @@ func removeAgent(state *agentState) {
 	defer agents.Unlock()
 	agentList, ok := agents.m[state.identity]
 	if !ok {
+		log.Printf("ERROR: removing unknown agent: (%s, %s)", state.identity, state.sessionIdentity)
 		return
 	}
+
+	close(state.inHTTPRequest)
+	close(state.inCancelRequest)
 
 	// TODO: We should always find our entry...
 	i := sliceIndex(len(agentList), func(i int) bool { return agentList[i] == state })
@@ -121,23 +127,10 @@ func removeAgent(state *agentState) {
 		agentList[len(agentList)-1] = nil
 		agentList = agentList[:len(agentList)-1]
 		agents.m[state.identity] = agentList
-		log.Printf("Session %s removed for agent %s, now at %d endpoints", state.sessionIdentity, state.identity, len(agentList))
+	} else {
+		log.Printf("Agent session %s not found in list of agents for %s", state.sessionIdentity, state.identity)
 	}
-
-	close(state.inHTTPRequest)
-	close(state.inCancelRequest)
-}
-
-func updateAgentPingtime(state *agentState) {
-	agents.Lock()
-	defer agents.Unlock()
-	state.lastPing = tunnel.Now()
-}
-
-func updateAgentUsetime(state *agentState) {
-	agents.Lock()
-	defer agents.Unlock()
-	state.lastUse = tunnel.Now()
+	log.Printf("Session %s removed for agent %s, now at %d endpoints", state.sessionIdentity, state.identity, len(agentList))
 }
 
 type tunnelServer struct {
@@ -213,7 +206,6 @@ func (s *tunnelServer) EventTunnel(stream tunnel.TunnelService_EventTunnelServer
 				log.Printf("Request channel closed for %s", agentIdentity)
 				return
 			}
-			updateAgentUsetime(state)
 			httpids.Lock()
 			httpids.m[request.cmd.Id] = request.out
 			httpids.Unlock()
@@ -275,7 +267,7 @@ func (s *tunnelServer) EventTunnel(stream tunnel.TunnelService_EventTunnelServer
 		switch x := in.Event.(type) {
 		case *tunnel.ASEventWrapper_PingRequest:
 			req := in.GetPingRequest()
-			updateAgentPingtime(state)
+			atomic.StoreUint64(&state.lastPing, tunnel.Now())
 			if err := stream.Send(makePingResponse(req)); err != nil {
 				log.Printf("Unable to respond to %s with ping response: %v", agentIdentity, err)
 				removeAgent(state)
@@ -283,7 +275,7 @@ func (s *tunnelServer) EventTunnel(stream tunnel.TunnelService_EventTunnelServer
 			}
 		case *tunnel.ASEventWrapper_HttpResponse:
 			resp := in.GetHttpResponse()
-			updateAgentUsetime(state)
+			atomic.StoreUint64(&state.lastUse, tunnel.Now())
 			httpids.Lock()
 			dest := httpids.m[resp.Id]
 			if dest != nil {
@@ -297,7 +289,7 @@ func (s *tunnelServer) EventTunnel(stream tunnel.TunnelService_EventTunnelServer
 			httpids.Unlock()
 		case *tunnel.ASEventWrapper_HttpChunkedResponse:
 			resp := in.GetHttpChunkedResponse()
-			updateAgentUsetime(state)
+			atomic.StoreUint64(&state.lastUse, tunnel.Now())
 			httpids.Lock()
 			dest := httpids.m[resp.Id]
 			if dest != nil {
@@ -343,6 +335,17 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	agentname := firstLabel(r.TLS.PeerCertificates[0].Subject.CommonName)
 	target := mapTarget(agentname)
 
+	agents.RLock()
+	agentList, ok := agents.m[target]
+	if !ok || len(agentList) == 0 {
+		agents.RUnlock()
+		log.Printf("No agents connected for: %s", target)
+		w.WriteHeader(http.StatusBadGateway)
+		return
+	}
+	agent := agentList[0] // TODO: Should we round robin, or randomize selection?
+	log.Printf("Using agent %s, session %s", agent.identity, agent.sessionIdentity)
+
 	body, _ := ioutil.ReadAll(r.Body)
 	req := &tunnel.HttpRequest{
 		Id:      ulidContext.Ulid(),
@@ -352,18 +355,6 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		Headers: makeHeaders(r.Header),
 		Body:    body,
 	}
-	agents.RLock()
-	agentList, ok := agents.m[req.Target]
-	if !ok {
-		agents.RUnlock()
-		log.Printf("No agents connected for: %s", req.Target)
-		w.WriteHeader(http.StatusBadGateway)
-		return
-	}
-	if len(agentList) == 0 {
-		log.Printf("No agents connected for: %s", req.Target)
-	}
-	agent := agentList[0] // TODO: Should we round robin, or randomize selection?
 	message := &httpMessage{out: make(chan *tunnel.ASEventWrapper), cmd: req}
 	agent.inHTTPRequest <- message
 	agents.RUnlock()

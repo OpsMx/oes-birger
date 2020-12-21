@@ -75,6 +75,7 @@ func callCancelFunction(id string) {
 
 func executeRequest(dataflow chan *tunnel.ASEventWrapper, c *serverContext, req *tunnel.HttpRequest) {
 	// TODO: A ServerCA is technically optional, but we might want to fail if it's not present...
+	log.Printf("Running request %v", req)
 	tlsConfig := &tls.Config{
 		MinVersion:         tls.VersionTLS12,
 		InsecureSkipVerify: c.insecure,
@@ -129,7 +130,7 @@ func executeRequest(dataflow chan *tunnel.ASEventWrapper, c *serverContext, req 
 	if len(c.token) > 0 {
 		httpRequest.Header.Set("Authorization", "Bearer "+c.token)
 	}
-	//log.Printf("Sending HTTP request: %v", httpRequest)
+	log.Printf("Sending HTTP request: %v", httpRequest)
 	get, err := client.Do(httpRequest)
 	if err != nil {
 		log.Printf("Failed to execute request for %s to %s: %v", req.Method, c.serverURL+req.URI, err)
@@ -389,6 +390,7 @@ func loadServiceAccount() *serverContext {
 	}
 
 	log.Printf("Using this pod's ServiceAccount to authenticate to Kubernetes API")
+	log.Printf("Server CA: %v", serverCert.PublicKey)
 
 	sa := &serverContext{
 		username:  "ServiceAccount",
@@ -397,7 +399,6 @@ func loadServiceAccount() *serverContext {
 		token:     string(token),
 		insecure:  true,
 	}
-	log.Printf("Context: %v", sa)
 	return sa
 }
 
