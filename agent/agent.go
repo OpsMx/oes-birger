@@ -244,7 +244,7 @@ func runTunnel(sa *serverContext, client tunnel.TunnelServiceClient, ticker chan
 	hello := &tunnel.ASEventWrapper{
 		Event: &tunnel.ASEventWrapper_AgentHello{
 			AgentHello: &tunnel.AgentHello{
-				Namespace: config.Namespaces,
+				Namespaces: config.Namespaces,
 			},
 		},
 	}
@@ -437,7 +437,7 @@ func loadServiceAccount() *serverContext {
 func main() {
 	flag.Parse()
 
-	config := loadConfig()
+	config = loadConfig()
 	log.Printf("Configured namesapces: %v", config.Namespaces)
 
 	// load client cert/key, cacert

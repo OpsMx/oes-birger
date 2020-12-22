@@ -293,7 +293,7 @@ func (s *tunnelServer) EventTunnel(stream tunnel.TunnelService_EventTunnelServer
 		case *tunnel.ASEventWrapper_AgentHello:
 			req := in.GetAgentHello()
 			addAgent(state)
-			sendWebhook(state.identity, req.Namespace)
+			sendWebhook(state.identity, req.Namespaces)
 		case *tunnel.ASEventWrapper_HttpResponse:
 			resp := in.GetHttpResponse()
 			atomic.StoreUint64(&state.lastUse, tunnel.Now())

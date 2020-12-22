@@ -52,7 +52,7 @@ message HttpChunkedResponse {
 }
 
 message AgentHello {
-    repeated string namespace = 1;
+    repeated string namespaces = 1;
 }
 
 // Messages sent from server to agent
