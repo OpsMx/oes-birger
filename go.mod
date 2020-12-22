@@ -7,6 +7,7 @@ require (
 	github.com/google/go-cmp v0.5.4 // indirect
 	github.com/kr/text v0.2.0 // indirect
 	github.com/oklog/ulid/v2 v2.0.2
+	github.com/prometheus/client_golang v1.9.0
 	golang.org/x/lint v0.0.0-20201208152925-83fdc39ff7b5 // indirect
 	golang.org/x/mod v0.4.0 // indirect
 	golang.org/x/net v0.0.0-20201216054612-986b41b23924

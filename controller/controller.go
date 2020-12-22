@@ -25,6 +25,7 @@ import (
 	"gopkg.in/yaml.v2"
 
 	"github.com/golang/protobuf/ptypes/empty"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/skandragon/grpc-bidir/controller/webhook"
 	"github.com/skandragon/grpc-bidir/tunnel"
 	"github.com/skandragon/grpc-bidir/ulid"
@@ -32,7 +33,8 @@ import (
 
 var (
 	port           = flag.Int("port", tunnel.DefaultPort, "The GRPC port to listen on")
-	httpPort       = flag.Int("httpPort", 9002, "The HTTP port to listen for Kubernetes API requests on")
+	apiPort        = flag.Int("apiPort", 9002, "The HTTPS port to listen for Kubernetes API requests on")
+	prometheusPort = flag.Int("prometheusPort", 9003, "The HTTP port to serve /metrics for Prometheus")
 	serverCertFile = flag.String("certFile", "/app/config/cert.pem", "The file containing the certificate for the server")
 	serverKeyFile  = flag.String("keyFile", "/app/config/key.pem", "The file containing the certificate for the server")
 	caCertFile     = flag.String("caCertFile", "/app/config/ca.pem", "The file containing the CA certificate we will use to verify the agent's cert")
@@ -471,7 +473,7 @@ func (s *tunnelServer) GetStatistics(ctx context.Context, in *empty.Empty) (*tun
 }
 
 func runAgentHTTPServer() {
-	log.Printf("Running HTTP listener on port %d", *httpPort)
+	log.Printf("Running HTTPS listener on port %d", *apiPort)
 
 	caCert, _ := ioutil.ReadFile(*caCertFile)
 	caCertPool := x509.NewCertPool()
@@ -489,12 +491,25 @@ func runAgentHTTPServer() {
 	mux.HandleFunc("/", handler)
 
 	server := &http.Server{
-		Addr:      fmt.Sprintf(":%d", *httpPort),
+		Addr:      fmt.Sprintf(":%d", *apiPort),
 		TLSConfig: tlsConfig,
 		Handler:   mux,
 	}
 
 	server.ListenAndServeTLS(*serverCertFile, *serverKeyFile)
+}
+
+func runPrometheusHTTPServer(port int) {
+	log.Printf("Running HTTP listener for Prometheus on port %d", port)
+
+	mux := http.NewServeMux()
+	mux.Handle("/metrics", promhttp.Handler())
+
+	server := &http.Server{
+		Addr:    fmt.Sprintf(":%d", port),
+		Handler: mux,
+	}
+	server.ListenAndServe()
 }
 
 func main() {
@@ -506,6 +521,13 @@ func main() {
 	if len(config.Webhook) > 0 {
 		hook = webhook.NewRunner(config.Webhook)
 		hook.Run()
+	}
+
+	//
+	// Run Prometheus HTTP server
+	//
+	if prometheusPort != nil {
+		go runPrometheusHTTPServer(*prometheusPort)
 	}
 
 	//
