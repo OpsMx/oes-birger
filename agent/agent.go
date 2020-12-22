@@ -220,6 +220,21 @@ func runTunnel(sa *serverContext, client tunnel.TunnelServiceClient, ticker chan
 		log.Fatalf("%v.EventTunnel(_) = _, %v", client, err)
 	}
 
+	namespaces := make([]string, 0)
+	namespaces = append(namespaces, "forwarder")
+	namespaces = append(namespaces, "default")
+
+	hello := &tunnel.ASEventWrapper{
+		Event: &tunnel.ASEventWrapper_AgentHello{
+			AgentHello: &tunnel.AgentHello{
+				Namespace: namespaces,
+			},
+		},
+	}
+	if err = stream.Send(hello); err != nil {
+		log.Fatalf("Unable to send hello packet: %v", err)
+	}
+
 	dataflow := make(chan *tunnel.ASEventWrapper, 20)
 
 	// Handle periodic pings from the ticker.

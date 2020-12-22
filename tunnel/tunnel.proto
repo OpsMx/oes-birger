@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package tunnel;
 
+import "google/protobuf/empty.proto";
+
 option go_package = ".;tunnel";
 
 message PingRequest {
@@ -49,6 +51,10 @@ message HttpChunkedResponse {
     bytes body = 3;
 }
 
+message AgentHello {
+    repeated string namespace = 1;
+}
+
 // Messages sent from server to agent
 message SAEventWrapper {
     oneof event {
@@ -64,9 +70,31 @@ message ASEventWrapper {
         PingRequest pingRequest = 1;
         HttpResponse httpResponse = 2;
         HttpChunkedResponse httpChunkedResponse = 3;
+        AgentHello agentHello = 4;
     }
 }
 
+//
+// Statistics and Control
+//
+
+message ControllerAgentStatistics {
+    string identity = 1;
+    string sessionIdentity = 2;
+    uint64 connectedAt = 3;
+    uint64 lastPing = 4;
+    uint64 lastUse = 5;
+}
+
+message ControllerStatistics {
+    repeated ControllerAgentStatistics agentStatistics = 1;
+}
+
+//
+// Service (runs on the controller)
+//
+
 service TunnelService {
     rpc EventTunnel(stream ASEventWrapper) returns (stream SAEventWrapper) {}
+    rpc GetStatistics(google.protobuf.Empty) returns (ControllerStatistics) {}
 }

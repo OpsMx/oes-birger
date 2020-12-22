@@ -22,6 +22,8 @@ import (
 	"google.golang.org/grpc/status"
 	"gopkg.in/yaml.v2"
 
+	"github.com/golang/protobuf/ptypes/empty"
+	"github.com/skandragon/grpc-bidir/controller/webhook"
 	"github.com/skandragon/grpc-bidir/tunnel"
 	"github.com/skandragon/grpc-bidir/ulid"
 )
@@ -42,10 +44,13 @@ var (
 	config *controllerConfig
 
 	ulidContext = ulid.NewContext()
+
+	hook *webhook.WebhookRunner
 )
 
 type controllerConfig struct {
 	Agents      map[string]*agentConfig `yaml:"agents"`
+	Webhook     string                  `yaml:"webhook"`
 	ServerNames []string                `yaml:"serverNames"`
 }
 
@@ -93,6 +98,18 @@ type agentState struct {
 	connectedAt     uint64
 	lastPing        uint64
 	lastUse         uint64
+}
+
+func sendWebhook(name string, namespaces []string) {
+	if hook == nil {
+		return
+	}
+	req := &webhook.WebhookRequest{
+		Name:       name,
+		Namespaces: namespaces,
+		Kubeconfig: "",
+	}
+	hook.Send(req)
 }
 
 func addAgent(state *agentState) {
@@ -197,7 +214,7 @@ func (s *tunnelServer) EventTunnel(stream tunnel.TunnelService_EventTunnelServer
 		connectedAt:     tunnel.Now(),
 	}
 
-	addAgent(state)
+	log.Printf("Agent %s connected, session id %s, awaiting hello message", state.identity, state.sessionIdentity)
 
 	go func() {
 		for {
@@ -273,6 +290,10 @@ func (s *tunnelServer) EventTunnel(stream tunnel.TunnelService_EventTunnelServer
 				removeAgent(state)
 				return err
 			}
+		case *tunnel.ASEventWrapper_AgentHello:
+			req := in.GetAgentHello()
+			addAgent(state)
+			sendWebhook(state.identity, req.Namespace)
 		case *tunnel.ASEventWrapper_HttpResponse:
 			resp := in.GetHttpResponse()
 			atomic.StoreUint64(&state.lastUse, tunnel.Now())
@@ -424,11 +445,39 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func (s *tunnelServer) GetStatistics(ctx context.Context, in *empty.Empty) (*tunnel.ControllerStatistics, error) {
+	agents.RLock()
+	defer agents.RUnlock()
+	as := make([]*tunnel.ControllerAgentStatistics, 0)
+	for _, list := range agents.m {
+		for _, agent := range list {
+			a := &tunnel.ControllerAgentStatistics{
+				Identity:        agent.identity,
+				SessionIdentity: agent.sessionIdentity,
+				ConnectedAt:     agent.connectedAt,
+				LastPing:        agent.lastPing,
+				LastUse:         agent.lastUse,
+			}
+			as = append(as, a)
+		}
+	}
+	ret := &tunnel.ControllerStatistics{
+		AgentStatistics: as,
+	}
+
+	return ret, nil
+}
+
 func main() {
 	flag.Parse()
 
 	config = loadConfig()
 	log.Printf("Server names for generated certificate: %v", config.ServerNames)
+
+	if len(config.Webhook) > 0 {
+		hook = webhook.NewRunner(config.Webhook)
+		hook.Run()
+	}
 
 	//
 	// Set up HTTP server
