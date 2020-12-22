@@ -9,11 +9,13 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
+	"math/rand"
 	"net"
 	"net/http"
 	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -46,6 +48,8 @@ var (
 	ulidContext = ulid.NewContext()
 
 	hook *webhook.WebhookRunner
+
+	rnd = rand.New(rand.NewSource(time.Now().UnixNano()))
 )
 
 type controllerConfig struct {
@@ -364,9 +368,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadGateway)
 		return
 	}
-	agent := agentList[0] // TODO: Should we round robin, or randomize selection?
-	log.Printf("Using agent %s, session %s", agent.identity, agent.sessionIdentity)
-
+	agent := agentList[rnd.Intn(len(agentList))]
 	body, _ := ioutil.ReadAll(r.Body)
 	req := &tunnel.HttpRequest{
 		Id:      ulidContext.Ulid(),
@@ -468,6 +470,33 @@ func (s *tunnelServer) GetStatistics(ctx context.Context, in *empty.Empty) (*tun
 	return ret, nil
 }
 
+func runAgentHTTPServer() {
+	log.Printf("Running HTTP listener on port %d", *httpPort)
+
+	caCert, _ := ioutil.ReadFile(*caCertFile)
+	caCertPool := x509.NewCertPool()
+	caCertPool.AppendCertsFromPEM(caCert)
+
+	tlsConfig := &tls.Config{
+		ClientCAs:  caCertPool,
+		ClientAuth: tls.RequireAndVerifyClientCert,
+		MinVersion: tls.VersionTLS12,
+	}
+	tlsConfig.BuildNameToCertificate()
+
+	mux := http.NewServeMux()
+
+	mux.HandleFunc("/", handler)
+
+	server := &http.Server{
+		Addr:      fmt.Sprintf(":%d", *httpPort),
+		TLSConfig: tlsConfig,
+		Handler:   mux,
+	}
+
+	server.ListenAndServeTLS(*serverCertFile, *serverKeyFile)
+}
+
 func main() {
 	flag.Parse()
 
@@ -482,27 +511,7 @@ func main() {
 	//
 	// Set up HTTP server
 	//
-	log.Printf("Running HTTP listener on port %d", *httpPort)
-
-	caCert, _ := ioutil.ReadFile(*caCertFile)
-	caCertPool := x509.NewCertPool()
-	caCertPool.AppendCertsFromPEM(caCert)
-
-	tlsConfig := &tls.Config{
-		ClientCAs:  caCertPool,
-		ClientAuth: tls.RequireAndVerifyClientCert,
-		MinVersion: tls.VersionTLS12,
-	}
-	tlsConfig.BuildNameToCertificate()
-
-	server := &http.Server{
-		Addr:      fmt.Sprintf(":%d", *httpPort),
-		TLSConfig: tlsConfig,
-	}
-
-	http.HandleFunc("/", handler)
-	// Configure the port
-	go server.ListenAndServeTLS(*serverCertFile, *serverKeyFile)
+	go runAgentHTTPServer()
 
 	//
 	// Set up GRPC server
