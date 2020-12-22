@@ -459,18 +459,21 @@ func main() {
 		RootCAs:      caCertPool,
 	})
 
-	//sa := loadServiceAccount()
-	//if sa == nil {
-	yaml, err := os.Open(*kubeConfigFilename)
+	// First, try to see if we have a kubeconfig.yaml
+	var sa *serverContext
+	yamlString, err := os.Open(*kubeConfigFilename)
 	if err != nil {
-		log.Fatalf("Unable to open kubeconfig '%s': %v", *kubeConfigFilename, err)
+		sa = loadServiceAccount()
+		if sa == nil {
+			log.Fatalf("No kubeconfig and no Kubernetes account found")
+		}
+	} else {
+		kconfig, err := kubeconfig.ReadKubeConfig(yamlString)
+		if err != nil {
+			log.Fatalf("Unable to read kubeconfig: %v", err)
+		}
+		sa = makeServerConfig(kconfig)
 	}
-	kconfig, err := kubeconfig.ReadKubeConfig(yaml)
-	if err != nil {
-		log.Fatalf("Unable to read kubeconfig: %v", err)
-	}
-	sa := makeServerConfig(kconfig)
-	//}
 
 	opts := []grpc.DialOption{
 		grpc.WithTransportCredentials(ta),
