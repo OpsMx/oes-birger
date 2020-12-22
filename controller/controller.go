@@ -25,6 +25,8 @@ import (
 	"gopkg.in/yaml.v2"
 
 	"github.com/golang/protobuf/ptypes/empty"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/skandragon/grpc-bidir/controller/webhook"
 	"github.com/skandragon/grpc-bidir/tunnel"
@@ -34,7 +36,7 @@ import (
 var (
 	port           = flag.Int("port", tunnel.DefaultPort, "The GRPC port to listen on")
 	apiPort        = flag.Int("apiPort", 9002, "The HTTPS port to listen for Kubernetes API requests on")
-	prometheusPort = flag.Int("prometheusPort", 9003, "The HTTP port to serve /metrics for Prometheus")
+	prometheusPort = flag.Int("prometheusPort", 9102, "The HTTP port to serve /metrics for Prometheus")
 	serverCertFile = flag.String("certFile", "/app/config/cert.pem", "The file containing the certificate for the server")
 	serverKeyFile  = flag.String("keyFile", "/app/config/key.pem", "The file containing the certificate for the server")
 	caCertFile     = flag.String("caCertFile", "/app/config/ca.pem", "The file containing the CA certificate we will use to verify the agent's cert")
@@ -52,6 +54,16 @@ var (
 	hook *webhook.WebhookRunner
 
 	rnd = rand.New(rand.NewSource(time.Now().UnixNano()))
+
+	// metrics
+	apiRequestCounter = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "controller_api_requests_total",
+		Help: "The total numbe of API requests",
+	}, []string{"agent_identity"})
+	connectedAgentsGauge = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "agents_connected",
+		Help: "The currently connected agents",
+	}, []string{"agent_identity"})
 )
 
 type controllerConfig struct {
@@ -129,6 +141,7 @@ func addAgent(state *agentState) {
 	agentList = append(agentList, state)
 	agents.m[state.identity] = agentList
 	log.Printf("Session %s added for agent %s, now at %d endpoints", state.sessionIdentity, state.identity, len(agentList))
+	connectedAgentsGauge.WithLabelValues(state.identity).Inc()
 }
 
 func removeAgent(state *agentState) {
@@ -150,6 +163,7 @@ func removeAgent(state *agentState) {
 		agentList[len(agentList)-1] = nil
 		agentList = agentList[:len(agentList)-1]
 		agents.m[state.identity] = agentList
+		connectedAgentsGauge.WithLabelValues(state.identity).Dec()
 	} else {
 		log.Printf("Agent session %s not found in list of agents for %s", state.sessionIdentity, state.identity)
 	}
@@ -362,6 +376,8 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	agentname := firstLabel(r.TLS.PeerCertificates[0].Subject.CommonName)
 	target := mapTarget(agentname)
 
+	apiRequestCounter.WithLabelValues(target).Inc()
+
 	agents.RLock()
 	agentList, ok := agents.m[target]
 	if !ok || len(agentList) == 0 {
@@ -510,6 +526,9 @@ func runPrometheusHTTPServer(port int) {
 		Handler: mux,
 	}
 	server.ListenAndServe()
+
+	prometheus.MustRegister(apiRequestCounter)
+	prometheus.MustRegister(connectedAgentsGauge)
 }
 
 func main() {
