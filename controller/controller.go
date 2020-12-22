@@ -9,7 +9,6 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/base64"
-	"encoding/json"
 	"encoding/pem"
 	"flag"
 	"fmt"
@@ -176,12 +175,13 @@ func makeKubectlConfig(name string, ca tls.Certificate) string {
 
 	k := kubeconfig.KubeConfig{
 		APIVersion: "v1",
-		Kind:       "config",
+		Kind:       "Config",
 		Contexts: []kubeconfig.Context{
 			{
 				Name: joinName,
 				Context: kubeconfig.ContextDetails{
-					User: joinName,
+					User:    joinName,
+					Cluster: joinName,
 				},
 			},
 		},
@@ -206,8 +206,8 @@ func makeKubectlConfig(name string, ca tls.Certificate) string {
 		CurrentContext: joinName,
 	}
 
-	js, _ := json.Marshal(k)
-	return string(js)
+	s, _ := yaml.Marshal(k)
+	return string(s)
 }
 
 type controllerConfig struct {
