@@ -1,14 +1,22 @@
 package main
 
 import (
+	"bytes"
 	"context"
+	crand "crypto/rand"
+	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/base64"
+	"encoding/json"
+	"encoding/pem"
 	"flag"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
+	"math/big"
 	"math/rand"
 	"net"
 	"net/http"
@@ -29,6 +37,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/skandragon/grpc-bidir/controller/webhook"
+	"github.com/skandragon/grpc-bidir/kubeconfig"
 	"github.com/skandragon/grpc-bidir/tunnel"
 	"github.com/skandragon/grpc-bidir/ulid"
 )
@@ -37,9 +46,8 @@ var (
 	port           = flag.Int("port", tunnel.DefaultPort, "The GRPC port to listen on")
 	apiPort        = flag.Int("apiPort", 9002, "The HTTPS port to listen for Kubernetes API requests on")
 	prometheusPort = flag.Int("prometheusPort", 9102, "The HTTP port to serve /metrics for Prometheus")
-	serverCertFile = flag.String("certFile", "/app/config/cert.pem", "The file containing the certificate for the server")
-	serverKeyFile  = flag.String("keyFile", "/app/config/key.pem", "The file containing the certificate for the server")
-	caCertFile     = flag.String("caCertFile", "/app/config/ca.pem", "The file containing the CA certificate we will use to verify the agent's cert")
+	caCertFile     = flag.String("caCertFile", "/app/config/ca.pem", "The file containing the CA certificate")
+	caKeyFile      = flag.String("caKeyFile", "/app/config/cakey.pem", "The CA key file")
 	configFile     = flag.String("configFile", "/app/config/config.yaml", "The file with the controller config")
 
 	agents = struct {
@@ -64,7 +72,143 @@ var (
 		Name: "agents_connected",
 		Help: "The currently connected agents",
 	}, []string{"agent_identity"})
+
+	caCert tls.Certificate
 )
+
+func makeServerCert(ca tls.Certificate) tls.Certificate {
+	cert := &x509.Certificate{
+		SerialNumber: big.NewInt(time.Now().UnixNano()),
+		Subject: pkix.Name{
+			Organization: []string{"OpsMX API Forwarder"},
+			Country:      []string{"US"},
+			Province:     []string{},
+			Locality:     []string{"San Francisco"},
+		},
+		NotBefore:    time.Now(),
+		NotAfter:     time.Now().AddDate(1, 0, 0),
+		SubjectKeyId: []byte{1},
+		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
+		KeyUsage:     x509.KeyUsageDigitalSignature,
+		DNSNames:     config.ServerNames,
+	}
+	certPrivKey, err := rsa.GenerateKey(crand.Reader, 4096)
+	if err != nil {
+		log.Fatalf("Unable to generate server key: %v", err)
+	}
+
+	// we now have a certificate and private key.  Now, sign the cert with the CA.
+
+	caCert, err := x509.ParseCertificate(ca.Certificate[0])
+
+	certBytes, err := x509.CreateCertificate(crand.Reader, cert, caCert, &certPrivKey.PublicKey, ca.PrivateKey)
+	if err != nil {
+		log.Fatalf("Unable to generate server certificate: %v", err)
+	}
+
+	certPEM := new(bytes.Buffer)
+	pem.Encode(certPEM, &pem.Block{
+		Type:  "CERTIFICATE",
+		Bytes: certBytes,
+	})
+
+	certPrivKeyPEM := new(bytes.Buffer)
+	pem.Encode(certPrivKeyPEM, &pem.Block{
+		Type:  "RSA PRIVATE KEY",
+		Bytes: x509.MarshalPKCS1PrivateKey(certPrivKey),
+	})
+
+	serverCert, err := tls.X509KeyPair(certPEM.Bytes(), certPrivKeyPEM.Bytes())
+	if err != nil {
+		log.Fatalf("Unable to convert to TLS server certificate: %v", err)
+	}
+	return serverCert
+}
+
+func makeKubectlConfig(name string, ca tls.Certificate) string {
+	cert := &x509.Certificate{
+		SerialNumber: big.NewInt(time.Now().UnixNano()),
+		Subject: pkix.Name{
+			CommonName:   name + ".client",
+			Organization: []string{"OpsMX API Forwarder Client"},
+			Country:      []string{"US"},
+			Province:     []string{},
+			Locality:     []string{"San Francisco"},
+		},
+		NotBefore:    time.Now(),
+		NotAfter:     time.Now().AddDate(1, 0, 0),
+		SubjectKeyId: []byte{1},
+		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
+		KeyUsage:     x509.KeyUsageDigitalSignature,
+		DNSNames:     config.ServerNames,
+	}
+	certPrivKey, err := rsa.GenerateKey(crand.Reader, 4096)
+	if err != nil {
+		log.Fatalf("Unable to generate server key: %v", err)
+	}
+
+	// we now have a certificate and private key.  Now, sign the cert with the CA.
+
+	caCert, err := x509.ParseCertificate(ca.Certificate[0])
+
+	certBytes, err := x509.CreateCertificate(crand.Reader, cert, caCert, &certPrivKey.PublicKey, ca.PrivateKey)
+	if err != nil {
+		log.Fatalf("Unable to generate server certificate: %v", err)
+	}
+
+	certPEM := new(bytes.Buffer)
+	pem.Encode(certPEM, &pem.Block{
+		Type:  "CERTIFICATE",
+		Bytes: certBytes,
+	})
+	cert64 := base64.StdEncoding.EncodeToString(certPEM.Bytes())
+
+	certPrivKeyPEM := new(bytes.Buffer)
+	pem.Encode(certPrivKeyPEM, &pem.Block{
+		Type:  "RSA PRIVATE KEY",
+		Bytes: x509.MarshalPKCS1PrivateKey(certPrivKey),
+	})
+	certPrivKey64 := base64.StdEncoding.EncodeToString(certPrivKeyPEM.Bytes())
+
+	caPEM, err := ioutil.ReadFile(*caCertFile)
+	ca64 := base64.StdEncoding.EncodeToString(caPEM)
+	joinName := "forwarder"
+
+	k := kubeconfig.KubeConfig{
+		APIVersion: "v1",
+		Kind:       "config",
+		Contexts: []kubeconfig.Context{
+			{
+				Name: joinName,
+				Context: kubeconfig.ContextDetails{
+					User: joinName,
+				},
+			},
+		},
+		Users: []kubeconfig.User{
+			{
+				Name: joinName,
+				User: kubeconfig.UserDetails{
+					ClientCertificateData: cert64,
+					ClientKeyData:         certPrivKey64,
+				},
+			},
+		},
+		Clusters: []kubeconfig.Cluster{
+			{
+				Name: joinName,
+				Cluster: kubeconfig.ClusterDetails{
+					Server:                   fmt.Sprintf("https://%s:%d", config.ServerNames[0], *apiPort),
+					CertificateAuthorityData: ca64,
+				},
+			},
+		},
+		CurrentContext: joinName,
+	}
+
+	js, _ := json.Marshal(k)
+	return string(js)
+}
 
 type controllerConfig struct {
 	Agents      map[string]*agentConfig `yaml:"agents"`
@@ -122,10 +266,11 @@ func sendWebhook(name string, namespaces []string) {
 	if hook == nil {
 		return
 	}
+	kc := makeKubectlConfig(name, caCert)
 	req := &webhook.WebhookRequest{
 		Name:       name,
 		Namespaces: namespaces,
-		Kubeconfig: "",
+		Kubeconfig: base64.StdEncoding.EncodeToString([]byte(kc)),
 	}
 	hook.Send(req)
 }
@@ -488,17 +633,26 @@ func (s *tunnelServer) GetStatistics(ctx context.Context, in *empty.Empty) (*tun
 	return ret, nil
 }
 
-func runAgentHTTPServer() {
+func runAgentHTTPServer(caCert tls.Certificate, serverCert tls.Certificate) {
 	log.Printf("Running HTTPS listener on port %d", *apiPort)
 
-	caCert, _ := ioutil.ReadFile(*caCertFile)
 	caCertPool := x509.NewCertPool()
-	caCertPool.AppendCertsFromPEM(caCert)
+	//for _, cert := range caCert.Certificate {
+	//	caCertPool.AppendCertsFromPEM(cert)
+	//}
+	ca, err := ioutil.ReadFile(*caCertFile)
+	if err != nil {
+		log.Fatalf("could not read ca certificate: %s", err)
+	}
+	if ok := caCertPool.AppendCertsFromPEM(ca); !ok {
+		log.Fatalf("failed to append agent certs")
+	}
 
 	tlsConfig := &tls.Config{
-		ClientCAs:  caCertPool,
-		ClientAuth: tls.RequireAndVerifyClientCert,
-		MinVersion: tls.VersionTLS12,
+		ClientCAs:    caCertPool,
+		ClientAuth:   tls.RequireAndVerifyClientCert,
+		Certificates: []tls.Certificate{serverCert},
+		MinVersion:   tls.VersionTLS12,
 	}
 	tlsConfig.BuildNameToCertificate()
 
@@ -512,7 +666,7 @@ func runAgentHTTPServer() {
 		Handler:   mux,
 	}
 
-	server.ListenAndServeTLS(*serverCertFile, *serverKeyFile)
+	server.ListenAndServeTLS("", "")
 }
 
 func runPrometheusHTTPServer(port int) {
@@ -529,6 +683,41 @@ func runPrometheusHTTPServer(port int) {
 
 	prometheus.MustRegister(apiRequestCounter)
 	prometheus.MustRegister(connectedAgentsGauge)
+}
+
+func runGRPCServer(caCert tls.Certificate, serverCert tls.Certificate) {
+	//
+	// Set up GRPC server
+	//
+	log.Printf("Starting GRPC server on port %d...", *port)
+	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", *port))
+	if err != nil {
+		log.Fatalf("Failed to listen: %v", err)
+	}
+
+	if err != nil {
+		log.Fatalf("could not load server key pair: %s", err)
+	}
+	caCertPool := x509.NewCertPool()
+	ca, err := ioutil.ReadFile(*caCertFile)
+	if err != nil {
+		log.Fatalf("could not read ca certificate: %s", err)
+	}
+	if ok := caCertPool.AppendCertsFromPEM(ca); !ok {
+		log.Fatalf("failed to append agent certs")
+	}
+	creds := credentials.NewTLS(&tls.Config{
+		ClientCAs:    caCertPool,
+		ClientAuth:   tls.RequireAndVerifyClientCert,
+		Certificates: []tls.Certificate{serverCert},
+		MinVersion:   tls.VersionTLS12,
+	})
+	grpcServer := grpc.NewServer(grpc.Creds(creds))
+	tunnel.RegisterTunnelServiceServer(grpcServer, newServer())
+	if err := grpcServer.Serve(lis); err != nil {
+		log.Fatalf("Failed to start GRPC server: %v", err)
+	}
+
 }
 
 func main() {
@@ -549,40 +738,18 @@ func main() {
 		go runPrometheusHTTPServer(*prometheusPort)
 	}
 
+	caCertLocal, err := tls.LoadX509KeyPair(*caCertFile, *caKeyFile)
+	if err != nil {
+		log.Fatalf("Unable to load CA cetificate or key: %v", err)
+	}
+	caCert = caCertLocal
+	serverCert := makeServerCert(caCert)
+
 	//
 	// Set up HTTP server
 	//
-	go runAgentHTTPServer()
+	go runAgentHTTPServer(caCert, serverCert)
 
-	//
-	// Set up GRPC server
-	//
-	log.Printf("Starting GRPC server on port %d...", *port)
-	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", *port))
-	if err != nil {
-		log.Fatalf("Failed to listen: %v", err)
-	}
-	certificate, err := tls.LoadX509KeyPair(*serverCertFile, *serverKeyFile)
-	if err != nil {
-		log.Fatalf("could not load server key pair: %s", err)
-	}
-	certPool := x509.NewCertPool()
-	ca, err := ioutil.ReadFile(*caCertFile)
-	if err != nil {
-		log.Fatalf("could not read ca certificate: %s", err)
-	}
-	if ok := certPool.AppendCertsFromPEM(ca); !ok {
-		log.Fatalf("failed to append agent certs")
-	}
-	creds := credentials.NewTLS(&tls.Config{
-		ClientAuth:   tls.RequireAndVerifyClientCert,
-		Certificates: []tls.Certificate{certificate},
-		ClientCAs:    certPool,
-		MinVersion:   tls.VersionTLS12,
-	})
-	grpcServer := grpc.NewServer(grpc.Creds(creds))
-	tunnel.RegisterTunnelServiceServer(grpcServer, newServer())
-	if err := grpcServer.Serve(lis); err != nil {
-		log.Fatalf("Failed to start GRPC server: %v", err)
-	}
+	// never returns
+	runGRPCServer(caCert, serverCert)
 }

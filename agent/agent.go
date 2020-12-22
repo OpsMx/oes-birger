@@ -459,18 +459,18 @@ func main() {
 		RootCAs:      caCertPool,
 	})
 
-	sa := loadServiceAccount()
-	if sa == nil {
-		yaml, err := os.Open(*kubeConfigFilename)
-		if err != nil {
-			log.Fatalf("Unable to open kubeconfig '%s': %v", *kubeConfigFilename, err)
-		}
-		kconfig, err := kubeconfig.ReadKubeConfig(yaml)
-		if err != nil {
-			log.Fatalf("Unable to read kubeconfig: %v", err)
-		}
-		sa = makeServerConfig(kconfig)
+	//sa := loadServiceAccount()
+	//if sa == nil {
+	yaml, err := os.Open(*kubeConfigFilename)
+	if err != nil {
+		log.Fatalf("Unable to open kubeconfig '%s': %v", *kubeConfigFilename, err)
 	}
+	kconfig, err := kubeconfig.ReadKubeConfig(yaml)
+	if err != nil {
+		log.Fatalf("Unable to read kubeconfig: %v", err)
+	}
+	sa := makeServerConfig(kconfig)
+	//}
 
 	opts := []grpc.DialOption{
 		grpc.WithTransportCredentials(ta),
