@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"golang.org/x/net/context"
+	"gopkg.in/yaml.v2"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -31,6 +32,9 @@ var (
 	agentKeyFile       = flag.String("keyFile", "/app/config/key.pem", "The file containing the certificate used to connect to the controller")
 	caCertFile         = flag.String("caCertFile", "/app/config/ca.pem", "The file containing the CA certificate we will use to verify the controller's cert")
 	kubeConfigFilename = flag.String("kubeconfig", "/app/config/kubeconfig.yaml", "The location of a kubeconfig file to define endpoints and kube API auth")
+	configFile         = flag.String("configFile", "/app/config/config.yaml", "The file with the controller config")
+
+	config *agentConfig
 )
 
 func makeHeaders(headers map[string][]string) []*tunnel.HttpHeader {
@@ -39,6 +43,24 @@ func makeHeaders(headers map[string][]string) []*tunnel.HttpHeader {
 		ret = append(ret, &tunnel.HttpHeader{Name: name, Values: values})
 	}
 	return ret
+}
+
+type agentConfig struct {
+	Namespaces []string `yaml:"namespaces"`
+}
+
+func loadConfig() *agentConfig {
+	buf, err := ioutil.ReadFile(*configFile)
+	if err != nil {
+		log.Fatalf("Unable to load config file: %v", err)
+	}
+
+	config := &agentConfig{}
+	err = yaml.Unmarshal(buf, config)
+	if err != nil {
+		log.Fatalf("Unable to read config file: %v", err)
+	}
+	return config
 }
 
 type cancelState struct {
@@ -219,15 +241,10 @@ func runTunnel(sa *serverContext, client tunnel.TunnelServiceClient, ticker chan
 	if err != nil {
 		log.Fatalf("%v.EventTunnel(_) = _, %v", client, err)
 	}
-
-	namespaces := make([]string, 0)
-	namespaces = append(namespaces, "forwarder")
-	namespaces = append(namespaces, "default")
-
 	hello := &tunnel.ASEventWrapper{
 		Event: &tunnel.ASEventWrapper_AgentHello{
 			AgentHello: &tunnel.AgentHello{
-				Namespace: namespaces,
+				Namespace: config.Namespaces,
 			},
 		},
 	}
@@ -419,6 +436,9 @@ func loadServiceAccount() *serverContext {
 
 func main() {
 	flag.Parse()
+
+	config := loadConfig()
+	log.Printf("Configured namesapces: %v", config.Namespaces)
 
 	// load client cert/key, cacert
 	clcert, err := tls.LoadX509KeyPair(*agentCertFile, *agentKeyFile)
