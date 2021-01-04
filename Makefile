@@ -1,6 +1,6 @@
 TARGETS=test local
 PLATFORM=linux/amd64,linux/arm64
-BUILD=docker buildx build --pull --platform ${PLATFORM}
+BUILDX=docker buildx build --pull --platform ${PLATFORM}
 
 # Generated protobuf outputs.  These are removed with "make clean"
 pb_deps = tunnel/tunnel.pb.go
@@ -62,7 +62,7 @@ forwarder-agent-image: forwarder-agent-image.buildtime
 forwarder-controller-image: forwarder-controller-image.buildtime
 
 forwarder-agent-image.buildtime: ${agent_deps} Dockerfile
-	@${BUILD} \
+	@${BUILDX} \
 		--tag docker.flame.org/library/forwarder-agent:latest \
 		--tag docker.flame.org/library/forwarder-agent:v${now} \
 		--target agent-image . \
@@ -70,7 +70,7 @@ forwarder-agent-image.buildtime: ${agent_deps} Dockerfile
 	touch forwarder-agent-image.buildtime
 
 forwarder-controller-image.buildtime: ${controller_deps} Dockerfile
-	@${BUILD} \
+	@${BUILDX} \
 	    --tag docker.flame.org/library/forwarder-controller:latest \
 		--tag docker.flame.org/library/forwarder-controller:v${now} \
 		--target controller-image . \
