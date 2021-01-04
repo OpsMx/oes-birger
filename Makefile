@@ -1,6 +1,7 @@
 TARGETS=test local
 PLATFORM=linux/amd64,linux/arm64
 BUILDX=docker buildx build --pull --platform ${PLATFORM}
+IMAGE_PREFIX=docker.flame.org/library/
 
 # Generated protobuf outputs.  These are removed with "make clean"
 pb_deps = tunnel/tunnel.pb.go
@@ -50,7 +51,38 @@ bin/controller: ${controller_deps}
 	go build -o bin/controller controller/controller.go
 
 #
-# Image builds
+# Multi-architecture image builds
+#
+.PHONY: images-ma
+images-ma: forwarder-controller-ma-image forwarder-agent-ma-image
+
+.PHONY: forwarder-agent-ma-image
+forwarder-agent-ma-image: forwarder-agent-ma-image.buildtime
+
+.PHONY: forwarder-controller-ma-image
+forwarder-controller-ma-image: forwarder-controller-ma-image.buildtime
+
+forwarder-agent-ma-image.buildtime: ${agent_deps} Dockerfile.multi
+	@${BUILDX} \
+		--tag ${IMAGE_PREFIX}forwarder-agent:latest \
+		--tag ${IMAGE_PREFIX}forwarder-agent:v${now} \
+		--target agent-image \
+		-f Dockerfile.multi \
+		--push .
+	touch forwarder-agent-ma-image.buildtime
+
+forwarder-controller-ma-image.buildtime: ${controller_deps} Dockerfile.multi
+	@${BUILDX} \
+	    --tag ${IMAGE_PREFIX}forwarder-controller:latest \
+		--tag ${IMAGE_PREFIX}forwarder-controller:v${now} \
+		--target controller-image \
+		-f Dockerfile.multi \
+		--push .
+	touch forwarder-controller-ma-image.buildtime
+
+
+#
+# Standard "whatever we are on now" image builds
 #
 .PHONY: images
 images: forwarder-controller-image forwarder-agent-image
@@ -62,19 +94,21 @@ forwarder-agent-image: forwarder-agent-image.buildtime
 forwarder-controller-image: forwarder-controller-image.buildtime
 
 forwarder-agent-image.buildtime: ${agent_deps} Dockerfile
-	@${BUILDX} \
-		--tag docker.flame.org/library/forwarder-agent:latest \
-		--tag docker.flame.org/library/forwarder-agent:v${now} \
-		--target agent-image . \
-		--push
+	@docker build \
+		--tag ${IMAGE_PREFIX}forwarder-agent:latest \
+		--tag ${IMAGE_PREFIX}forwarder-agent:v${now} \
+		--target agent-image \
+		.
+	@echo Tags: ${IMAGE_PREFIX}forwarder-agent:latest ${IMAGE_PREFIX}forwarder-agent:v${now}
 	touch forwarder-agent-image.buildtime
 
 forwarder-controller-image.buildtime: ${controller_deps} Dockerfile
-	@${BUILDX} \
-	    --tag docker.flame.org/library/forwarder-controller:latest \
-		--tag docker.flame.org/library/forwarder-controller:v${now} \
-		--target controller-image . \
-		--push
+	@docker build \
+	    --tag ${IMAGE_PREFIX}forwarder-controller:latest \
+		--tag ${IMAGE_PREFIX}forwarder-controller:v${now} \
+		--target controller-image \
+		.
+	@echo Tags: ${IMAGE_PREFIX}forwarder-controller:latest ${IMAGE_PREFIX}forwarder-controller:v${now}
 	touch forwarder-controller-image.buildtime
 
 #

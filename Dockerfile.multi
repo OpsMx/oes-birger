@@ -2,7 +2,7 @@
 # Install the latest versions of our mods.  This is done as a separate step
 # so it will pull from an image cache if possible, unless there are changes.
 #
-FROM golang:1.15.6-alpine AS buildmod
+FROM --platform=${BUILDPLATFORM} golang:1.15.6-alpine AS buildmod
 ENV CGO_ENABLED=0
 RUN mkdir /build
 WORKDIR /build
@@ -15,16 +15,20 @@ RUN go mod download
 #
 FROM buildmod AS build-agent
 COPY . .
+ARG TARGETOS
+ARG TARGETARCH
 RUN mkdir /out
-RUN go build -o /out/agent agent/agent.go
+RUN GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o /out/agent agent/agent.go
 
 #
 # Compile the controller.
 #
 FROM buildmod AS build-controller
 COPY . .
+ARG TARGETOS
+ARG TARGETARCH
 RUN mkdir /out
-RUN go build -o /out/controller controller/controller.go
+RUN GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o /out/controller controller/controller.go
 
 #
 # Base OS image for both published images
