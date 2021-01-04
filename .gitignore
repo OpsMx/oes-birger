@@ -17,3 +17,4 @@ bin
 ca
 .DS_Store
 tunnel/tunnel.pb.go
+*.buildtime
