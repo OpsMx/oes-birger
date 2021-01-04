@@ -45,8 +45,8 @@ var (
 	port           = flag.Int("port", tunnel.DefaultPort, "The GRPC port to listen on")
 	apiPort        = flag.Int("apiPort", 9002, "The HTTPS port to listen for Kubernetes API requests on")
 	prometheusPort = flag.Int("prometheusPort", 9102, "The HTTP port to serve /metrics for Prometheus")
-	caCertFile     = flag.String("caCertFile", "/app/config/ca.pem", "The file containing the CA certificate")
-	caKeyFile      = flag.String("caKeyFile", "/app/config/cakey.pem", "The CA key file")
+	caCertFile     = flag.String("caCertFile", "/app/secrets/ca/tls.crt", "The file containing the CA certificate")
+	caKeyFile      = flag.String("caKeyFile", "/app/secrets/ca/tls.key", "The CA key file")
 	configFile     = flag.String("configFile", "/app/config/config.yaml", "The file with the controller config")
 
 	agents = struct {
