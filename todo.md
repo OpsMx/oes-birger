@@ -4,4 +4,3 @@
 # later
 
 1. allow multiple servers
-1. allow multiple connections from the same agent ID
