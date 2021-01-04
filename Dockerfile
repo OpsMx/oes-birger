@@ -4,6 +4,7 @@
 #
 FROM --platform=${BUILDPLATFORM} golang:1.15.6-alpine AS buildmod
 ENV CGO_ENABLED=0
+RUN mkdir /build
 WORKDIR /build
 COPY go.mod .
 COPY go.sum .
@@ -16,7 +17,8 @@ FROM buildmod AS build-agent
 COPY . .
 ARG TARGETOS
 ARG TARGETARCH
-RUN GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o /build/agent agent/agent.go
+RUN mkdir /out
+RUN GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o /out/agent agent/agent.go
 
 #
 # Compile the controller.
@@ -25,27 +27,30 @@ FROM buildmod AS build-controller
 COPY . .
 ARG TARGETOS
 ARG TARGETARCH
-RUN GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o /build/controller controller/controller.go
+RUN mkdir /out
+RUN GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o /out/controller controller/controller.go
 
 #
 # Base OS image for both published images
 #
 FROM alpine AS base
 RUN apk update && apk upgrade
+RUN mkdir /app
 
 #
 # Build the agent image.  This should be a --target on docker build.
 #
-FROM base AS agent
+FROM base AS agent-image
 WORKDIR /app
-COPY --from=build-agent /build/agent /app
+COPY --from=build-agent /out/agent /app
+EXPOSE 9102
 CMD ["/app/agent"]
 
 #
 # Build the controller image.  This should be a --target on docker build.
 #
-FROM base AS controller
+FROM base AS controller-image
 WORKDIR /app
-COPY --from=build-controller /build/controller /app
-EXPOSE 9001-9002
+COPY --from=build-controller /out/controller /app
+EXPOSE 9001-9002 9102
 CMD ["/app/controller"]
