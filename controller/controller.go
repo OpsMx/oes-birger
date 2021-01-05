@@ -43,7 +43,7 @@ var (
 
 	ulidContext = ulid.NewContext()
 
-	hook *webhook.WebhookRunner
+	hook *webhook.Runner
 
 	rnd = rand.New(rand.NewSource(time.Now().UnixNano()))
 
@@ -51,11 +51,11 @@ var (
 	apiRequestCounter = promauto.NewCounterVec(prometheus.CounterOpts{
 		Name: "controller_api_requests_total",
 		Help: "The total numbe of API requests",
-	}, []string{"agent_identity"})
+	}, []string{"agent", "protocol"})
 	connectedAgentsGauge = promauto.NewGaugeVec(prometheus.GaugeOpts{
 		Name: "agents_connected",
 		Help: "The currently connected agents",
-	}, []string{"agent_identity"})
+	}, []string{"agent", "protocol"})
 
 	caCert tls.Certificate
 )
@@ -101,10 +101,11 @@ func makeHeaders(headers map[string][]string) []*tunnel.HttpHeader {
 
 func kubernetesAPIHandler(w http.ResponseWriter, r *http.Request) {
 	agentname := firstLabel(r.TLS.PeerCertificates[0].Subject.CommonName)
-	apiRequestCounter.WithLabelValues(agentname).Inc()
+	ep := endpoint{protocol: "kubernetes", name: agentname}
+	apiRequestCounter.WithLabelValues(agentname, "kubernetes").Inc()
 
 	agents.RLock()
-	agentList, ok := agents.m[agentname]
+	agentList, ok := agents.m[ep]
 	if !ok || len(agentList) == 0 {
 		agents.RUnlock()
 		log.Printf("No agents connected for: %s", agentname)
@@ -114,12 +115,13 @@ func kubernetesAPIHandler(w http.ResponseWriter, r *http.Request) {
 	agent := agentList[rnd.Intn(len(agentList))]
 	body, _ := ioutil.ReadAll(r.Body)
 	req := &tunnel.HttpRequest{
-		Id:      ulidContext.Ulid(),
-		Target:  agentname,
-		Method:  r.Method,
-		URI:     r.RequestURI,
-		Headers: makeHeaders(r.Header),
-		Body:    body,
+		Id:       ulidContext.Ulid(),
+		Target:   agentname,
+		Protocol: "kubernetes",
+		Method:   r.Method,
+		URI:      r.RequestURI,
+		Headers:  makeHeaders(r.Header),
+		Body:     body,
 	}
 	message := &httpMessage{out: make(chan *tunnel.ASEventWrapper), cmd: req}
 	agent.inHTTPRequest <- message
@@ -197,11 +199,12 @@ func (s *tunnelServer) GetStatistics(ctx context.Context, in *empty.Empty) (*tun
 	for _, list := range agents.m {
 		for _, agent := range list {
 			a := &tunnel.ControllerAgentStatistics{
-				Identity:        agent.identity,
-				SessionIdentity: agent.sessionIdentity,
-				ConnectedAt:     agent.connectedAt,
-				LastPing:        agent.lastPing,
-				LastUse:         agent.lastUse,
+				Identity:    agent.ep.name,
+				Protocol:    agent.ep.protocol,
+				Session:     agent.session,
+				ConnectedAt: agent.connectedAt,
+				LastPing:    agent.lastPing,
+				LastUse:     agent.lastUse,
 			}
 			as = append(as, a)
 		}

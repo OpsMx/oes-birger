@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"sync"
 
@@ -9,7 +10,7 @@ import (
 
 type Agents struct {
 	sync.RWMutex
-	m map[string][]*agentState
+	m map[endpoint][]*agentState
 }
 
 type httpMessage struct {
@@ -22,8 +23,8 @@ type cancelRequest struct {
 }
 
 type agentState struct {
-	identity        string
-	sessionIdentity string
+	ep              endpoint
+	session         string
 	inHTTPRequest   chan *httpMessage
 	inCancelRequest chan *cancelRequest
 	connectedAt     uint64
@@ -31,9 +32,18 @@ type agentState struct {
 	lastUse         uint64
 }
 
+func (s *agentState) String() string {
+	return fmt.Sprintf("(%s, %s, %s)", s.ep.name, s.ep.protocol, s.session)
+}
+
+type endpoint struct {
+	name     string // The agent name
+	protocol string // "kubernetes" or whatever API we are handling
+}
+
 func MakeAgents() *Agents {
 	return &Agents{
-		m: make(map[string][]*agentState),
+		m: make(map[endpoint][]*agentState),
 	}
 }
 
@@ -49,23 +59,22 @@ func sliceIndex(limit int, predicate func(i int) bool) int {
 func (a *Agents) AddAgent(state *agentState) {
 	agents.Lock()
 	defer agents.Unlock()
-	agentList, ok := agents.m[state.identity]
+	agentList, ok := agents.m[state.ep]
 	if !ok {
-		log.Printf("No previous agent for id %s found, creating a new list", state.identity)
 		agentList = make([]*agentState, 0)
 	}
 	agentList = append(agentList, state)
-	agents.m[state.identity] = agentList
-	log.Printf("Session %s added for agent %s, now at %d endpoints", state.sessionIdentity, state.identity, len(agentList))
-	connectedAgentsGauge.WithLabelValues(state.identity).Inc()
+	agents.m[state.ep] = agentList
+	log.Printf("Agent %s added, now at %d endpoints", state, len(agentList))
+	connectedAgentsGauge.WithLabelValues(state.ep.name, state.ep.protocol).Inc()
 }
 
 func (a *Agents) RemoveAgent(state *agentState) {
 	agents.Lock()
 	defer agents.Unlock()
-	agentList, ok := agents.m[state.identity]
+	agentList, ok := agents.m[state.ep]
 	if !ok {
-		log.Printf("ERROR: removing unknown agent: (%s, %s)", state.identity, state.sessionIdentity)
+		log.Printf("Attempt to remove unknown agent %s", state)
 		return
 	}
 
@@ -78,10 +87,10 @@ func (a *Agents) RemoveAgent(state *agentState) {
 		agentList[i] = agentList[len(agentList)-1]
 		agentList[len(agentList)-1] = nil
 		agentList = agentList[:len(agentList)-1]
-		agents.m[state.identity] = agentList
-		connectedAgentsGauge.WithLabelValues(state.identity).Dec()
+		agents.m[state.ep] = agentList
+		connectedAgentsGauge.WithLabelValues(state.ep.name, state.ep.protocol).Dec()
 	} else {
-		log.Printf("Agent session %s not found in list of agents for %s", state.sessionIdentity, state.identity)
+		log.Printf("Attempt to remove unknown agent %s", state)
 	}
-	log.Printf("Session %s removed for agent %s, now at %d endpoints", state.sessionIdentity, state.identity, len(agentList))
+	log.Printf("Agent %s removed, now at %d endpoints", state, len(agentList))
 }

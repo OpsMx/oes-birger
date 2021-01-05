@@ -21,15 +21,16 @@ func newServer() *tunnelServer {
 	return s
 }
 
-func sendWebhook(name string, namespaces []string) {
+func sendWebhook(state *agentState, namespaces []string) {
 	if hook == nil {
 		return
 	}
-	req := &webhook.WebhookRequest{
-		Name:       name,
+	req := &webhook.Request{
+		Name:       state.ep.name,
+		Protocol:   state.ep.protocol,
 		Namespaces: namespaces,
 	}
-	kc, err := authority.MakeKubectlConfig(name, fmt.Sprintf("https://%s:%d", config.ServerNames[0], *apiPort))
+	kc, err := authority.MakeKubectlConfig(state.ep.name, fmt.Sprintf("https://%s:%d", config.ServerNames[0], *apiPort))
 	if err != nil {
 		log.Printf("Unable to generate a working kubectl: %v", err)
 	} else {
@@ -37,31 +38,6 @@ func sendWebhook(name string, namespaces []string) {
 	}
 
 	hook.Send(req)
-}
-
-//
-// endpoints are some way we can send data.  How it is sent and how it gets to where
-// it is intended is up to what type of endpoint it may be.
-//
-type endpoint struct {
-	protocol string // "kubernetes" or whatever API we are handling
-	name     string // The agent name this transaction is bound to
-	session  string // The agent session this transaction is bound to
-
-}
-
-// Transactions are created based on the HTTP request coming in, and stored in a list of currently
-// running transactions.  If the destination is lost (an agent disconnects) all transactions
-// bound to that destination should be cancelled.
-//
-// Actual destinations can be a directly connected agent, or it can be another controller
-// which has a directly connected agent.
-// That is:
-//    apiRequest <-> agent
-//    apiRequest <-> otherController <-> agent
-type transaction struct {
-	endpoint
-	id string // the per-request id, used for passing info and cancelling if needed
 }
 
 //
@@ -93,7 +69,6 @@ func (s *tunnelServer) EventTunnel(stream tunnel.TunnelService_EventTunnelServer
 	}
 
 	sessionIdentity := ulidContext.Ulid()
-	log.Printf("Registered agent: %s, session id %s", agentIdentity, sessionIdentity)
 
 	inHTTPRequest := make(chan *httpMessage, 1)
 	inCancelRequest := make(chan *cancelRequest, 1)
@@ -103,20 +78,20 @@ func (s *tunnelServer) EventTunnel(stream tunnel.TunnelService_EventTunnelServer
 	}{m: make(map[string]chan *tunnel.ASEventWrapper)}
 
 	state := &agentState{
-		identity:        agentIdentity,
-		sessionIdentity: sessionIdentity,
+		ep:              endpoint{name: agentIdentity, protocol: "UNKNOWN"},
+		session:         sessionIdentity,
 		inHTTPRequest:   inHTTPRequest,
 		inCancelRequest: inCancelRequest,
 		connectedAt:     tunnel.Now(),
 	}
 
-	log.Printf("Agent %s connected, session id %s, awaiting hello message", state.identity, state.sessionIdentity)
+	log.Printf("Agent %s connected, awaiting hello message", state)
 
 	go func() {
 		for {
 			request, more := <-inHTTPRequest
 			if !more {
-				log.Printf("Request channel closed for %s", agentIdentity)
+				log.Printf("Request channel closed for %s", state)
 				return
 			}
 			httpids.Lock()
@@ -128,7 +103,7 @@ func (s *tunnelServer) EventTunnel(stream tunnel.TunnelService_EventTunnelServer
 				},
 			}
 			if err := stream.Send(resp); err != nil {
-				log.Printf("Unable to send to agent %s for HTTP request %s", agentIdentity, request.cmd.Id)
+				log.Printf("Unable to send to agent %s for HTTP request %s", state, request.cmd.Id)
 			}
 		}
 	}()
@@ -137,7 +112,7 @@ func (s *tunnelServer) EventTunnel(stream tunnel.TunnelService_EventTunnelServer
 		for {
 			request, more := <-inCancelRequest
 			if !more {
-				log.Printf("cancel channel closed for agent %s", agentIdentity)
+				log.Printf("cancel channel closed for agent %s", state)
 				return
 			}
 			httpids.Lock()
@@ -149,7 +124,7 @@ func (s *tunnelServer) EventTunnel(stream tunnel.TunnelService_EventTunnelServer
 				},
 			}
 			if err := stream.Send(resp); err != nil {
-				log.Printf("Unable to send to agent %s for cancel request %s", agentIdentity, request.id)
+				log.Printf("Unable to send to agent %s for cancel request %s", state, request.id)
 			}
 		}
 	}()
@@ -157,7 +132,7 @@ func (s *tunnelServer) EventTunnel(stream tunnel.TunnelService_EventTunnelServer
 	for {
 		in, err := stream.Recv()
 		if err == io.EOF {
-			log.Printf("Closing %s", agentIdentity)
+			log.Printf("Closing %s", state)
 			httpids.Lock()
 			for _, v := range httpids.m {
 				close(v)
@@ -167,7 +142,7 @@ func (s *tunnelServer) EventTunnel(stream tunnel.TunnelService_EventTunnelServer
 			return nil
 		}
 		if err != nil {
-			log.Printf("Agent closed connection: %s", agentIdentity)
+			log.Printf("Agent closed connection: %s", state)
 			httpids.Lock()
 			for _, v := range httpids.m {
 				close(v)
@@ -182,14 +157,15 @@ func (s *tunnelServer) EventTunnel(stream tunnel.TunnelService_EventTunnelServer
 			req := in.GetPingRequest()
 			atomic.StoreUint64(&state.lastPing, tunnel.Now())
 			if err := stream.Send(makePingResponse(req)); err != nil {
-				log.Printf("Unable to respond to %s with ping response: %v", agentIdentity, err)
+				log.Printf("Unable to respond to %s with ping response: %v", state, err)
 				agents.RemoveAgent(state)
 				return err
 			}
 		case *tunnel.ASEventWrapper_AgentHello:
 			req := in.GetAgentHello()
+			state.ep.protocol = req.Protocol
 			agents.AddAgent(state)
-			sendWebhook(state.identity, req.Namespaces)
+			sendWebhook(state, req.Namespaces)
 		case *tunnel.ASEventWrapper_HttpResponse:
 			resp := in.GetHttpResponse()
 			atomic.StoreUint64(&state.lastUse, tunnel.Now())
@@ -215,13 +191,13 @@ func (s *tunnelServer) EventTunnel(stream tunnel.TunnelService_EventTunnelServer
 					delete(httpids.m, resp.Id)
 				}
 			} else {
-				log.Printf("Got response to unknown HTTP request id %s from %s", resp.Id, agentIdentity)
+				log.Printf("Got response to unknown HTTP request id %s from %s", resp.Id, state)
 			}
 			httpids.Unlock()
 		case nil:
 			// ignore for now
 		default:
-			log.Printf("Received unknown message: %s: %T", agentIdentity, x)
+			log.Printf("Received unknown message: %s: %T", state, x)
 		}
 	}
 }

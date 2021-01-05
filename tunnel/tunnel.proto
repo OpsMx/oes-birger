@@ -23,6 +23,7 @@ message HttpHeader {
 message HttpRequest {
     string id = 1;
     string target = 2;
+    string protocol = 3;
     string method = 4;
     string URI = 5;
     repeated HttpHeader headers = 6;
@@ -52,7 +53,8 @@ message HttpChunkedResponse {
 }
 
 message AgentHello {
-    repeated string namespaces = 1;
+    string protocol = 1;
+    repeated string namespaces = 2;
 }
 
 // Messages sent from server to agent
@@ -80,10 +82,11 @@ message ASEventWrapper {
 
 message ControllerAgentStatistics {
     string identity = 1;
-    string sessionIdentity = 2;
-    uint64 connectedAt = 3;
-    uint64 lastPing = 4;
-    uint64 lastUse = 5;
+    string protocol = 2;
+    string session = 3;
+    uint64 connectedAt = 4;
+    uint64 lastPing = 5;
+    uint64 lastUse = 6;
 }
 
 message ControllerStatistics {
