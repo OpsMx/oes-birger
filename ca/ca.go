@@ -45,7 +45,7 @@ func MakeCA(config Config) (*CA, error) {
 	}
 
 	ca := &CA{
-		config: config,
+		config: &config,
 		caCert: caCert,
 	}
 	return ca, nil
