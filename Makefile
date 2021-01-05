@@ -82,7 +82,6 @@ forwarder-controller-ma-image.buildtime: ${controller_deps} Dockerfile.multi
 		--push .
 	touch forwarder-controller-ma-image.buildtime
 
-
 #
 # Standard "whatever we are on now" image builds
 #
