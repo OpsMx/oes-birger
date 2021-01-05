@@ -3,18 +3,14 @@ package main
 import (
 	"context"
 	"crypto/tls"
-	"encoding/base64"
 	"flag"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"log"
 	"math/rand"
 	"net"
 	"net/http"
 	"strings"
-	"sync"
-	"sync/atomic"
 	"time"
 
 	"google.golang.org/grpc"
@@ -39,10 +35,7 @@ var (
 	prometheusPort = flag.Int("prometheusPort", 9102, "The HTTP port to serve /metrics for Prometheus")
 	configFile     = flag.String("configFile", "/app/config/config.yaml", "The file with the controller config")
 
-	agents = struct {
-		sync.RWMutex
-		m map[string][]*agentState
-	}{m: make(map[string][]*agentState)}
+	agents *Agents = MakeAgents()
 
 	config *ControllerConfig
 
@@ -66,101 +59,6 @@ var (
 
 	caCert tls.Certificate
 )
-
-type httpMessage struct {
-	out chan *tunnel.ASEventWrapper
-	cmd *tunnel.HttpRequest
-}
-
-type cancelRequest struct {
-	id string
-}
-
-func sliceIndex(limit int, predicate func(i int) bool) int {
-	for i := 0; i < limit; i++ {
-		if predicate(i) {
-			return i
-		}
-	}
-	return -1
-}
-
-type agentState struct {
-	identity        string
-	sessionIdentity string
-	inHTTPRequest   chan *httpMessage
-	inCancelRequest chan *cancelRequest
-	connectedAt     uint64
-	lastPing        uint64
-	lastUse         uint64
-}
-
-func sendWebhook(name string, namespaces []string) {
-	if hook == nil {
-		return
-	}
-	req := &webhook.WebhookRequest{
-		Name:       name,
-		Namespaces: namespaces,
-	}
-	kc, err := authority.MakeKubectlConfig(name, fmt.Sprintf("https://%s:%d", config.ServerNames[0], *apiPort))
-	if err != nil {
-		log.Printf("Unable to generate a working kubectl: %v", err)
-	} else {
-		req.Kubeconfig = base64.StdEncoding.EncodeToString([]byte(kc))
-	}
-
-	hook.Send(req)
-}
-
-func addAgent(state *agentState) {
-	agents.Lock()
-	defer agents.Unlock()
-	agentList, ok := agents.m[state.identity]
-	if !ok {
-		log.Printf("No previous agent for id %s found, creating a new list", state.identity)
-		agentList = make([]*agentState, 0)
-	}
-	agentList = append(agentList, state)
-	agents.m[state.identity] = agentList
-	log.Printf("Session %s added for agent %s, now at %d endpoints", state.sessionIdentity, state.identity, len(agentList))
-	connectedAgentsGauge.WithLabelValues(state.identity).Inc()
-}
-
-func removeAgent(state *agentState) {
-	agents.Lock()
-	defer agents.Unlock()
-	agentList, ok := agents.m[state.identity]
-	if !ok {
-		log.Printf("ERROR: removing unknown agent: (%s, %s)", state.identity, state.sessionIdentity)
-		return
-	}
-
-	close(state.inHTTPRequest)
-	close(state.inCancelRequest)
-
-	// TODO: We should always find our entry...
-	i := sliceIndex(len(agentList), func(i int) bool { return agentList[i] == state })
-	if i != -1 {
-		agentList[i] = agentList[len(agentList)-1]
-		agentList[len(agentList)-1] = nil
-		agentList = agentList[:len(agentList)-1]
-		agents.m[state.identity] = agentList
-		connectedAgentsGauge.WithLabelValues(state.identity).Dec()
-	} else {
-		log.Printf("Agent session %s not found in list of agents for %s", state.sessionIdentity, state.identity)
-	}
-	log.Printf("Session %s removed for agent %s, now at %d endpoints", state.sessionIdentity, state.identity, len(agentList))
-}
-
-type tunnelServer struct {
-	tunnel.UnimplementedTunnelServiceServer
-}
-
-func newServer() *tunnelServer {
-	s := &tunnelServer{}
-	return s
-}
 
 func makePingResponse(req *tunnel.PingRequest) *tunnel.SAEventWrapper {
 	resp := &tunnel.SAEventWrapper{
@@ -191,148 +89,6 @@ func getAgentNameFromContext(ctx context.Context) (string, error) {
 	return shortName[0], nil
 }
 
-func (s *tunnelServer) EventTunnel(stream tunnel.TunnelService_EventTunnelServer) error {
-	agentIdentity, err := getAgentNameFromContext(stream.Context())
-	if err != nil {
-		return err
-	}
-
-	sessionIdentity := ulidContext.Ulid()
-	log.Printf("Registered agent: %s, session id %s", agentIdentity, sessionIdentity)
-
-	inHTTPRequest := make(chan *httpMessage, 1)
-	inCancelRequest := make(chan *cancelRequest, 1)
-	httpids := struct {
-		sync.RWMutex
-		m map[string]chan *tunnel.ASEventWrapper
-	}{m: make(map[string]chan *tunnel.ASEventWrapper)}
-
-	state := &agentState{
-		identity:        agentIdentity,
-		sessionIdentity: sessionIdentity,
-		inHTTPRequest:   inHTTPRequest,
-		inCancelRequest: inCancelRequest,
-		lastPing:        0,
-		lastUse:         0,
-		connectedAt:     tunnel.Now(),
-	}
-
-	log.Printf("Agent %s connected, session id %s, awaiting hello message", state.identity, state.sessionIdentity)
-
-	go func() {
-		for {
-			request, more := <-inHTTPRequest
-			if !more {
-				log.Printf("Request channel closed for %s", agentIdentity)
-				return
-			}
-			httpids.Lock()
-			httpids.m[request.cmd.Id] = request.out
-			httpids.Unlock()
-			resp := &tunnel.SAEventWrapper{
-				Event: &tunnel.SAEventWrapper_HttpRequest{
-					HttpRequest: request.cmd,
-				},
-			}
-			if err := stream.Send(resp); err != nil {
-				log.Printf("Unable to send to agent %s for HTTP request %s", agentIdentity, request.cmd.Id)
-			}
-		}
-	}()
-
-	go func() {
-		for {
-			request, more := <-inCancelRequest
-			if !more {
-				log.Printf("cancel channel closed for agent %s", agentIdentity)
-				return
-			}
-			httpids.Lock()
-			delete(httpids.m, request.id)
-			httpids.Unlock()
-			resp := &tunnel.SAEventWrapper{
-				Event: &tunnel.SAEventWrapper_HttpRequestCancel{
-					HttpRequestCancel: &tunnel.HttpRequestCancel{Id: request.id, Target: agentIdentity},
-				},
-			}
-			if err := stream.Send(resp); err != nil {
-				log.Printf("Unable to send to agent %s for cancel request %s", agentIdentity, request.id)
-			}
-		}
-	}()
-
-	for {
-		in, err := stream.Recv()
-		if err == io.EOF {
-			log.Printf("Closing %s", agentIdentity)
-			httpids.Lock()
-			for _, v := range httpids.m {
-				close(v)
-			}
-			httpids.Unlock()
-			removeAgent(state)
-			return nil
-		}
-		if err != nil {
-			log.Printf("Agent closed connection: %s", agentIdentity)
-			httpids.Lock()
-			for _, v := range httpids.m {
-				close(v)
-			}
-			httpids.Unlock()
-			removeAgent(state)
-			return err
-		}
-
-		switch x := in.Event.(type) {
-		case *tunnel.ASEventWrapper_PingRequest:
-			req := in.GetPingRequest()
-			atomic.StoreUint64(&state.lastPing, tunnel.Now())
-			if err := stream.Send(makePingResponse(req)); err != nil {
-				log.Printf("Unable to respond to %s with ping response: %v", agentIdentity, err)
-				removeAgent(state)
-				return err
-			}
-		case *tunnel.ASEventWrapper_AgentHello:
-			req := in.GetAgentHello()
-			addAgent(state)
-			sendWebhook(state.identity, req.Namespaces)
-		case *tunnel.ASEventWrapper_HttpResponse:
-			resp := in.GetHttpResponse()
-			atomic.StoreUint64(&state.lastUse, tunnel.Now())
-			httpids.Lock()
-			dest := httpids.m[resp.Id]
-			if dest != nil {
-				dest <- in
-				if resp.ContentLength == 0 {
-					delete(httpids.m, resp.Id)
-				}
-			} else {
-				log.Printf("Got response to unknown HTTP request id %s from %s", resp.Id, agentIdentity)
-			}
-			httpids.Unlock()
-		case *tunnel.ASEventWrapper_HttpChunkedResponse:
-			resp := in.GetHttpChunkedResponse()
-			atomic.StoreUint64(&state.lastUse, tunnel.Now())
-			httpids.Lock()
-			dest := httpids.m[resp.Id]
-			if dest != nil {
-				dest <- in
-				if len(resp.Body) == 0 {
-					delete(httpids.m, resp.Id)
-				}
-			} else {
-				log.Printf("Got response to unknown HTTP request id %s from %s", resp.Id, agentIdentity)
-			}
-			httpids.Unlock()
-		case nil:
-			// ignore for now
-		default:
-			log.Printf("Received unknown message: %s: %T", agentIdentity, x)
-		}
-	}
-}
-
 func makeHeaders(headers map[string][]string) []*tunnel.HttpHeader {
 	ret := make([]*tunnel.HttpHeader, 0)
 	for name, values := range headers {
@@ -343,29 +99,15 @@ func makeHeaders(headers map[string][]string) []*tunnel.HttpHeader {
 	return ret
 }
 
-//
-// Look up the target name we are given in our config.  If it doesn't exist,
-// use the name provided as the target.
-//
-func mapTarget(name string) string {
-	target, ok := config.Agents[name]
-	if !ok {
-		return name
-	}
-	return target.Identity
-}
-
-func handler(w http.ResponseWriter, r *http.Request) {
+func kubernetesAPIHandler(w http.ResponseWriter, r *http.Request) {
 	agentname := firstLabel(r.TLS.PeerCertificates[0].Subject.CommonName)
-	target := mapTarget(agentname)
-
-	apiRequestCounter.WithLabelValues(target).Inc()
+	apiRequestCounter.WithLabelValues(agentname).Inc()
 
 	agents.RLock()
-	agentList, ok := agents.m[target]
+	agentList, ok := agents.m[agentname]
 	if !ok || len(agentList) == 0 {
 		agents.RUnlock()
-		log.Printf("No agents connected for: %s", target)
+		log.Printf("No agents connected for: %s", agentname)
 		w.WriteHeader(http.StatusBadGateway)
 		return
 	}
@@ -373,7 +115,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	body, _ := ioutil.ReadAll(r.Body)
 	req := &tunnel.HttpRequest{
 		Id:      ulidContext.Ulid(),
-		Target:  target,
+		Target:  agentname,
 		Method:  r.Method,
 		URI:     r.RequestURI,
 		Headers: makeHeaders(r.Header),
@@ -489,7 +231,7 @@ func runAgentHTTPServer(caCert tls.Certificate, serverCert tls.Certificate) {
 
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("/", handler)
+	mux.HandleFunc("/", kubernetesAPIHandler)
 
 	server := &http.Server{
 		Addr:      fmt.Sprintf(":%d", *apiPort),
