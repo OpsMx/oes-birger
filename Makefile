@@ -10,12 +10,14 @@ controller_deps = ${pb_deps} \
     ulid/ulid.go \
 	controller/webhook/webhook.go \
 	controller/controller.go \
+	controller/config.go \
 	tunnel/time.go \
 	tunnel/defaults.go \
 	kubeconfig/config.go
 
 agent_deps = ${pb_deps} \
 	agent/agent.go \
+	agent/config.go \
     kubeconfig/config.go
 
 now = `date -u +%Y%m%dT%H%M%S`
