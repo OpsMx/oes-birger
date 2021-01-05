@@ -254,3 +254,16 @@ func makeKubeConfig(name string, ca64 string, cert64 string, certPrivKey64 strin
 	}
 	return string(s), nil
 }
+
+func (c *CA) MakeCertPool() (*x509.CertPool, error) {
+	caCertPool := x509.NewCertPool()
+	for _, cert := range c.caCert.Certificate {
+		x, err := x509.ParseCertificate(cert)
+		if err != nil {
+			return nil, fmt.Errorf("Unable to parse certificate ASN.1: %v", err)
+		}
+		caCertPool.AddCert(x)
+		caCertPool.AppendCertsFromPEM(cert)
+	}
+	return caCertPool, nil
+}

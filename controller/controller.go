@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"crypto/tls"
-	"crypto/x509"
 	"encoding/base64"
 	"flag"
 	"fmt"
@@ -475,20 +474,13 @@ func (s *tunnelServer) GetStatistics(ctx context.Context, in *empty.Empty) (*tun
 func runAgentHTTPServer(caCert tls.Certificate, serverCert tls.Certificate) {
 	log.Printf("Running HTTPS listener on port %d", *apiPort)
 
-	caCertPool := x509.NewCertPool()
-	//for _, cert := range caCert.Certificate {
-	//	caCertPool.AppendCertsFromPEM(cert)
-	//}
-	ca, err := ioutil.ReadFile(*caCertFile)
+	certPool, err := authority.MakeCertPool()
 	if err != nil {
-		log.Fatalf("could not read ca certificate: %s", err)
-	}
-	if ok := caCertPool.AppendCertsFromPEM(ca); !ok {
-		log.Fatalf("failed to append agent certs")
+		log.Fatalf("While making certpool: %v", err)
 	}
 
 	tlsConfig := &tls.Config{
-		ClientCAs:    caCertPool,
+		ClientCAs:    certPool,
 		ClientAuth:   tls.RequireAndVerifyClientCert,
 		Certificates: []tls.Certificate{serverCert},
 		MinVersion:   tls.VersionTLS12,
@@ -534,19 +526,12 @@ func runGRPCServer(caCert tls.Certificate, serverCert tls.Certificate) {
 		log.Fatalf("Failed to listen: %v", err)
 	}
 
+	certPool, err := authority.MakeCertPool()
 	if err != nil {
-		log.Fatalf("could not load server key pair: %s", err)
-	}
-	caCertPool := x509.NewCertPool()
-	ca, err := ioutil.ReadFile(*caCertFile)
-	if err != nil {
-		log.Fatalf("could not read ca certificate: %s", err)
-	}
-	if ok := caCertPool.AppendCertsFromPEM(ca); !ok {
-		log.Fatalf("failed to append agent certs")
+		log.Fatalf("While making certpool: %v", err)
 	}
 	creds := credentials.NewTLS(&tls.Config{
-		ClientCAs:    caCertPool,
+		ClientCAs:    certPool,
 		ClientAuth:   tls.RequireAndVerifyClientCert,
 		Certificates: []tls.Certificate{serverCert},
 		MinVersion:   tls.VersionTLS12,
@@ -556,7 +541,6 @@ func runGRPCServer(caCert tls.Certificate, serverCert tls.Certificate) {
 	if err := grpcServer.Serve(lis); err != nil {
 		log.Fatalf("Failed to start GRPC server: %v", err)
 	}
-
 }
 
 func main() {
@@ -586,7 +570,7 @@ func main() {
 		go runPrometheusHTTPServer(*prometheusPort)
 	}
 
-	serverCert, err := ca.MakeServerCert(config.ServerNames)
+	serverCert, err := authority.MakeServerCert(config.ServerNames)
 	if err != nil {
 		log.Fatalf("Cannot make server certificate: %v", err)
 	}
@@ -594,8 +578,8 @@ func main() {
 	//
 	// Set up HTTP server
 	//
-	go runAgentHTTPServer(caCert, serverCert)
+	go runAgentHTTPServer(caCert, *serverCert)
 
 	// never returns
-	runGRPCServer(caCert, serverCert)
+	runGRPCServer(caCert, *serverCert)
 }
