@@ -9,7 +9,7 @@ import (
 // CA holds the state for the certificate authority.
 //
 type CA struct {
-	config *CAConfig
+	config *Config
 	caCert tls.Certificate
 }
 
