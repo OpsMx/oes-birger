@@ -1,4 +1,4 @@
-module github.com/skandragon/grpc-bidir
+module github.com/opsmx/grpc-bidir
 
 go 1.15
 

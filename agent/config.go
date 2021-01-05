@@ -11,7 +11,7 @@ import (
 // configuration file is loaded from disk first, and then any
 // environment variables are applied.
 type AgentConfig struct {
-	Namespaces []string `yaml:"namespaces"`
+	Namespaces []string `yaml:"namespaces,omitempty"`
 }
 
 // LoadConfig will load YAML configuration from the provided filename, and then apply
