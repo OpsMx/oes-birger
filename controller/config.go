@@ -22,8 +22,8 @@ type agentConfig struct {
 // LoadConfig will load YAML configuration from the provided filename,
 // and then apply environment variables to override some subset of
 // available options.
-func LoadConfig() (*ControllerConfig, error) {
-	buf, err := ioutil.ReadFile(*configFile)
+func LoadConfig(filename string) (*ControllerConfig, error) {
+	buf, err := ioutil.ReadFile(filename)
 	if err != nil {
 		return nil, err
 	}

@@ -699,7 +699,7 @@ func runGRPCServer(caCert tls.Certificate, serverCert tls.Certificate) {
 func main() {
 	flag.Parse()
 
-	c, err := LoadConfig()
+	c, err := LoadConfig(*configFile)
 	if err != nil {
 		log.Printf("Server names for generated certificate: %v", config.ServerNames)
 	}

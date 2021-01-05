@@ -27,7 +27,6 @@ func LoadConfig(filename string) (*AgentConfig, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	return config, nil
 }
 
