@@ -43,12 +43,12 @@ local: bin/agent bin/controller
 
 bin/agent: ${agent_deps}
 	[ -d bin ] || mkdir bin
-	go build -o bin/agent agent/agent.go
+	go build -o bin/agent agent/*.go
 
 
 bin/controller: ${controller_deps}
 	[ -d bin ] || mkdir bin
-	go build -o bin/controller controller/controller.go
+	go build -o bin/controller controller/*.go
 
 #
 # Multi-architecture image builds

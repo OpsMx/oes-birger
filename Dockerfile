@@ -16,7 +16,7 @@ RUN go mod download
 FROM buildmod AS build-agent
 COPY . .
 RUN mkdir /out
-RUN go build -o /out/agent agent/agent.go
+RUN go build -o /out/agent agent/*.go
 
 #
 # Compile the controller.
@@ -24,7 +24,7 @@ RUN go build -o /out/agent agent/agent.go
 FROM buildmod AS build-controller
 COPY . .
 RUN mkdir /out
-RUN go build -o /out/controller controller/controller.go
+RUN go build -o /out/controller controller/*.go
 
 #
 # Base OS image for both published images

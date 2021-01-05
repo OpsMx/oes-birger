@@ -18,7 +18,7 @@ COPY . .
 ARG TARGETOS
 ARG TARGETARCH
 RUN mkdir /out
-RUN GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o /out/agent agent/agent.go
+RUN GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o /out/agent agent/*.go
 
 #
 # Compile the controller.
@@ -28,7 +28,7 @@ COPY . .
 ARG TARGETOS
 ARG TARGETARCH
 RUN mkdir /out
-RUN GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o /out/controller controller/controller.go
+RUN GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o /out/controller controller/*.go
 
 #
 # Base OS image for both published images

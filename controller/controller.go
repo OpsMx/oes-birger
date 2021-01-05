@@ -54,7 +54,7 @@ var (
 		m map[string][]*agentState
 	}{m: make(map[string][]*agentState)}
 
-	config *controllerConfig
+	config *ControllerConfig
 
 	ulidContext = ulid.NewContext()
 
@@ -208,30 +208,6 @@ func makeKubectlConfig(name string, ca tls.Certificate) string {
 
 	s, _ := yaml.Marshal(k)
 	return string(s)
-}
-
-type controllerConfig struct {
-	Agents      map[string]*agentConfig `yaml:"agents"`
-	Webhook     string                  `yaml:"webhook"`
-	ServerNames []string                `yaml:"serverNames"`
-}
-
-type agentConfig struct {
-	Identity string `yaml:"identity"`
-}
-
-func loadConfig() *controllerConfig {
-	buf, err := ioutil.ReadFile(*configFile)
-	if err != nil {
-		log.Fatalf("Unable to load config file: %v", err)
-	}
-
-	config := &controllerConfig{}
-	err = yaml.Unmarshal(buf, config)
-	if err != nil {
-		log.Fatalf("Unable to read config file: %v", err)
-	}
-	return config
 }
 
 type httpMessage struct {
@@ -723,8 +699,11 @@ func runGRPCServer(caCert tls.Certificate, serverCert tls.Certificate) {
 func main() {
 	flag.Parse()
 
-	config = loadConfig()
-	log.Printf("Server names for generated certificate: %v", config.ServerNames)
+	c, err := LoadConfig()
+	if err != nil {
+		log.Printf("Server names for generated certificate: %v", config.ServerNames)
+	}
+	config = c
 
 	if len(config.Webhook) > 0 {
 		hook = webhook.NewRunner(config.Webhook)

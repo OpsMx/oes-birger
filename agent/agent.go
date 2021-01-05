@@ -16,7 +16,6 @@ import (
 	"time"
 
 	"golang.org/x/net/context"
-	"gopkg.in/yaml.v2"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -28,13 +27,13 @@ import (
 var (
 	tickTime           = flag.Int("tickTime", 30, "Time between sending Ping messages")
 	host               = flag.String("host", tunnel.DefaultHostAndPort, "The address:port of the controller to connect to")
-	agentCertFile      = flag.String("certFile", "/app/config/cert.pem", "The file containing the certificate used to connect to the controller")
-	agentKeyFile       = flag.String("keyFile", "/app/config/key.pem", "The file containing the certificate used to connect to the controller")
+	agentCertFile      = flag.String("certFile", "/app/secrets/agent/tls.crt", "The file containing the certificate used to connect to the controller")
+	agentKeyFile       = flag.String("keyFile", "/app/secrets/agent/tls.key", "The file containing the certificate used to connect to the controller")
 	caCertFile         = flag.String("caCertFile", "/app/config/ca.pem", "The file containing the CA certificate we will use to verify the controller's cert")
 	kubeConfigFilename = flag.String("kubeconfig", "/app/config/kubeconfig.yaml", "The location of a kubeconfig file to define endpoints and kube API auth")
 	configFile         = flag.String("configFile", "/app/config/config.yaml", "The file with the controller config")
 
-	config *agentConfig
+	config *AgentConfig
 )
 
 func makeHeaders(headers map[string][]string) []*tunnel.HttpHeader {
@@ -43,24 +42,6 @@ func makeHeaders(headers map[string][]string) []*tunnel.HttpHeader {
 		ret = append(ret, &tunnel.HttpHeader{Name: name, Values: values})
 	}
 	return ret
-}
-
-type agentConfig struct {
-	Namespaces []string `yaml:"namespaces"`
-}
-
-func loadConfig() *agentConfig {
-	buf, err := ioutil.ReadFile(*configFile)
-	if err != nil {
-		log.Fatalf("Unable to load config file: %v", err)
-	}
-
-	config := &agentConfig{}
-	err = yaml.Unmarshal(buf, config)
-	if err != nil {
-		log.Fatalf("Unable to read config file: %v", err)
-	}
-	return config
 }
 
 type cancelState struct {
@@ -437,8 +418,12 @@ func loadServiceAccount() *serverContext {
 func main() {
 	flag.Parse()
 
-	config = loadConfig()
-	log.Printf("Configured namesapces: %v", config.Namespaces)
+	c, err := LoadConfig(*configFile)
+	if err != nil {
+		log.Fatalf("Error loading config: %v", err)
+	}
+	config = c
+	config.DumpConfig()
 
 	// load client cert/key, cacert
 	clcert, err := tls.LoadX509KeyPair(*agentCertFile, *agentKeyFile)
@@ -451,7 +436,7 @@ func main() {
 	}
 	caCertPool := x509.NewCertPool()
 	if ok := caCertPool.AppendCertsFromPEM(srvcert); !ok {
-		log.Fatalf("Unable to append certificat to pool: %v", err)
+		log.Fatalf("Unable to append certificate to pool: %v", err)
 	}
 
 	ta := credentials.NewTLS(&tls.Config{
