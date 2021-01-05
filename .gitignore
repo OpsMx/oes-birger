@@ -14,7 +14,7 @@
 # Dependency directories
 # vendor/
 bin
-ca
+minica
 .DS_Store
 tunnel/tunnel.pb.go
 *.buildtime

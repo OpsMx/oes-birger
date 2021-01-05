@@ -20,8 +20,8 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 
-	"github.com/skandragon/grpc-bidir/kubeconfig"
-	"github.com/skandragon/grpc-bidir/tunnel"
+	"github.com/opsmx/grpc-bidir/kubeconfig"
+	"github.com/opsmx/grpc-bidir/tunnel"
 )
 
 var (

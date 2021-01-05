@@ -13,7 +13,8 @@ controller_deps = ${pb_deps} \
 	controller/config.go \
 	tunnel/time.go \
 	tunnel/defaults.go \
-	kubeconfig/config.go
+	kubeconfig/config.go \
+	ca/ca.go
 
 agent_deps = ${pb_deps} \
 	agent/agent.go \

@@ -4,26 +4,29 @@ import (
 	"io/ioutil"
 
 	"gopkg.in/yaml.v2"
+
+	"github.com/opsmx/grpc-bidir/ca"
 )
 
 // ControllerConfig holds all the configuration for the controller.  The
 // configuration file is loaded from disk first, and then any
 // environment variables are applied.
 type ControllerConfig struct {
-	Agents      map[string]*agentConfig `yaml:"agents"`
-	Webhook     string                  `yaml:"webhook"`
-	ServerNames []string                `yaml:"serverNames"`
+	Agents      map[string]*agentConfig `yaml:"agents,omitempty"`
+	Webhook     string                  `yaml:"webhook,omitempty"`
+	ServerNames []string                `yaml:"serverNames,omitempty"`
+	CAConfig    ca.Config               `yaml:"caConfig,omitempty"`
 }
 
 type agentConfig struct {
-	Identity string `yaml:"identity"`
+	Identity string `yaml:"identity,omitempty"`
 }
 
 // LoadConfig will load YAML configuration from the provided filename,
 // and then apply environment variables to override some subset of
 // available options.
-func LoadConfig() (*ControllerConfig, error) {
-	buf, err := ioutil.ReadFile(*configFile)
+func LoadConfig(filename string) (*ControllerConfig, error) {
+	buf, err := ioutil.ReadFile(filename)
 	if err != nil {
 		return nil, err
 	}
