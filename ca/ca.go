@@ -189,32 +189,24 @@ func (c *CA) MakeKubectlConfig(clientName string, serverURL string) (string, err
 		return "", err
 	}
 
-	certPEM := new(bytes.Buffer)
-	pem.Encode(certPEM, &pem.Block{
-		Type:  "CERTIFICATE",
-		Bytes: certBytes,
-	})
-
-	certPrivKeyPEM := new(bytes.Buffer)
-	pem.Encode(certPrivKeyPEM, &pem.Block{
-		Type:  "RSA PRIVATE KEY",
-		Bytes: x509.MarshalPKCS1PrivateKey(certPrivKey),
-	})
-
-	caPEM := new(bytes.Buffer)
-	pem.Encode(caPEM, &pem.Block{
-		Type:  "CERTIFICATE",
-		Bytes: c.caCert.Certificate[0],
-	})
-	ca64 := base64.StdEncoding.EncodeToString(caPEM.Bytes())
-	cert64 := base64.StdEncoding.EncodeToString(certPEM.Bytes())
-	certPrivKey64 := base64.StdEncoding.EncodeToString(certPrivKeyPEM.Bytes())
+	ca64 := bytesTo64("CERTIFICATE", c.caCert.Certificate[0])
+	cert64 := bytesTo64("RSA PUBLIC KEY", x509.MarshalPKCS1PrivateKey(certPrivKey)
+	certPrivKey64 := bytesTo64("CERTIFICATE", certBytes)
 
 	y, err := makeKubeConfig("forwarder", ca64, cert64, certPrivKey64, serverURL)
 	if err != nil {
 		return "", nil
 	}
 	return y, nil
+}
+
+func bytesTo64(prefix string, data []byte) string {
+	p := new(bytes.Buffer)
+	pem.Encode(p, &pem.Block{
+		Type:  prefix,
+		Bytes: data,
+	})
+	return base64.StdEncoding.EncodeToString(p.Bytes())
 }
 
 func makeKubeConfig(name string, ca64 string, cert64 string, certPrivKey64 string, serverURL string) (string, error) {
