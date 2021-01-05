@@ -41,7 +41,7 @@ func deepcopy(dst interface{}, src interface{}) error {
 	if err != nil {
 		return err
 	}
-	err = json.Unmarshal(j, dst)
+	err = json.Unmarshal(j, &dst)
 	if err != nil {
 		return err
 	}
@@ -112,12 +112,11 @@ func (c *CA) MakeServerCert(names []string) (*tls.Certificate, error) {
 			Province:     []string{},
 			Locality:     []string{"San Francisco"},
 		},
-		NotBefore:      now,
-		NotAfter:       now.AddDate(1, 0, 0),
-		AuthorityKeyId: c.caCert.Leaf.SubjectKeyId,
-		ExtKeyUsage:    []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
-		KeyUsage:       x509.KeyUsageDigitalSignature,
-		DNSNames:       names,
+		NotBefore:   now,
+		NotAfter:    now.AddDate(1, 0, 0),
+		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
+		KeyUsage:    x509.KeyUsageDigitalSignature,
+		DNSNames:    names,
 	}
 	certPrivKey, err := rsa.GenerateKey(crand.Reader, 4096)
 	if err != nil {
@@ -168,11 +167,10 @@ func (c *CA) MakeKubectlConfig(clientName string, serverURL string) (string, err
 			Province:     []string{},
 			Locality:     []string{"San Francisco"},
 		},
-		NotBefore:      now,
-		NotAfter:       now.AddDate(1, 0, 0),
-		AuthorityKeyId: c.caCert.Leaf.SubjectKeyId,
-		ExtKeyUsage:    []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
-		KeyUsage:       x509.KeyUsageDigitalSignature,
+		NotBefore:   now,
+		NotAfter:    now.AddDate(1, 0, 0),
+		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
+		KeyUsage:    x509.KeyUsageDigitalSignature,
 	}
 	certPrivKey, err := rsa.GenerateKey(crand.Reader, 4096)
 	if err != nil {
@@ -203,7 +201,12 @@ func (c *CA) MakeKubectlConfig(clientName string, serverURL string) (string, err
 		Bytes: x509.MarshalPKCS1PrivateKey(certPrivKey),
 	})
 
-	ca64 := base64.StdEncoding.EncodeToString(c.caCert.Certificate[0])
+	caPEM := new(bytes.Buffer)
+	pem.Encode(caPEM, &pem.Block{
+		Type:  "CERTIFICATE",
+		Bytes: c.caCert.Certificate[0],
+	})
+	ca64 := base64.StdEncoding.EncodeToString(caPEM.Bytes())
 	cert64 := base64.StdEncoding.EncodeToString(certPEM.Bytes())
 	certPrivKey64 := base64.StdEncoding.EncodeToString(certPrivKeyPEM.Bytes())
 
