@@ -12,10 +12,13 @@ import (
 // configuration file is loaded from disk first, and then any
 // environment variables are applied.
 type ControllerConfig struct {
-	Agents      map[string]*agentConfig `yaml:"agents,omitempty"`
-	Webhook     string                  `yaml:"webhook,omitempty"`
-	ServerNames []string                `yaml:"serverNames,omitempty"`
-	CAConfig    ca.Config               `yaml:"caConfig,omitempty"`
+	Agents         map[string]*agentConfig `yaml:"agents,omitempty"`
+	Webhook        string                  `yaml:"webhook,omitempty"`
+	ServerNames    []string                `yaml:"serverNames,omitempty"`
+	CAConfig       ca.Config               `yaml:"caConfig,omitempty"`
+	GRPCPort       int                     `yaml:"grpcPort"`
+	APIPort        int                     `yaml:"apiPort"`
+	PrometheusPort int                     `yaml:"prometheusPort"`
 }
 
 type agentConfig struct {
@@ -36,5 +39,16 @@ func LoadConfig(filename string) (*ControllerConfig, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	if config.GRPCPort <= 0 {
+		config.GRPCPort = 9001
+	}
+	if config.APIPort <= 0 {
+		config.APIPort = 9002
+	}
+	if config.PrometheusPort <= 0 {
+		config.PrometheusPort = 9102
+	}
+
 	return config, nil
 }

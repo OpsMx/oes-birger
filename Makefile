@@ -7,14 +7,16 @@ IMAGE_PREFIX=docker.flame.org/library/
 pb_deps = tunnel/tunnel.pb.go
 
 controller_deps = ${pb_deps} \
-    ulid/ulid.go \
-	controller/webhook/webhook.go \
-	controller/controller.go \
+	ca/ca.go \
+	controller/agent-tracker.go \
 	controller/config.go \
+	controller/controller.go \
+	controller/grpc-server.go \
+	controller/webhook/webhook.go \
 	tunnel/time.go \
 	tunnel/defaults.go \
 	kubeconfig/config.go \
-	ca/ca.go
+    ulid/ulid.go
 
 agent_deps = ${pb_deps} \
 	agent/agent.go \
