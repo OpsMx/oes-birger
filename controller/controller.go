@@ -30,10 +30,7 @@ import (
 )
 
 var (
-	port           = flag.Int("port", tunnel.DefaultPort, "The GRPC port to listen on")
-	apiPort        = flag.Int("apiPort", 9002, "The HTTPS port to listen for Kubernetes API requests on")
-	prometheusPort = flag.Int("prometheusPort", 9102, "The HTTP port to serve /metrics for Prometheus")
-	configFile     = flag.String("configFile", "/app/config/config.yaml", "The file with the controller config")
+	configFile = flag.String("configFile", "/app/config/config.yaml", "The file with the controller config")
 
 	agents *Agents = MakeAgents()
 
@@ -217,7 +214,7 @@ func (s *tunnelServer) GetStatistics(ctx context.Context, in *empty.Empty) (*tun
 }
 
 func runAgentHTTPServer(caCert tls.Certificate, serverCert tls.Certificate) {
-	log.Printf("Running HTTPS listener on port %d", *apiPort)
+	log.Printf("Running HTTPS listener on port %d", config.APIPort)
 
 	certPool, err := authority.MakeCertPool()
 	if err != nil {
@@ -237,7 +234,7 @@ func runAgentHTTPServer(caCert tls.Certificate, serverCert tls.Certificate) {
 	mux.HandleFunc("/", kubernetesAPIHandler)
 
 	server := &http.Server{
-		Addr:      fmt.Sprintf(":%d", *apiPort),
+		Addr:      fmt.Sprintf(":%d", config.APIPort),
 		TLSConfig: tlsConfig,
 		Handler:   mux,
 	}
@@ -265,8 +262,8 @@ func runGRPCServer(caCert tls.Certificate, serverCert tls.Certificate) {
 	//
 	// Set up GRPC server
 	//
-	log.Printf("Starting GRPC server on port %d...", *port)
-	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", *port))
+	log.Printf("Starting GRPC server on port %d...", config.GRPCPort)
+	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", config.GRPCPort))
 	if err != nil {
 		log.Fatalf("Failed to listen: %v", err)
 	}
@@ -314,9 +311,7 @@ func main() {
 	//
 	// Run Prometheus HTTP server
 	//
-	if prometheusPort != nil {
-		go runPrometheusHTTPServer(*prometheusPort)
-	}
+	go runPrometheusHTTPServer(config.PrometheusPort)
 
 	serverCert, err := authority.MakeServerCert(config.ServerNames)
 	if err != nil {

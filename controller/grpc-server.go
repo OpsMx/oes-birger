@@ -30,7 +30,7 @@ func sendWebhook(state *agentState, namespaces []string) {
 		Protocol:   state.ep.protocol,
 		Namespaces: namespaces,
 	}
-	kc, err := authority.MakeKubectlConfig(state.ep.name, fmt.Sprintf("https://%s:%d", config.ServerNames[0], *apiPort))
+	kc, err := authority.MakeKubectlConfig(state.ep.name, fmt.Sprintf("https://%s:%d", config.ServerNames[0], config.APIPort))
 	if err != nil {
 		log.Printf("Unable to generate a working kubectl: %v", err)
 	} else {
