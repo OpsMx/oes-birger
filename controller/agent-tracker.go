@@ -95,11 +95,15 @@ func (a *Agents) RemoveAgent(state *agentState) {
 	log.Printf("Agent %s removed, now at %d endpoints", state, len(agentList))
 }
 
-func (a *Agents) AgentFor(ep endpoint) *agentState {
+func (a *Agents) SendToAgent(ep endpoint, message *httpMessage) *agentState {
+	agents.RLock()
+	defer agents.RUnlock()
 	agentList, ok := agents.m[ep]
 	if !ok || len(agentList) == 0 {
 		log.Printf("No agents connected for: %s", ep)
 		return nil
 	}
-	return agentList[rnd.Intn(len(agentList))]
+	agent := agentList[rnd.Intn(len(agentList))]
+	agent.inHTTPRequest <- message
+	return agent
 }

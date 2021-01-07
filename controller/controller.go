@@ -97,31 +97,26 @@ func makeHeaders(headers map[string][]string) []*tunnel.HttpHeader {
 func kubernetesAPIHandler(w http.ResponseWriter, r *http.Request) {
 	agentname := firstLabel(r.TLS.PeerCertificates[0].Subject.CommonName)
 	ep := endpoint{protocol: "kubernetes", name: agentname}
-	apiRequestCounter.WithLabelValues(agentname, "kubernetes").Inc()
+	apiRequestCounter.WithLabelValues(agentname, ep.protocol).Inc()
 
-	agents.RLock()
-	agent := agents.AgentFor(ep)
-	if agent == nil {
-		agents.RUnlock()
-		w.WriteHeader(http.StatusBadGateway)
-		return
-	}
 	body, _ := ioutil.ReadAll(r.Body)
 	req := &tunnel.HttpRequest{
 		Id:       ulidContext.Ulid(),
 		Target:   agentname,
-		Protocol: "kubernetes",
+		Protocol: ep.protocol,
 		Method:   r.Method,
 		URI:      r.RequestURI,
 		Headers:  makeHeaders(r.Header),
 		Body:     body,
 	}
 	message := &httpMessage{out: make(chan *tunnel.ASEventWrapper), cmd: req}
-	agent.inHTTPRequest <- message
-	agents.RUnlock()
+	agent := agents.SendToAgent(ep, message)
+	if agent == nil {
+		w.WriteHeader(http.StatusBadGateway)
+		return
+	}
 
 	cleanClose := false
-
 	notify := r.Context().Done()
 	go func() {
 		<-notify
@@ -137,7 +132,7 @@ func kubernetesAPIHandler(w http.ResponseWriter, r *http.Request) {
 		in, more := <-message.out
 		if !more {
 			if !seenHeader {
-				log.Printf("Request timed out sending to agent %s", req.Target)
+				log.Printf("Request timed out sending to agent %s", agent)
 				w.WriteHeader(http.StatusBadGateway)
 			}
 			cleanClose = true
@@ -180,7 +175,7 @@ func kubernetesAPIHandler(w http.ResponseWriter, r *http.Request) {
 		case nil:
 			// ignore for now
 		default:
-			log.Printf("Received unknown message: %s: %T", agentname, x)
+			log.Printf("Received unknown message: %s: %T", agent, x)
 		}
 	}
 }
