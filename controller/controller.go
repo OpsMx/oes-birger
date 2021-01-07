@@ -100,14 +100,12 @@ func kubernetesAPIHandler(w http.ResponseWriter, r *http.Request) {
 	apiRequestCounter.WithLabelValues(agentname, "kubernetes").Inc()
 
 	agents.RLock()
-	agentList, ok := agents.m[ep]
-	if !ok || len(agentList) == 0 {
+	agent := agents.AgentFor(ep)
+	if agent == nil {
 		agents.RUnlock()
-		log.Printf("No agents connected for: %s", agentname)
 		w.WriteHeader(http.StatusBadGateway)
 		return
 	}
-	agent := agentList[rnd.Intn(len(agentList))]
 	body, _ := ioutil.ReadAll(r.Body)
 	req := &tunnel.HttpRequest{
 		Id:       ulidContext.Ulid(),
