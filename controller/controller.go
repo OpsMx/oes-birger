@@ -53,8 +53,6 @@ var (
 		Name: "agents_connected",
 		Help: "The currently connected agents",
 	}, []string{"agent", "protocol"})
-
-	caCert tls.Certificate
 )
 
 func makePingResponse(req *tunnel.PingRequest) *tunnel.SAEventWrapper {
@@ -213,7 +211,7 @@ func (s *tunnelServer) GetStatistics(ctx context.Context, in *empty.Empty) (*tun
 	return ret, nil
 }
 
-func runAgentHTTPServer(caCert tls.Certificate, serverCert tls.Certificate) {
+func runAgentHTTPServer(serverCert tls.Certificate) {
 	log.Printf("Running HTTPS listener on port %d", config.APIPort)
 
 	certPool, err := authority.MakeCertPool()
@@ -258,7 +256,7 @@ func runPrometheusHTTPServer(port int) {
 	prometheus.MustRegister(connectedAgentsGauge)
 }
 
-func runGRPCServer(caCert tls.Certificate, serverCert tls.Certificate) {
+func runGRPCServer(serverCert tls.Certificate) {
 	//
 	// Set up GRPC server
 	//
@@ -321,8 +319,8 @@ func main() {
 	//
 	// Set up HTTP server
 	//
-	go runAgentHTTPServer(caCert, *serverCert)
+	go runAgentHTTPServer(*serverCert)
 
 	// never returns
-	runGRPCServer(caCert, *serverCert)
+	runGRPCServer(*serverCert)
 }
