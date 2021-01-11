@@ -1,15 +1,21 @@
 package main
 
 import (
+	"context"
+	"crypto/tls"
 	"encoding/base64"
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"sync"
 	"sync/atomic"
 
+	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/opsmx/grpc-bidir/controller/webhook"
 	"github.com/opsmx/grpc-bidir/tunnel"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 )
 
 type tunnelServer struct {
@@ -40,27 +46,14 @@ func sendWebhook(state *agentState, namespaces []string) {
 	hook.Send(req)
 }
 
-//
-// Flow:
-//  * API request comes in
-//  * We look in our local list of possible endpoints.  Error if not found.
-//  * One of the endpoint paths (directly connected preferred, but if none use another controller)
-//  * The message is sent to the endpoint.
-//  * If the "other side" cancells the request, we expect to get notified.
-//  * If we cancel the request, we notify the endpoint.
-//  * Multiple data packets can flow in either direction:  { header, data... }
-//  * If the endpoint vanishes, we will cancel all outstanding transactions.
-
-// Impl:
-//
-// An agent uses a tunnel, which will allow messages to flow back and forth. If the connection
-// is closed, we can detect this.  Each agent has only one ID and one protocol it can handle.
-//
-// A peer controller also uses a tunnel, where it sends a list of ( protocol, agentID, agentSession )
-// to allow proxying through this controller.  If it closes, all endpoints handled by this
-// tunnel are closed.
-//
-// Endpoints always receive the full list of
+func makePingResponse(req *tunnel.PingRequest) *tunnel.SAEventWrapper {
+	resp := &tunnel.SAEventWrapper{
+		Event: &tunnel.SAEventWrapper_PingResponse{
+			PingResponse: &tunnel.PingResponse{Ts: tunnel.Now(), EchoedTs: req.Ts},
+		},
+	}
+	return resp
+}
 
 func (s *tunnelServer) EventTunnel(stream tunnel.TunnelService_EventTunnelServer) error {
 	agentIdentity, err := getAgentNameFromContext(stream.Context())
@@ -199,5 +192,56 @@ func (s *tunnelServer) EventTunnel(stream tunnel.TunnelService_EventTunnelServer
 		default:
 			log.Printf("Received unknown message: %s: %T", state, x)
 		}
+	}
+}
+
+func (s *tunnelServer) GetStatistics(ctx context.Context, in *empty.Empty) (*tunnel.ControllerStatistics, error) {
+	agents.RLock()
+	defer agents.RUnlock()
+	as := make([]*tunnel.ControllerAgentStatistics, 0)
+	for _, list := range agents.m {
+		for _, agent := range list {
+			a := &tunnel.ControllerAgentStatistics{
+				Identity:    agent.ep.name,
+				Protocol:    agent.ep.protocol,
+				Session:     agent.session,
+				ConnectedAt: agent.connectedAt,
+				LastPing:    agent.lastPing,
+				LastUse:     agent.lastUse,
+			}
+			as = append(as, a)
+		}
+	}
+	ret := &tunnel.ControllerStatistics{
+		AgentStatistics: as,
+	}
+
+	return ret, nil
+}
+
+func runGRPCServer(serverCert tls.Certificate) {
+	//
+	// Set up GRPC server
+	//
+	log.Printf("Starting GRPC server on port %d...", config.GRPCPort)
+	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", config.GRPCPort))
+	if err != nil {
+		log.Fatalf("Failed to listen: %v", err)
+	}
+
+	certPool, err := authority.MakeCertPool()
+	if err != nil {
+		log.Fatalf("While making certpool: %v", err)
+	}
+	creds := credentials.NewTLS(&tls.Config{
+		ClientCAs:    certPool,
+		ClientAuth:   tls.RequireAndVerifyClientCert,
+		Certificates: []tls.Certificate{serverCert},
+		MinVersion:   tls.VersionTLS12,
+	})
+	grpcServer := grpc.NewServer(grpc.Creds(creds))
+	tunnel.RegisterTunnelServiceServer(grpcServer, newServer())
+	if err := grpcServer.Serve(lis); err != nil {
+		log.Fatalf("Failed to start GRPC server: %v", err)
 	}
 }
