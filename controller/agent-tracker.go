@@ -6,6 +6,15 @@ import (
 	"sync"
 
 	"github.com/opsmx/grpc-bidir/tunnel"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
+)
+
+var (
+	connectedAgentsGauge = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "agents_connected",
+		Help: "The currently connected agents",
+	}, []string{"agent", "protocol"})
 )
 
 type Agents struct {
@@ -93,4 +102,17 @@ func (a *Agents) RemoveAgent(state *agentState) {
 		log.Printf("Attempt to remove unknown agent %s", state)
 	}
 	log.Printf("Agent %s removed, now at %d endpoints", state, len(agentList))
+}
+
+func (a *Agents) SendToAgent(ep endpoint, message *httpMessage) *agentState {
+	agents.RLock()
+	defer agents.RUnlock()
+	agentList, ok := agents.m[ep]
+	if !ok || len(agentList) == 0 {
+		log.Printf("No agents connected for: %s", ep)
+		return nil
+	}
+	agent := agentList[rnd.Intn(len(agentList))]
+	agent.inHTTPRequest <- message
+	return agent
 }
