@@ -250,7 +250,7 @@ func main() {
 
 	if len(config.Webhook) > 0 {
 		hook = webhook.NewRunner(config.Webhook)
-		hook.Run()
+		go hook.Run()
 	}
 
 	//

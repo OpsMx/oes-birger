@@ -53,15 +53,13 @@ func (wr *Runner) Send(msg *AgentConnectionNotification) {
 // Run starts a goroutine to process incoming web requests.
 //
 func (wr *Runner) Run() {
-	go func() {
-		for {
-			event, more := <-wr.rc
-			if !more {
-				return
-			}
-			go wr.perform(event)
+	for {
+		event, more := <-wr.rc
+		if !more {
+			return
 		}
-	}()
+		go wr.perform(event)
+	}
 }
 
 //
