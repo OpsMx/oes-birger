@@ -8,29 +8,28 @@ import (
 )
 
 //
-// Request defines the data sent to a target webhook destination
+// AgentConnectionNotification defines the data sent to a target webhook destination
 //
-type Request struct {
-	Name       string   `json:"name,omitempty"`
-	Protocol   string   `json:"protocol,omitempty"`
-	Kubeconfig string   `json:"kubeconfig,omitempty"`
-	Namespaces []string `json:"namespaces,omitempty"`
+type AgentConnectionNotification struct {
+	Identity             string   `json:"identity,omitempty"`
+	Protocols            []string `json:"protocols,omitempty"`
+	Session              string   `json:"session,omitempty"`
+	KubernetesNamespaces []string `json:"namespaces,omitempty"`
 }
 
 //
 // Runner holds state for the specific runner.
 type Runner struct {
 	url string
-	rc  chan *Request
+	rc  chan *AgentConnectionNotification
 }
 
 //
-// NewRunner returns a new webhook runner.  Use `Channel` to get the channel to send on, and
-// `Close` when done.
+// NewRunner returns a new webhook runner.  Call `Close` when done.
 func NewRunner(url string) *Runner {
 	return &Runner{
 		url: url,
-		rc:  make(chan *Request),
+		rc:  make(chan *AgentConnectionNotification),
 	}
 }
 
@@ -46,7 +45,7 @@ func (wr *Runner) Close() {
 // future, perhaps on a new goroutine.  There is no return status,
 // and errors are logged but otherwise silently ignored.
 //
-func (wr *Runner) Send(msg *Request) {
+func (wr *Runner) Send(msg *AgentConnectionNotification) {
 	wr.rc <- msg
 }
 
@@ -68,7 +67,7 @@ func (wr *Runner) Run() {
 //
 // Perform an actual web request
 //
-func (wr *Runner) perform(msg *Request) {
+func (wr *Runner) perform(msg *AgentConnectionNotification) {
 	log.Printf("Webhook request: %v", msg)
 	jsonString, err := json.Marshal(msg)
 	if err != nil {

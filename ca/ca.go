@@ -13,9 +13,6 @@ import (
 	"fmt"
 	"math/big"
 	"time"
-
-	"github.com/opsmx/grpc-bidir/kubeconfig"
-	"gopkg.in/yaml.v2"
 )
 
 //
@@ -152,23 +149,6 @@ func (c *CA) MakeServerCert(names []string) (*tls.Certificate, error) {
 }
 
 //
-// MakeKubectlConfig will generate a new client certificate with the specified
-// clientName, configured to connect to the specified serverUrl, and will provide
-// the CA certificate as a trusted authprity.
-//
-func (c *CA) MakeKubectlConfig(clientName string, serverURL string) (string, error) {
-	ca64, cert64, certPrivKey64, err := c.GenerateCertificate(clientName, "client")
-	if err != nil {
-		return "", err
-	}
-	y, err := makeKubeConfig("forwarder", ca64, cert64, certPrivKey64, serverURL)
-	if err != nil {
-		return "", nil
-	}
-	return y, nil
-}
-
-//
 // GenerateCertificate will make a new certificate, and return a base64 encoded
 // string for the certificate, key, and authority certificate.
 //
@@ -219,47 +199,6 @@ func bytesTo64(prefix string, data []byte) string {
 		Bytes: data,
 	})
 	return base64.StdEncoding.EncodeToString(p.Bytes())
-}
-
-func makeKubeConfig(name string, ca64 string, cert64 string, certPrivKey64 string, serverURL string) (string, error) {
-	k := kubeconfig.KubeConfig{
-		APIVersion: "v1",
-		Kind:       "Config",
-		Contexts: []kubeconfig.Context{
-			{
-				Name: name,
-				Context: kubeconfig.ContextDetails{
-					User:    name,
-					Cluster: name,
-				},
-			},
-		},
-		Users: []kubeconfig.User{
-			{
-				Name: name,
-				User: kubeconfig.UserDetails{
-					ClientCertificateData: cert64,
-					ClientKeyData:         certPrivKey64,
-				},
-			},
-		},
-		Clusters: []kubeconfig.Cluster{
-			{
-				Name: name,
-				Cluster: kubeconfig.ClusterDetails{
-					Server:                   serverURL,
-					CertificateAuthorityData: ca64,
-				},
-			},
-		},
-		CurrentContext: name,
-	}
-
-	s, err := yaml.Marshal(k)
-	if err != nil {
-		return "", nil
-	}
-	return string(s), nil
 }
 
 func (c *CA) MakeCertPool() (*x509.CertPool, error) {

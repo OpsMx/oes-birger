@@ -2,7 +2,6 @@ package main
 
 import (
 	"crypto/tls"
-	"encoding/base64"
 	"fmt"
 	"io"
 	"log"
@@ -29,18 +28,12 @@ func sendWebhook(state *agentState, namespaces []string) {
 	if hook == nil {
 		return
 	}
-	req := &webhook.Request{
-		Name:       state.ep.name,
-		Protocol:   state.ep.protocol,
-		Namespaces: namespaces,
+	req := &webhook.AgentConnectionNotification{
+		Identity:             state.ep.name,
+		Protocols:            []string{state.ep.protocol},
+		Session:              state.session,
+		KubernetesNamespaces: namespaces,
 	}
-	kc, err := authority.MakeKubectlConfig(state.ep.name, fmt.Sprintf("https://%s:%d", config.ServerNames[0], config.APIPort))
-	if err != nil {
-		log.Printf("Unable to generate a working kubectl: %v", err)
-	} else {
-		req.Kubeconfig = base64.StdEncoding.EncodeToString([]byte(kc))
-	}
-
 	hook.Send(req)
 }
 
