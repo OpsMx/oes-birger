@@ -206,7 +206,7 @@ func (c *CA) GenerateCertificate(name string, suffix string) (string, string, st
 	}
 
 	ca64 := bytesTo64("CERTIFICATE", c.caCert.Certificate[0])
-	cert64 := bytesTo64("RSA PUBLIC KEY", x509.MarshalPKCS1PrivateKey(certPrivKey))
+	cert64 := bytesTo64("RSA PRIVATE KEY", x509.MarshalPKCS1PrivateKey(certPrivKey))
 	certPrivKey64 := bytesTo64("CERTIFICATE", certBytes)
 
 	return ca64, cert64, certPrivKey64, nil
