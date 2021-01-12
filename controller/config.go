@@ -16,9 +16,10 @@ type ControllerConfig struct {
 	Webhook        string                  `yaml:"webhook,omitempty"`
 	ServerNames    []string                `yaml:"serverNames,omitempty"`
 	CAConfig       ca.Config               `yaml:"caConfig,omitempty"`
-	GRPCPort       int                     `yaml:"grpcPort"`
-	APIPort        int                     `yaml:"apiPort"`
-	PrometheusPort int                     `yaml:"prometheusPort"`
+	GRPCPort       uint16                  `yaml:"grpcPort"`
+	CNCPort        uint16                  `yaml:"cncPort"`
+	APIPort        uint16                  `yaml:"apiPort"`
+	PrometheusPort uint16                  `yaml:"prometheusPort"`
 }
 
 type agentConfig struct {
@@ -40,13 +41,16 @@ func LoadConfig(filename string) (*ControllerConfig, error) {
 		return nil, err
 	}
 
-	if config.GRPCPort <= 0 {
+	if config.GRPCPort == 0 {
 		config.GRPCPort = 9001
 	}
-	if config.APIPort <= 0 {
+	if config.APIPort == 0 {
 		config.APIPort = 9002
 	}
-	if config.PrometheusPort <= 0 {
+	if config.CNCPort == 0 {
+		config.CNCPort = 9003
+	}
+	if config.PrometheusPort == 0 {
 		config.PrometheusPort = 9102
 	}
 

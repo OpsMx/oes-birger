@@ -94,47 +94,10 @@ message ControllerStatistics {
 }
 
 //
-// Create and get kubectl components
-//
-
-message CreateKubectlRequest {
-    string identity = 1;
-}
-
-message CreateKubectlResult {
-    string identity = 1;
-    bytes userCertificate = 2;
-    bytes userKey = 3;
-    bytes certificateAuthorityCertificate = 4;
-    string servername = 5;
-    int32 port = 6;
-}
-
-//
-// Create agent manifest components
-//
-
-message CreateAgentManifestRequest {
-    string identity = 1;
-    repeated string namespaces = 2;
-}
-
-message CreateAgentManifestResponse {
-    string identity = 1;
-    bytes agentCertificate = 2;
-    bytes agentKey = 3;
-    bytes certificateAuthorityCertificate = 4;
-    string servername = 5;
-    int32 port = 6;
-}
-
-//
 // Service (runs on the controller)
 //
 
 service TunnelService {
     rpc EventTunnel(stream ASEventWrapper) returns (stream SAEventWrapper) {}
     rpc GetStatistics(google.protobuf.Empty) returns (ControllerStatistics) {}
-    rpc CreateKubectl(CreateKubectlRequest) returns (CreateKubectlResult) {}
-    rpc CreateAgentManifest(CreateAgentManifestRequest) returns (CreateAgentManifestResponse) {}
 }

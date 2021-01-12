@@ -52,20 +52,28 @@ func firstLabel(name string) string {
 	return strings.Split(name, ".")[0]
 }
 
-func getAgentNameFromContext(ctx context.Context) (string, error) {
+func getNamesFromContext(ctx context.Context) ([]string, error) {
 	p, ok := peer.FromContext(ctx)
+	empty := make([]string, 0)
 	if !ok {
-		return "", status.Error(codes.Unauthenticated, "no peer found")
+		return empty, status.Error(codes.Unauthenticated, "no peer found")
 	}
 	tlsAuth, ok := p.AuthInfo.(credentials.TLSInfo)
 	if !ok {
-		return "", status.Error(codes.Unauthenticated, "unexpected peer transport credentials")
+		return empty, status.Error(codes.Unauthenticated, "unexpected peer transport credentials")
 	}
 	if len(tlsAuth.State.VerifiedChains) == 0 || len(tlsAuth.State.VerifiedChains[0]) == 0 {
-		return "", status.Error(codes.Unauthenticated, "could not verify peer certificate")
+		return empty, status.Error(codes.Unauthenticated, "could not verify peer certificate")
 	}
-	shortName := strings.Split(tlsAuth.State.VerifiedChains[0][0].Subject.CommonName, ".")
-	return shortName[0], nil
+	return strings.Split(tlsAuth.State.VerifiedChains[0][0].Subject.CommonName, "."), nil
+}
+
+func getAgentNameFromContext(ctx context.Context) (string, error) {
+	names, err := getNamesFromContext(ctx)
+	if err != nil {
+		return "", err
+	}
+	return names[0], nil
 }
 
 func makeHeaders(headers map[string][]string) []*tunnel.HttpHeader {
@@ -116,8 +124,8 @@ func kubernetesAPIHandler(w http.ResponseWriter, r *http.Request) {
 		Body:     body,
 	}
 	message := &httpMessage{out: make(chan *tunnel.ASEventWrapper), cmd: req}
-	agent := agents.SendToAgent(ep, message)
-	if agent == nil {
+	found := agents.SendToAgent(ep, message)
+	if !found {
 		w.WriteHeader(http.StatusBadGateway)
 		return
 	}
@@ -127,7 +135,7 @@ func kubernetesAPIHandler(w http.ResponseWriter, r *http.Request) {
 	go func() {
 		<-notify
 		if !cleanClose {
-			agent.inCancelRequest <- &cancelRequest{id: req.Id}
+			agents.CancelRequest(ep, &cancelRequest{id: req.Id})
 		}
 	}()
 
@@ -138,7 +146,7 @@ func kubernetesAPIHandler(w http.ResponseWriter, r *http.Request) {
 		in, more := <-message.out
 		if !more {
 			if !seenHeader {
-				log.Printf("Request timed out sending to agent %s", agent)
+				log.Printf("Request timed out sending to agent")
 				w.WriteHeader(http.StatusBadGateway)
 			}
 			cleanClose = true
@@ -181,13 +189,13 @@ func kubernetesAPIHandler(w http.ResponseWriter, r *http.Request) {
 		case nil:
 			// ignore for now
 		default:
-			log.Printf("Received unknown message: %s: %T", agent, x)
+			log.Printf("Received unknown message: %T", x)
 		}
 	}
 }
 
 func runAgentHTTPServer(serverCert tls.Certificate) {
-	log.Printf("Running HTTPS listener on port %d", config.APIPort)
+	log.Printf("Running Kubernetes API HTTPS listener on port %d", config.APIPort)
 
 	certPool, err := authority.MakeCertPool()
 	if err != nil {
@@ -215,7 +223,7 @@ func runAgentHTTPServer(serverCert tls.Certificate) {
 	server.ListenAndServeTLS("", "")
 }
 
-func runPrometheusHTTPServer(port int) {
+func runPrometheusHTTPServer(port uint16) {
 	log.Printf("Running HTTP listener for Prometheus on port %d", port)
 
 	mux := http.NewServeMux()
@@ -265,9 +273,14 @@ func main() {
 	}
 
 	//
-	// Set up HTTP server
+	// Set up k8s API server
 	//
 	go runAgentHTTPServer(*serverCert)
+
+	//
+	// Start up command and control API server
+	//
+	go runCommandHTTPServer(*serverCert)
 
 	// never returns
 	runGRPCServer(*serverCert)

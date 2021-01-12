@@ -157,11 +157,27 @@ func (c *CA) MakeServerCert(names []string) (*tls.Certificate, error) {
 // the CA certificate as a trusted authprity.
 //
 func (c *CA) MakeKubectlConfig(clientName string, serverURL string) (string, error) {
+	ca64, cert64, certPrivKey64, err := c.GenerateCertificate(clientName, "client")
+	if err != nil {
+		return "", err
+	}
+	y, err := makeKubeConfig("forwarder", ca64, cert64, certPrivKey64, serverURL)
+	if err != nil {
+		return "", nil
+	}
+	return y, nil
+}
+
+//
+// GenerateCertificate will make a new certificate, and return a base64 encoded
+// string for the certificate, key, and authority certificate.
+//
+func (c *CA) GenerateCertificate(name string, suffix string) (string, string, string, error) {
 	now := time.Now().UTC()
 	cert := &x509.Certificate{
 		SerialNumber: big.NewInt(time.Now().UnixNano()),
 		Subject: pkix.Name{
-			CommonName:   clientName + ".client",
+			CommonName:   name + "." + suffix,
 			Organization: []string{"OpsMX API Forwarder Client"},
 			Country:      []string{"US"},
 			Province:     []string{},
@@ -174,30 +190,26 @@ func (c *CA) MakeKubectlConfig(clientName string, serverURL string) (string, err
 	}
 	certPrivKey, err := rsa.GenerateKey(crand.Reader, 4096)
 	if err != nil {
-		return "", err
+		return "", "", "", err
 	}
 
 	// we now have a certificate and private key.  Now, sign the cert with the CA.
 
 	caCert, err := x509.ParseCertificate(c.caCert.Certificate[0])
 	if err != nil {
-		return "", err
+		return "", "", "", err
 	}
 
 	certBytes, err := x509.CreateCertificate(crand.Reader, cert, caCert, &certPrivKey.PublicKey, c.caCert.PrivateKey)
 	if err != nil {
-		return "", err
+		return "", "", "", err
 	}
 
 	ca64 := bytesTo64("CERTIFICATE", c.caCert.Certificate[0])
 	cert64 := bytesTo64("RSA PUBLIC KEY", x509.MarshalPKCS1PrivateKey(certPrivKey))
 	certPrivKey64 := bytesTo64("CERTIFICATE", certBytes)
 
-	y, err := makeKubeConfig("forwarder", ca64, cert64, certPrivKey64, serverURL)
-	if err != nil {
-		return "", nil
-	}
-	return y, nil
+	return ca64, cert64, certPrivKey64, nil
 }
 
 func bytesTo64(prefix string, data []byte) string {

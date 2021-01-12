@@ -202,12 +202,12 @@ func (s *tunnelServer) GetStatistics(ctx context.Context, in *empty.Empty) (*tun
 	for _, list := range agents.m {
 		for _, agent := range list {
 			a := &tunnel.ControllerAgentStatistics{
-				Identity:    agent.ep.name,
-				Protocol:    agent.ep.protocol,
-				Session:     agent.session,
-				ConnectedAt: agent.connectedAt,
-				LastPing:    agent.lastPing,
-				LastUse:     agent.lastUse,
+				Identity:    agent.Endpoint().name,
+				Protocol:    agent.Endpoint().protocol,
+				Session:     agent.Session(),
+				ConnectedAt: agent.ConnectedAt(),
+				LastPing:    agent.LastPing(),
+				LastUse:     agent.LastUse(),
 			}
 			as = append(as, a)
 		}

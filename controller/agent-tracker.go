@@ -17,9 +17,20 @@ var (
 	}, []string{"agent", "protocol"})
 )
 
+type Agent interface {
+	Send(*httpMessage)
+	CancelRequest(*cancelRequest)
+
+	Endpoint() endpoint
+	Session() string
+	ConnectedAt() uint64
+	LastPing() uint64
+	LastUse() uint64
+}
+
 type Agents struct {
 	sync.RWMutex
-	m map[endpoint][]*agentState
+	m map[endpoint][]Agent
 }
 
 type httpMessage struct {
@@ -41,6 +52,26 @@ type agentState struct {
 	lastUse         uint64
 }
 
+func (s *agentState) Endpoint() endpoint {
+	return s.ep
+}
+
+func (s *agentState) Session() string {
+	return s.session
+}
+
+func (s *agentState) ConnectedAt() uint64 {
+	return s.connectedAt
+}
+
+func (s *agentState) LastPing() uint64 {
+	return s.lastPing
+}
+
+func (s *agentState) LastUse() uint64 {
+	return s.lastUse
+}
+
 func (s *agentState) String() string {
 	return fmt.Sprintf("(%s, %s, %s)", s.ep.name, s.ep.protocol, s.session)
 }
@@ -52,7 +83,7 @@ type endpoint struct {
 
 func MakeAgents() *Agents {
 	return &Agents{
-		m: make(map[endpoint][]*agentState),
+		m: make(map[endpoint][]Agent),
 	}
 }
 
@@ -70,7 +101,7 @@ func (a *Agents) AddAgent(state *agentState) {
 	defer agents.Unlock()
 	agentList, ok := agents.m[state.ep]
 	if !ok {
-		agentList = make([]*agentState, 0)
+		agentList = make([]Agent, 0)
 	}
 	agentList = append(agentList, state)
 	agents.m[state.ep] = agentList
@@ -104,15 +135,36 @@ func (a *Agents) RemoveAgent(state *agentState) {
 	log.Printf("Agent %s removed, now at %d endpoints", state, len(agentList))
 }
 
-func (a *Agents) SendToAgent(ep endpoint, message *httpMessage) *agentState {
+func (a *Agents) SendToAgent(ep endpoint, message *httpMessage) bool {
 	agents.RLock()
 	defer agents.RUnlock()
 	agentList, ok := agents.m[ep]
 	if !ok || len(agentList) == 0 {
 		log.Printf("No agents connected for: %s", ep)
-		return nil
+		return false
 	}
 	agent := agentList[rnd.Intn(len(agentList))]
-	agent.inHTTPRequest <- message
-	return agent
+	agent.Send(message)
+	return true
+}
+
+func (a *Agents) CancelRequest(ep endpoint, message *cancelRequest) bool {
+	agents.RLock()
+	defer agents.RUnlock()
+	agentList, ok := agents.m[ep]
+	if !ok || len(agentList) == 0 {
+		log.Printf("No agents connected for: %s", ep)
+		return false
+	}
+	agent := agentList[rnd.Intn(len(agentList))]
+	agent.CancelRequest(message)
+	return true
+}
+
+func (s *agentState) Send(message *httpMessage) {
+	s.inHTTPRequest <- message
+}
+
+func (s *agentState) CancelRequest(message *cancelRequest) {
+	s.inCancelRequest <- message
 }
