@@ -30,7 +30,7 @@ type manifestResponse struct {
 	ServerHostname   string `json:"serverHostname"`
 	ServerPort       uint16 `json:"serverPort"`
 	AgentCertificate string `json:"agentCertificate"`
-	AgentKey         string `json:"agnetKey"`
+	AgentKey         string `json:"agentKey"`
 	CACert           string `json:"caCert"`
 }
 
@@ -59,10 +59,12 @@ func cncGenerateKubectlComponents(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("content-type", "application/json")
 	names := strings.Split(r.TLS.PeerCertificates[0].Subject.CommonName, ".")
 	if names[1] != "command" {
+		w.Write(httpError(fmt.Errorf("identity does not end with 'command': %v", names)))
 		w.WriteHeader(http.StatusForbidden)
 		return
 	}
 	if r.Method != "POST" {
+		w.Write(httpError(fmt.Errorf("only 'POST' is accepted")))
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
 	}
@@ -70,6 +72,7 @@ func cncGenerateKubectlComponents(w http.ResponseWriter, r *http.Request) {
 	var req kubeConfigRequest
 	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
+		w.Write(httpError(err))
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -114,6 +117,7 @@ func cncGenerateAgentManifestComponents(w http.ResponseWriter, r *http.Request) 
 	var req manifestRequest
 	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
+		w.Write(httpError(err))
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
