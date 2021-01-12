@@ -188,7 +188,7 @@ func (c *CA) GenerateCertificate(name string, suffix string) (string, string, st
 		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
 		KeyUsage:    x509.KeyUsageDigitalSignature,
 	}
-	certPrivKey, err := rsa.GenerateKey(crand.Reader, 4096)
+	certPrivKey, err := rsa.GenerateKey(crand.Reader, 2048)
 	if err != nil {
 		return "", "", "", err
 	}
