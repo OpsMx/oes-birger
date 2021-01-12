@@ -17,6 +17,10 @@ var (
 	}, []string{"agent", "protocol"})
 )
 
+//
+// Agent is a thing that looks like a connected agent, either directly connected or
+// through another controller.
+//
 type Agent interface {
 	Send(*httpMessage)
 	CancelRequest(*cancelRequest)
@@ -28,6 +32,9 @@ type Agent interface {
 	LastUse() uint64
 }
 
+//
+// Agents holds a list of all currently known agents
+//
 type Agents struct {
 	sync.RWMutex
 	m map[endpoint][]Agent
@@ -81,6 +88,10 @@ type endpoint struct {
 	protocol string // "kubernetes" or whatever API we are handling
 }
 
+//
+// MakeAgents returns a new agent object which will manage (safely) agents
+// connected directly or indirectly.
+//
 func MakeAgents() *Agents {
 	return &Agents{
 		m: make(map[endpoint][]Agent),
@@ -96,6 +107,9 @@ func sliceIndex(limit int, predicate func(i int) bool) int {
 	return -1
 }
 
+//
+// AddAgent will add a bew agent to our list.
+//
 func (a *Agents) AddAgent(state *agentState) {
 	agents.Lock()
 	defer agents.Unlock()
@@ -109,6 +123,9 @@ func (a *Agents) AddAgent(state *agentState) {
 	connectedAgentsGauge.WithLabelValues(state.ep.name, state.ep.protocol).Inc()
 }
 
+//
+// RemoveAgent will remove an agent and signal to it that closing down is started.
+//
 func (a *Agents) RemoveAgent(state *agentState) {
 	agents.Lock()
 	defer agents.Unlock()
@@ -135,6 +152,10 @@ func (a *Agents) RemoveAgent(state *agentState) {
 	log.Printf("Agent %s removed, now at %d endpoints", state, len(agentList))
 }
 
+//
+// SendToAgent will send a new httpMessage to an agent, and return true if an agent
+// was found.
+//
 func (a *Agents) SendToAgent(ep endpoint, message *httpMessage) bool {
 	agents.RLock()
 	defer agents.RUnlock()
@@ -148,6 +169,9 @@ func (a *Agents) SendToAgent(ep endpoint, message *httpMessage) bool {
 	return true
 }
 
+//
+// CancelRequest will cancel an ongoing request.
+//
 func (a *Agents) CancelRequest(ep endpoint, message *cancelRequest) bool {
 	agents.RLock()
 	defer agents.RUnlock()
@@ -161,10 +185,16 @@ func (a *Agents) CancelRequest(ep endpoint, message *cancelRequest) bool {
 	return true
 }
 
+//
+// Send sends a message to a spceific Agent
+//
 func (s *agentState) Send(message *httpMessage) {
 	s.inHTTPRequest <- message
 }
 
+//
+// CancelRequest canceles a specific stream
+//
 func (s *agentState) CancelRequest(message *cancelRequest) {
 	s.inCancelRequest <- message
 }
