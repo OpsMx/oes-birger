@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"crypto/tls"
 	"encoding/base64"
 	"fmt"
@@ -11,7 +10,6 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/opsmx/grpc-bidir/controller/webhook"
 	"github.com/opsmx/grpc-bidir/tunnel"
 	"google.golang.org/grpc"
@@ -156,9 +154,9 @@ func (s *tunnelServer) EventTunnel(stream tunnel.TunnelService_EventTunnelServer
 			}
 		case *tunnel.ASEventWrapper_AgentHello:
 			req := in.GetAgentHello()
-			state.ep.protocol = req.Protocol
+			state.ep.protocol = req.Protocols[0] // TODO: handle multiple protocols
 			agents.AddAgent(state)
-			sendWebhook(state, req.Namespaces)
+			sendWebhook(state, req.KubernetesNamespaces)
 		case *tunnel.ASEventWrapper_HttpResponse:
 			resp := in.GetHttpResponse()
 			atomic.StoreUint64(&state.lastUse, tunnel.Now())
@@ -193,30 +191,6 @@ func (s *tunnelServer) EventTunnel(stream tunnel.TunnelService_EventTunnelServer
 			log.Printf("Received unknown message: %s: %T", state, x)
 		}
 	}
-}
-
-func (s *tunnelServer) GetStatistics(ctx context.Context, in *empty.Empty) (*tunnel.ControllerStatistics, error) {
-	agents.RLock()
-	defer agents.RUnlock()
-	as := make([]*tunnel.ControllerAgentStatistics, 0)
-	for _, list := range agents.m {
-		for _, agent := range list {
-			a := &tunnel.ControllerAgentStatistics{
-				Identity:    agent.Endpoint().name,
-				Protocol:    agent.Endpoint().protocol,
-				Session:     agent.Session(),
-				ConnectedAt: agent.ConnectedAt(),
-				LastPing:    agent.LastPing(),
-				LastUse:     agent.LastUse(),
-			}
-			as = append(as, a)
-		}
-	}
-	ret := &tunnel.ControllerStatistics{
-		AgentStatistics: as,
-	}
-
-	return ret, nil
 }
 
 func runGRPCServer(serverCert tls.Certificate) {

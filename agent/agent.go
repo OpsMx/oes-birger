@@ -225,8 +225,8 @@ func runTunnel(sa *serverContext, client tunnel.TunnelServiceClient, ticker chan
 	hello := &tunnel.ASEventWrapper{
 		Event: &tunnel.ASEventWrapper_AgentHello{
 			AgentHello: &tunnel.AgentHello{
-				Protocol:   "kubernetes",
-				Namespaces: config.Namespaces,
+				Protocols:            []string{"kubernetes"},
+				KubernetesNamespaces: config.Namespaces,
 			},
 		},
 	}

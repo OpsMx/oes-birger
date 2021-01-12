@@ -53,8 +53,8 @@ message HttpChunkedResponse {
 }
 
 message AgentHello {
-    string protocol = 1;
-    repeated string namespaces = 2;
+    repeated string protocols = 1;
+    repeated string kubernetesNamespaces = 2;
 }
 
 // Messages sent from server to agent
@@ -77,27 +77,9 @@ message ASEventWrapper {
 }
 
 //
-// Statistics and Control
-//
-
-message ControllerAgentStatistics {
-    string identity = 1;
-    string protocol = 2;
-    string session = 3;
-    uint64 connectedAt = 4;
-    uint64 lastPing = 5;
-    uint64 lastUse = 6;
-}
-
-message ControllerStatistics {
-    repeated ControllerAgentStatistics agentStatistics = 1;
-}
-
-//
 // Service (runs on the controller)
 //
 
 service TunnelService {
     rpc EventTunnel(stream ASEventWrapper) returns (stream SAEventWrapper) {}
-    rpc GetStatistics(google.protobuf.Empty) returns (ControllerStatistics) {}
 }

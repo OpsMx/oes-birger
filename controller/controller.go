@@ -282,6 +282,15 @@ func main() {
 	//
 	go runCommandHTTPServer(*serverCert)
 
+	//
+	// TODO: remove this once we properly bootstrap!
+	//
+	log.Println("Bootstraping certificate and key follows")
+	ca64, c64, k64, err := authority.GenerateCertificate("bootstrap", "command")
+	log.Printf("caCert: %s", ca64)
+	log.Printf("controlCert: %s", c64)
+	log.Printf("controlKey: %s", k64)
+
 	// never returns
 	runGRPCServer(*serverCert)
 }
