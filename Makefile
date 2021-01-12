@@ -12,6 +12,7 @@ controller_deps = ${pb_deps} \
 	controller/config.go \
 	controller/controller.go \
 	controller/grpc-server.go \
+	controller/cnc-server.go \
 	controller/webhook/webhook.go \
 	tunnel/time.go \
 	tunnel/defaults.go \
