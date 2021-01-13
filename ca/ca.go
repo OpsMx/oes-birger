@@ -104,6 +104,9 @@ func toPEM(data []byte, t string) []byte {
 	return p.Bytes()
 }
 
+//
+// MakeCertificateAuthority generates a new certificate authority key, and self-signs it.
+//
 func (c *CA) MakeCertificateAuthority() (*tls.Certificate, error) {
 	now := time.Now().UTC()
 	cert := &x509.Certificate{
@@ -126,11 +129,8 @@ func (c *CA) MakeCertificateAuthority() (*tls.Certificate, error) {
 		return nil, err
 	}
 
-	// we now have a certificate and private key.  Now, sign the cert with the CA.
-
-	caCert, err := x509.ParseCertificate(c.caCert.Certificate[0])
-
-	certBytes, err := x509.CreateCertificate(crand.Reader, cert, caCert, &certPrivKey.PublicKey, c.caCert.PrivateKey)
+	// Self-sign the CA key.
+	certBytes, err := x509.CreateCertificate(crand.Reader, cert, cert, &certPrivKey.PublicKey, certPrivKey)
 	if err != nil {
 		return nil, err
 	}
@@ -236,6 +236,9 @@ func bytesTo64(prefix string, data []byte) string {
 	return base64.StdEncoding.EncodeToString(p)
 }
 
+//
+// MakeCertPool will return a certificate pool with our CA installed.
+//
 func (c *CA) MakeCertPool() (*x509.CertPool, error) {
 	caCertPool := x509.NewCertPool()
 	for _, cert := range c.caCert.Certificate {
