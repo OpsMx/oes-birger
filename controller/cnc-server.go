@@ -144,6 +144,30 @@ func cncGenerateAgentManifestComponents(w http.ResponseWriter, r *http.Request) 
 	w.Write(json)
 }
 
+func cncGetStatistics(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("content-type", "application/json")
+	names := strings.Split(r.TLS.PeerCertificates[0].Subject.CommonName, ".")
+	if names[1] != "command" {
+		w.Write(httpError(fmt.Errorf("identity does not end with 'command': %v", names)))
+		w.WriteHeader(http.StatusForbidden)
+		return
+	}
+	if r.Method != "GET" {
+		w.Write(httpError(fmt.Errorf("only 'GET' is accepted")))
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
+	ret := agents.GetStatistics()
+	json, err := json.Marshal(ret)
+	if err != nil {
+		w.Write(httpError(err))
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	w.Write(json)
+}
+
 func runCommandHTTPServer(serverCert tls.Certificate) {
 	log.Printf("Running Command and Control API HTTPS listener on port %d", config.CNCPort)
 
@@ -164,6 +188,7 @@ func runCommandHTTPServer(serverCert tls.Certificate) {
 
 	mux.HandleFunc("/api/v1/generateKubectlComponents", cncGenerateKubectlComponents)
 	mux.HandleFunc("/api/v1/generateAgentManifestComponents", cncGenerateAgentManifestComponents)
+	mux.HandleFunc("/api/v1/getAgentStatistics", cncGetStatistics)
 
 	server := &http.Server{
 		Addr:      fmt.Sprintf(":%d", config.CNCPort),

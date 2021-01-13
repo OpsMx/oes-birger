@@ -30,6 +30,7 @@ type Agent interface {
 	ConnectedAt() uint64
 	LastPing() uint64
 	LastUse() uint64
+	GetStatistics() interface{}
 }
 
 //
@@ -57,6 +58,36 @@ type agentState struct {
 	connectedAt     uint64
 	lastPing        uint64
 	lastUse         uint64
+}
+
+//
+// DirectlyConnectedAgentStatistics describes statistics for a directly connected agent.
+//
+type DirectlyConnectedAgentStatistics struct {
+	Identity       string   `json:"identity"`
+	Protocols      []string `json:"protocols"`
+	Session        string   `json:"session"`
+	ConnectedAt    uint64   `json:"connectedAt"`
+	LastPing       uint64   `json:"lastPing"`
+	LastUse        uint64   `json:"lastUse"`
+	ConnectionType string   `json:"connectionType"`
+}
+
+//
+// GetStatistics returns statistics for all agents currently connected.
+// The statistics returned is an opaque object, intended to be rendered to JSON or some
+// other output format using a system that uses introspection.
+//
+func (s *Agents) GetStatistics() interface{} {
+	ret := make([]interface{}, 0)
+	s.RLock()
+	defer s.RUnlock()
+	for _, agentList := range s.m {
+		for _, agent := range agentList {
+			ret = append(ret, agent.GetStatistics())
+		}
+	}
+	return ret
 }
 
 func (s *agentState) Endpoint() endpoint {
@@ -110,15 +141,15 @@ func sliceIndex(limit int, predicate func(i int) bool) int {
 //
 // AddAgent will add a bew agent to our list.
 //
-func (a *Agents) AddAgent(state *agentState) {
-	agents.Lock()
-	defer agents.Unlock()
-	agentList, ok := agents.m[state.ep]
+func (s *Agents) AddAgent(state *agentState) {
+	s.Lock()
+	defer s.Unlock()
+	agentList, ok := s.m[state.ep]
 	if !ok {
 		agentList = make([]Agent, 0)
 	}
 	agentList = append(agentList, state)
-	agents.m[state.ep] = agentList
+	s.m[state.ep] = agentList
 	log.Printf("Agent %s added, now at %d endpoints", state, len(agentList))
 	connectedAgentsGauge.WithLabelValues(state.ep.name, state.ep.protocol).Inc()
 }
@@ -126,10 +157,10 @@ func (a *Agents) AddAgent(state *agentState) {
 //
 // RemoveAgent will remove an agent and signal to it that closing down is started.
 //
-func (a *Agents) RemoveAgent(state *agentState) {
-	agents.Lock()
-	defer agents.Unlock()
-	agentList, ok := agents.m[state.ep]
+func (s *Agents) RemoveAgent(state *agentState) {
+	s.Lock()
+	defer s.Unlock()
+	agentList, ok := s.m[state.ep]
 	if !ok {
 		log.Printf("Attempt to remove unknown agent %s", state)
 		return
@@ -144,7 +175,7 @@ func (a *Agents) RemoveAgent(state *agentState) {
 		agentList[i] = agentList[len(agentList)-1]
 		agentList[len(agentList)-1] = nil
 		agentList = agentList[:len(agentList)-1]
-		agents.m[state.ep] = agentList
+		s.m[state.ep] = agentList
 		connectedAgentsGauge.WithLabelValues(state.ep.name, state.ep.protocol).Dec()
 	} else {
 		log.Printf("Attempt to remove unknown agent %s", state)
@@ -156,10 +187,10 @@ func (a *Agents) RemoveAgent(state *agentState) {
 // SendToAgent will send a new httpMessage to an agent, and return true if an agent
 // was found.
 //
-func (a *Agents) SendToAgent(ep endpoint, message *httpMessage) bool {
-	agents.RLock()
-	defer agents.RUnlock()
-	agentList, ok := agents.m[ep]
+func (s *Agents) SendToAgent(ep endpoint, message *httpMessage) bool {
+	s.RLock()
+	defer s.RUnlock()
+	agentList, ok := s.m[ep]
 	if !ok || len(agentList) == 0 {
 		log.Printf("No agents connected for: %s", ep)
 		return false
@@ -172,10 +203,10 @@ func (a *Agents) SendToAgent(ep endpoint, message *httpMessage) bool {
 //
 // CancelRequest will cancel an ongoing request.
 //
-func (a *Agents) CancelRequest(ep endpoint, message *cancelRequest) bool {
-	agents.RLock()
-	defer agents.RUnlock()
-	agentList, ok := agents.m[ep]
+func (s *Agents) CancelRequest(ep endpoint, message *cancelRequest) bool {
+	s.RLock()
+	defer s.RUnlock()
+	agentList, ok := s.m[ep]
 	if !ok || len(agentList) == 0 {
 		log.Printf("No agents connected for: %s", ep)
 		return false
@@ -197,4 +228,19 @@ func (s *agentState) Send(message *httpMessage) {
 //
 func (s *agentState) CancelRequest(message *cancelRequest) {
 	s.inCancelRequest <- message
+}
+
+//
+// Get statistics for this agent
+//
+func (s *agentState) GetStatistics() interface{} {
+	return &DirectlyConnectedAgentStatistics{
+		Identity:       s.ep.name,
+		Protocols:      []string{s.ep.protocol},
+		Session:        s.session,
+		ConnectedAt:    s.connectedAt,
+		LastPing:       s.lastPing,
+		LastUse:        s.lastUse,
+		ConnectionType: "direct",
+	}
 }
