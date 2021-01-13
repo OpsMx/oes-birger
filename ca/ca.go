@@ -89,6 +89,19 @@ func MakeCA(c *Config) (*CA, error) {
 }
 
 //
+// MakeCAFromData does approximately the same thing as MakeCA() except the CA
+// contents are loaded from PEM strings.
+//
+func MakeCAFromData(certPEM []byte, certPrivKeyPEM []byte) (*CA, error) {
+	caCert, err := tls.X509KeyPair(certPEM, certPrivKeyPEM)
+	if err != nil {
+		return nil, err
+	}
+	ca := &CA{caCert: caCert}
+	return ca, nil
+}
+
+//
 // GetCACertificate returns the public certificate for the CA.
 //
 func (c *CA) GetCACertificate() []byte {
@@ -107,7 +120,7 @@ func toPEM(data []byte, t string) []byte {
 //
 // MakeCertificateAuthority generates a new certificate authority key, and self-signs it.
 //
-func (c *CA) MakeCertificateAuthority() (*tls.Certificate, error) {
+func MakeCertificateAuthority() ([]byte, []byte, error) {
 	now := time.Now().UTC()
 	cert := &x509.Certificate{
 		SerialNumber: big.NewInt(now.UnixNano()),
@@ -124,24 +137,22 @@ func (c *CA) MakeCertificateAuthority() (*tls.Certificate, error) {
 		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
 		BasicConstraintsValid: true,
 	}
+	empty := []byte{}
+
 	certPrivKey, err := rsa.GenerateKey(crand.Reader, 4096)
 	if err != nil {
-		return nil, err
+		return empty, empty, err
 	}
 
 	// Self-sign the CA key.
 	certBytes, err := x509.CreateCertificate(crand.Reader, cert, cert, &certPrivKey.PublicKey, certPrivKey)
 	if err != nil {
-		return nil, err
+		return empty, empty, err
 	}
 
 	certPEM := toPEM(certBytes, "CERTIFICATE")
 	certPrivKeyPEM := toPEM(x509.MarshalPKCS1PrivateKey(certPrivKey), "RSA PRIVATE KEY")
-	tlsCert, err := tls.X509KeyPair(certPEM, certPrivKeyPEM)
-	if err != nil {
-		return nil, err
-	}
-	return &tlsCert, nil
+	return certPEM, certPrivKeyPEM, nil
 }
 
 //

@@ -24,6 +24,10 @@ agent_deps = ${pb_deps} \
 	agent/config.go \
     kubeconfig/config.go
 
+make_ca_deps = \
+	make-ca/make-ca.go \
+	ca/ca.go
+
 now = `date -u +%Y%m%dT%H%M%S`
 
 #
@@ -45,16 +49,19 @@ tunnel/tunnel.pb.go: go.mod tunnel/tunnel.proto
 #
 
 .PHONY: local
-local: bin/agent bin/controller
+local: bin/agent bin/controller bin/make-ca
 
 bin/agent: ${agent_deps}
-	[ -d bin ] || mkdir bin
+	@[ -d bin ] || mkdir bin
 	go build -o bin/agent agent/*.go
 
-
 bin/controller: ${controller_deps}
-	[ -d bin ] || mkdir bin
+	@[ -d bin ] || mkdir bin
 	go build -o bin/controller controller/*.go
+
+bin/make-ca: ${make_ca_deps}
+	@[ -d bin ] || mkdir bin
+	go build -o bin/make-ca make-ca/*.go
 
 #
 # Multi-architecture image builds
