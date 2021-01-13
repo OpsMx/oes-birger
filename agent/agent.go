@@ -26,7 +26,6 @@ import (
 
 var (
 	tickTime           = flag.Int("tickTime", 30, "Time between sending Ping messages")
-	host               = flag.String("host", tunnel.DefaultHostAndPort, "The address:port of the controller to connect to")
 	agentCertFile      = flag.String("certFile", "/app/secrets/agent/tls.crt", "The file containing the certificate used to connect to the controller")
 	agentKeyFile       = flag.String("keyFile", "/app/secrets/agent/tls.key", "The file containing the certificate used to connect to the controller")
 	caCertFile         = flag.String("caCertFile", "/app/config/ca.pem", "The file containing the CA certificate we will use to verify the controller's cert")
@@ -404,7 +403,6 @@ func loadServiceAccount() *serverContext {
 	}
 
 	log.Printf("Using this pod's ServiceAccount to authenticate to Kubernetes API")
-	log.Printf("Server CA: %v", serverCert.PublicKey)
 
 	sa := &serverContext{
 		username:  "ServiceAccount",
@@ -467,7 +465,7 @@ func main() {
 		grpc.WithTimeout(10 * time.Second),
 	}
 
-	conn, err := grpc.Dial(*host, opts...)
+	conn, err := grpc.Dial(config.ControllerHostname, opts...)
 	if err != nil {
 		log.Fatalf("Could not connect: %v", err)
 	}
