@@ -95,25 +95,31 @@ func (c *CA) GetCACertificate() []byte {
 	return c.caCert.Certificate[0]
 }
 
-//
-// MakeServerCert will generate a new server certificate, signed with the authority,
-// with a validity period of 1 year.  The DNS names will be applied.
-//
-func (c *CA) MakeServerCert(names []string) (*tls.Certificate, error) {
+func toPEM(data []byte, t string) []byte {
+	p := &bytes.Buffer{}
+	pem.Encode(p, &pem.Block{
+		Type:  t,
+		Bytes: data,
+	})
+	return p.Bytes()
+}
+
+func (c *CA) MakeCertificateAuthority() (*tls.Certificate, error) {
 	now := time.Now().UTC()
 	cert := &x509.Certificate{
-		SerialNumber: big.NewInt(time.Now().UnixNano()),
+		SerialNumber: big.NewInt(now.UnixNano()),
 		Subject: pkix.Name{
-			Organization: []string{"OpsMX API Forwarder"},
+			Organization: []string{"OpsMX API Forwarder CA"},
 			Country:      []string{"US"},
-			Province:     []string{},
+			Province:     []string{""},
 			Locality:     []string{"San Francisco"},
 		},
-		NotBefore:   now,
-		NotAfter:    now.AddDate(1, 0, 0),
-		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
-		KeyUsage:    x509.KeyUsageDigitalSignature,
-		DNSNames:    names,
+		NotBefore:             now,
+		NotAfter:              now.AddDate(10, 0, 0),
+		IsCA:                  true,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
+		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
+		BasicConstraintsValid: true,
 	}
 	certPrivKey, err := rsa.GenerateKey(crand.Reader, 4096)
 	if err != nil {
@@ -129,19 +135,52 @@ func (c *CA) MakeServerCert(names []string) (*tls.Certificate, error) {
 		return nil, err
 	}
 
-	certPEM := new(bytes.Buffer)
-	pem.Encode(certPEM, &pem.Block{
-		Type:  "CERTIFICATE",
-		Bytes: certBytes,
-	})
+	certPEM := toPEM(certBytes, "CERTIFICATE")
+	certPrivKeyPEM := toPEM(x509.MarshalPKCS1PrivateKey(certPrivKey), "RSA PRIVATE KEY")
+	tlsCert, err := tls.X509KeyPair(certPEM, certPrivKeyPEM)
+	if err != nil {
+		return nil, err
+	}
+	return &tlsCert, nil
+}
 
-	certPrivKeyPEM := new(bytes.Buffer)
-	pem.Encode(certPrivKeyPEM, &pem.Block{
-		Type:  "RSA PRIVATE KEY",
-		Bytes: x509.MarshalPKCS1PrivateKey(certPrivKey),
-	})
+//
+// MakeServerCert will generate a new server certificate, signed with the authority,
+// with a validity period of 1 year.  The DNS names will be applied.
+//
+func (c *CA) MakeServerCert(names []string) (*tls.Certificate, error) {
+	now := time.Now().UTC()
+	cert := &x509.Certificate{
+		SerialNumber: big.NewInt(now.UnixNano()),
+		Subject: pkix.Name{
+			Organization: []string{"OpsMX API Forwarder"},
+			Country:      []string{"US"},
+			Province:     []string{},
+			Locality:     []string{"San Francisco"},
+		},
+		NotBefore:   now,
+		NotAfter:    now.AddDate(1, 0, 0),
+		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
+		KeyUsage:    x509.KeyUsageDigitalSignature,
+		DNSNames:    names,
+	}
+	certPrivKey, err := rsa.GenerateKey(crand.Reader, 2048)
+	if err != nil {
+		return nil, err
+	}
 
-	serverCert, err := tls.X509KeyPair(certPEM.Bytes(), certPrivKeyPEM.Bytes())
+	// we now have a certificate and private key.  Now, sign the cert with the CA.
+
+	caCert, err := x509.ParseCertificate(c.caCert.Certificate[0])
+
+	certBytes, err := x509.CreateCertificate(crand.Reader, cert, caCert, &certPrivKey.PublicKey, c.caCert.PrivateKey)
+	if err != nil {
+		return nil, err
+	}
+
+	certPEM := toPEM(certBytes, "CERTIFICATE")
+	certPrivKeyPEM := toPEM(x509.MarshalPKCS1PrivateKey(certPrivKey), "RSA PRIVATE KEY")
+	serverCert, err := tls.X509KeyPair(certPEM, certPrivKeyPEM)
 	if err != nil {
 		return nil, err
 	}
@@ -155,7 +194,7 @@ func (c *CA) MakeServerCert(names []string) (*tls.Certificate, error) {
 func (c *CA) GenerateCertificate(name string, suffix string) (string, string, string, error) {
 	now := time.Now().UTC()
 	cert := &x509.Certificate{
-		SerialNumber: big.NewInt(time.Now().UnixNano()),
+		SerialNumber: big.NewInt(now.UnixNano()),
 		Subject: pkix.Name{
 			CommonName:   name + "." + suffix,
 			Organization: []string{"OpsMX API Forwarder Client"},
@@ -193,12 +232,8 @@ func (c *CA) GenerateCertificate(name string, suffix string) (string, string, st
 }
 
 func bytesTo64(prefix string, data []byte) string {
-	p := new(bytes.Buffer)
-	pem.Encode(p, &pem.Block{
-		Type:  prefix,
-		Bytes: data,
-	})
-	return base64.StdEncoding.EncodeToString(p.Bytes())
+	p := toPEM(data, prefix)
+	return base64.StdEncoding.EncodeToString(p)
 }
 
 func (c *CA) MakeCertPool() (*x509.CertPool, error) {
