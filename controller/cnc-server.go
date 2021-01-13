@@ -57,20 +57,14 @@ func httpError(err error) []byte {
 
 func cncGenerateKubectlComponents(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("content-type", "application/json")
-	names := strings.Split(r.TLS.PeerCertificates[0].Subject.CommonName, ".")
-	if names[1] != "command" {
-		w.Write(httpError(fmt.Errorf("identity does not end with 'command': %v", names)))
-		w.WriteHeader(http.StatusForbidden)
-		return
-	}
-	if r.Method != "POST" {
-		w.Write(httpError(fmt.Errorf("only 'POST' is accepted")))
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		return
+	statusCode, err := authenticate(r, "POST")
+	if err != nil {
+		w.Write(httpError(err))
+		w.WriteHeader(statusCode)
 	}
 
 	var req kubeConfigRequest
-	err := json.NewDecoder(r.Body).Decode(&req)
+	err = json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
 		w.Write(httpError(err))
 		w.WriteHeader(http.StatusBadRequest)
@@ -78,7 +72,6 @@ func cncGenerateKubectlComponents(w http.ResponseWriter, r *http.Request) {
 	}
 
 	serverURL := fmt.Sprintf("https://%s:%d", config.ServerNames[0], config.APIPort)
-
 	ca64, user64, key64, err := authority.GenerateCertificate(req.Identity, "client")
 	if err != nil {
 		w.Write(httpError(err))
@@ -100,22 +93,27 @@ func cncGenerateKubectlComponents(w http.ResponseWriter, r *http.Request) {
 	w.Write(json)
 }
 
-func cncGenerateAgentManifestComponents(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("content-type", "application/json")
+func authenticate(r *http.Request, method string) (int, error) {
 	names := strings.Split(r.TLS.PeerCertificates[0].Subject.CommonName, ".")
 	if names[1] != "command" {
-		w.Write(httpError(fmt.Errorf("identity does not end with 'command': %v", names)))
-		w.WriteHeader(http.StatusForbidden)
-		return
+		return http.StatusForbidden, fmt.Errorf("identity does not end with 'command': %v", names)
 	}
-	if r.Method != "POST" {
-		w.Write(httpError(fmt.Errorf("only 'POST' is accepted")))
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		return
+	if r.Method != method {
+		return http.StatusMethodNotAllowed, fmt.Errorf("only 'POST' is accepted")
+	}
+	return -1, nil
+}
+
+func cncGenerateAgentManifestComponents(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("content-type", "application/json")
+	statusCode, err := authenticate(r, "POST")
+	if err != nil {
+		w.Write(httpError(err))
+		w.WriteHeader(statusCode)
 	}
 
 	var req manifestRequest
-	err := json.NewDecoder(r.Body).Decode(&req)
+	err = json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
 		w.Write(httpError(err))
 		w.WriteHeader(http.StatusBadRequest)
@@ -146,16 +144,10 @@ func cncGenerateAgentManifestComponents(w http.ResponseWriter, r *http.Request) 
 
 func cncGetStatistics(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("content-type", "application/json")
-	names := strings.Split(r.TLS.PeerCertificates[0].Subject.CommonName, ".")
-	if names[1] != "command" {
-		w.Write(httpError(fmt.Errorf("identity does not end with 'command': %v", names)))
-		w.WriteHeader(http.StatusForbidden)
-		return
-	}
-	if r.Method != "GET" {
-		w.Write(httpError(fmt.Errorf("only 'GET' is accepted")))
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		return
+	statusCode, err := authenticate(r, "GET")
+	if err != nil {
+		w.Write(httpError(err))
+		w.WriteHeader(statusCode)
 	}
 
 	ret := agents.GetStatistics()
