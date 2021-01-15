@@ -132,7 +132,7 @@ func executeRequest(dataflow chan *tunnel.ASEventWrapper, c *serverContext, req 
 	if len(c.token) > 0 {
 		httpRequest.Header.Set("Authorization", "Bearer "+c.token)
 	}
-	log.Printf("Sending HTTP request: %v", httpRequest)
+	log.Printf("Sending HTTP request: %s to %v", req.Method, c.serverURL+req.URI)
 	get, err := client.Do(httpRequest)
 	if err != nil {
 		log.Printf("Failed to execute request for %s to %s: %v", req.Method, c.serverURL+req.URI, err)
