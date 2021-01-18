@@ -13,6 +13,7 @@ import (
 type AgentConfig struct {
 	Namespaces         []string `yaml:"namespaces,omitempty"`
 	ControllerHostname string   `yaml:"controllerHostname,omitempty"`
+	CACert64           *string  `yaml:"caCert64,omitempty"`
 }
 
 // LoadConfig will load YAML configuration from the provided filename, and then apply

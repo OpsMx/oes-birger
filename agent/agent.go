@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/base64"
 	b64 "encoding/base64"
 	"encoding/pem"
 	"flag"
@@ -414,6 +415,21 @@ func loadServiceAccount() *serverContext {
 	return sa
 }
 
+func loadCert() []byte {
+	cert, err := ioutil.ReadFile(*caCertFile)
+	if err == nil {
+		return cert
+	}
+	if config.CACert64 == nil {
+		log.Fatal("Unable to load CA certificate from file or from config")
+	}
+	cert, err = base64.StdEncoding.DecodeString(*config.CACert64)
+	if err != nil {
+		log.Fatal("Unable to decode CA cert base64 from config")
+	}
+	return cert
+}
+
 func main() {
 	flag.Parse()
 
@@ -429,11 +445,8 @@ func main() {
 	if err != nil {
 		log.Fatalf("Unable to load agent certificate or key: %v", err)
 	}
-	srvcert, err := ioutil.ReadFile(*caCertFile)
-	if err != nil {
-		log.Fatalf("Unable to load CA certificate: %v", err)
-	}
 	caCertPool := x509.NewCertPool()
+	srvcert := loadCert()
 	if ok := caCertPool.AppendCertsFromPEM(srvcert); !ok {
 		log.Fatalf("Unable to append certificate to pool: %v", err)
 	}
