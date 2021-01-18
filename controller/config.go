@@ -59,7 +59,33 @@ func LoadConfig(filename string) (*ControllerConfig, error) {
 		config.PrometheusPort = 9102
 	}
 
+	config.addAllHostnames()
+
 	return config, nil
+}
+
+func (c *ControllerConfig) hasServerName(target string) bool {
+	for _, a := range c.ServerNames {
+		if a == target {
+			return true
+		}
+	}
+	return false
+}
+
+func (c *ControllerConfig) addIfMissing(target *string, reason string) {
+	if target != nil {
+		if !c.hasServerName(*target) {
+			c.ServerNames = append(c.ServerNames, *target)
+			log.Printf("Adding %s to ServerNames (for %s configuration setting)", *target, reason)
+		}
+	}
+}
+
+func (c *ControllerConfig) addAllHostnames() {
+	c.addIfMissing(c.AgentHostname, "agentHostname")
+	c.addIfMissing(c.CommandHostname, "commandHostname")
+	c.addIfMissing(c.KubernetesAPIHostname, "kubernetesAPIHostname")
 }
 
 func (c *ControllerConfig) getAgentHostname() string {

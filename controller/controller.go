@@ -255,6 +255,7 @@ func main() {
 		log.Printf("Server names for generated certificate: %v", config.ServerNames)
 	}
 	config = c
+	c.Dump()
 
 	if len(config.Webhook) > 0 {
 		hook = webhook.NewRunner(config.Webhook)
