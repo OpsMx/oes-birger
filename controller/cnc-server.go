@@ -7,6 +7,8 @@ import (
 	"log"
 	"net/http"
 	"strings"
+
+	"github.com/oklog/ulid/v2"
 )
 
 type kubeConfigRequest struct {
@@ -32,6 +34,11 @@ type manifestResponse struct {
 	AgentCertificate string `json:"agentCertificate"`
 	AgentKey         string `json:"agentKey"`
 	CACert           string `json:"caCert"`
+}
+
+type statisticsResponse struct {
+	ServerTime      uint64      `json:"serverTime"`
+	ConnectedAgents interface{} `json:"connectedAgents"`
 }
 
 type httpErrorMessage struct {
@@ -152,7 +159,10 @@ func cncGetStatistics(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ret := agents.GetStatistics()
+	ret := statisticsResponse{
+		ServerTime:      ulid.Now(),
+		ConnectedAgents: agents.GetStatistics(),
+	}
 	json, err := json.Marshal(ret)
 	if err != nil {
 		w.Write(httpError(err))
