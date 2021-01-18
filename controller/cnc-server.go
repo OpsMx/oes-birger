@@ -71,7 +71,6 @@ func cncGenerateKubectlComponents(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	serverURL := fmt.Sprintf("https://%s:%d", config.ServerNames[0], config.APIPort)
 	ca64, user64, key64, err := authority.GenerateCertificate(req.Identity, "client")
 	if err != nil {
 		w.Write(httpError(err))
@@ -79,7 +78,7 @@ func cncGenerateKubectlComponents(w http.ResponseWriter, r *http.Request) {
 	}
 	ret := kubeConfigResponse{
 		Identity:        req.Identity,
-		ServerURL:       serverURL,
+		ServerURL:       config.getKubernetesURL(),
 		UserCertificate: user64,
 		UserKey:         key64,
 		CACert:          ca64,
@@ -99,7 +98,7 @@ func authenticate(r *http.Request, method string) (int, error) {
 		return http.StatusForbidden, fmt.Errorf("identity does not end with 'command': %v", names)
 	}
 	if r.Method != method {
-		return http.StatusMethodNotAllowed, fmt.Errorf("only 'POST' is accepted")
+		return http.StatusMethodNotAllowed, fmt.Errorf("only '%s' is accepted", method)
 	}
 	return -1, nil
 }
@@ -110,6 +109,7 @@ func cncGenerateAgentManifestComponents(w http.ResponseWriter, r *http.Request) 
 	if err != nil {
 		w.Write(httpError(err))
 		w.WriteHeader(statusCode)
+		return
 	}
 
 	var req manifestRequest
@@ -124,11 +124,12 @@ func cncGenerateAgentManifestComponents(w http.ResponseWriter, r *http.Request) 
 	if err != nil {
 		w.Write(httpError(err))
 		w.WriteHeader(http.StatusBadRequest)
+		return
 	}
 	ret := manifestResponse{
 		Identity:         req.Identity,
-		ServerHostname:   config.ServerNames[0],
-		ServerPort:       config.GRPCPort,
+		ServerHostname:   config.getAgentHostname(),
+		ServerPort:       config.getAgentPort(),
 		AgentCertificate: user64,
 		AgentKey:         key64,
 		CACert:           ca64,
@@ -148,6 +149,7 @@ func cncGetStatistics(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		w.Write(httpError(err))
 		w.WriteHeader(statusCode)
+		return
 	}
 
 	ret := agents.GetStatistics()
@@ -161,7 +163,7 @@ func cncGetStatistics(w http.ResponseWriter, r *http.Request) {
 }
 
 func runCommandHTTPServer(serverCert tls.Certificate) {
-	log.Printf("Running Command and Control API HTTPS listener on port %d", config.CNCPort)
+	log.Printf("Running Command and Control API HTTPS listener on port %d", config.CommandPort)
 
 	certPool, err := authority.MakeCertPool()
 	if err != nil {
@@ -183,7 +185,7 @@ func runCommandHTTPServer(serverCert tls.Certificate) {
 	mux.HandleFunc("/api/v1/getAgentStatistics", cncGetStatistics)
 
 	server := &http.Server{
-		Addr:      fmt.Sprintf(":%d", config.CNCPort),
+		Addr:      fmt.Sprintf(":%d", config.CommandPort),
 		TLSConfig: tlsConfig,
 		Handler:   mux,
 	}

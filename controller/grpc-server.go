@@ -190,8 +190,8 @@ func runGRPCServer(serverCert tls.Certificate) {
 	//
 	// Set up GRPC server
 	//
-	log.Printf("Starting GRPC server on port %d...", config.GRPCPort)
-	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", config.GRPCPort))
+	log.Printf("Starting GRPC server on port %d...", config.AgentPort)
+	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", config.AgentPort))
 	if err != nil {
 		log.Fatalf("Failed to listen: %v", err)
 	}

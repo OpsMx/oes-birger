@@ -1,7 +1,9 @@
 package main
 
 import (
+	"fmt"
 	"io/ioutil"
+	"log"
 
 	"gopkg.in/yaml.v2"
 
@@ -12,14 +14,17 @@ import (
 // configuration file is loaded from disk first, and then any
 // environment variables are applied.
 type ControllerConfig struct {
-	Agents         map[string]*agentConfig `yaml:"agents,omitempty"`
-	Webhook        string                  `yaml:"webhook,omitempty"`
-	ServerNames    []string                `yaml:"serverNames,omitempty"`
-	CAConfig       ca.Config               `yaml:"caConfig,omitempty"`
-	GRPCPort       uint16                  `yaml:"grpcPort"`
-	CNCPort        uint16                  `yaml:"cncPort"`
-	APIPort        uint16                  `yaml:"apiPort"`
-	PrometheusPort uint16                  `yaml:"prometheusPort"`
+	Agents                map[string]*agentConfig `yaml:"agents,omitempty"`
+	Webhook               string                  `yaml:"webhook,omitempty"`
+	ServerNames           []string                `yaml:"serverNames,omitempty"`
+	CAConfig              ca.Config               `yaml:"caConfig,omitempty"`
+	PrometheusPort        uint16                  `yaml:"prometheusPort"`
+	KubernetesAPIPort     uint16                  `yaml:"kubernetesAPIPort"`
+	KubernetesAPIHostname *string                 `yaml:"kubernetesAPIHostname"`
+	CommandHostname       *string                 `yaml:"commandHostname"`
+	CommandPort           uint16                  `yaml:"commandPort"`
+	AgentHostname         *string                 `yaml:"agentHostname"`
+	AgentPort             uint16                  `yaml:"agentPort"`
 }
 
 type agentConfig struct {
@@ -41,18 +46,54 @@ func LoadConfig(filename string) (*ControllerConfig, error) {
 		return nil, err
 	}
 
-	if config.GRPCPort == 0 {
-		config.GRPCPort = 9001
+	if config.AgentPort == 0 {
+		config.AgentPort = 9001
 	}
-	if config.APIPort == 0 {
-		config.APIPort = 9002
+	if config.KubernetesAPIPort == 0 {
+		config.KubernetesAPIPort = 9002
 	}
-	if config.CNCPort == 0 {
-		config.CNCPort = 9003
+	if config.CommandPort == 0 {
+		config.CommandPort = 9003
 	}
 	if config.PrometheusPort == 0 {
 		config.PrometheusPort = 9102
 	}
 
 	return config, nil
+}
+
+func (c *ControllerConfig) getAgentHostname() string {
+	if c.AgentHostname != nil {
+		return *c.AgentHostname
+	}
+	return c.ServerNames[0]
+}
+
+func (c *ControllerConfig) getAgentPort() uint16 {
+	return c.AgentPort
+}
+
+func (c *ControllerConfig) getKubernetesURL() string {
+	if c.KubernetesAPIHostname != nil {
+		return fmt.Sprintf("https://%s:%d", *c.KubernetesAPIHostname, c.KubernetesAPIPort)
+	}
+	return fmt.Sprintf("https://%s:%d", c.ServerNames[0], c.KubernetesAPIPort)
+}
+
+func (c *ControllerConfig) getCommandHostname() string {
+	if c.CommandHostname != nil {
+		return *c.CommandHostname
+	}
+	return c.ServerNames[0]
+}
+
+//
+// Dump will display MOST of the controller's configuration.
+//
+func (c *ControllerConfig) Dump() {
+	log.Println("ControllerConfig:")
+	log.Printf("ServerNames: %v", config.ServerNames)
+	log.Printf("Kubernetes API URL returned for kubectl components: %s", c.getKubernetesURL())
+	log.Printf("Agent hostname: %s, port %d", c.getAgentHostname(), c.getAgentPort())
+	log.Printf("Command Hostname: %s, port %d", c.getCommandHostname(), c.CommandPort)
 }
