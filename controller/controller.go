@@ -223,11 +223,19 @@ func runAgentHTTPServer(serverCert tls.Certificate) {
 	server.ListenAndServeTLS("", "")
 }
 
+func healthcheck(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("content-type", "application/json")
+	w.Write([]byte("{}"))
+	w.WriteHeader(200)
+}
+
 func runPrometheusHTTPServer(port uint16) {
 	log.Printf("Running HTTP listener for Prometheus on port %d", port)
 
 	mux := http.NewServeMux()
 	mux.Handle("/metrics", promhttp.Handler())
+	mux.HandleFunc("/", healthcheck)
+	mux.HandleFunc("/health", healthcheck)
 
 	server := &http.Server{
 		Addr:    fmt.Sprintf(":%d", port),
@@ -263,11 +271,6 @@ func main() {
 	authority = caLocal
 
 	//
-	// Run Prometheus HTTP server
-	//
-	go runPrometheusHTTPServer(config.PrometheusPort)
-
-	//
 	// Make a server certificate.
 	//
 	log.Println("Generating a server certificate...")
@@ -286,6 +289,13 @@ func main() {
 	//
 	go runCommandHTTPServer(*serverCert)
 
-	// never returns
-	runGRPCServer(*serverCert)
+	//
+	// Run the GRPC server itself
+	//
+	go runGRPCServer(*serverCert)
+
+	//
+	// Run Prometheus HTTP server (never returns)
+	//
+	runPrometheusHTTPServer(config.PrometheusPort)
 }
