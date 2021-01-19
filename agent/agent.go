@@ -8,6 +8,7 @@ import (
 	b64 "encoding/base64"
 	"encoding/pem"
 	"flag"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
@@ -76,7 +77,7 @@ func callCancelFunction(id string) {
 	cancelRegistry.Unlock()
 }
 
-func executeRequest(dataflow chan *tunnel.ASEventWrapper, c *serverContext, req *tunnel.HttpRequest) {
+func executeRequest(dataflow chan *tunnel.ASEventWrapper, c *serverContextFields, req *tunnel.HttpRequest) {
 	// TODO: A ServerCA is technically optional, but we might want to fail if it's not present...
 	log.Printf("Running request %v", req)
 	tlsConfig := &tls.Config{
@@ -287,7 +288,7 @@ func runTunnel(sa *serverContext, client tunnel.TunnelServiceClient, ticker chan
 				callCancelFunction(req.Id)
 			case *tunnel.SAEventWrapper_HttpRequest:
 				req := in.GetHttpRequest()
-				go executeRequest(dataflow, sa, req)
+				go executeRequest(dataflow, makeServerContextFields(sa), req)
 			case nil:
 				continue
 			default:
@@ -311,7 +312,7 @@ func runTicker(tickTime int, ticker chan uint64) {
 
 }
 
-type serverContext struct {
+type serverContextFields struct {
 	username   string
 	serverURL  string
 	serverCA   *x509.Certificate
@@ -320,7 +321,25 @@ type serverContext struct {
 	insecure   bool
 }
 
-func makeServerConfig(kconfig *kubeconfig.KubeConfig) *serverContext {
+type serverContext struct {
+	sync.RWMutex
+	f serverContextFields
+}
+
+func makeServerContextFields(src *serverContext) *serverContextFields {
+	src.RLock()
+	defer src.RUnlock()
+	return &serverContextFields{
+		username:   src.f.username,
+		serverURL:  src.f.serverURL,
+		serverCA:   src.f.serverCA,
+		clientCert: src.f.clientCert,
+		token:      src.f.token,
+		insecure:   src.f.insecure,
+	}
+}
+
+func serverContextFromKubeconfig(kconfig *kubeconfig.KubeConfig) *serverContextFields {
 	names := kconfig.GetContextNames()
 	for _, name := range names {
 		if name != kconfig.CurrentContext {
@@ -345,7 +364,7 @@ func makeServerConfig(kconfig *kubeconfig.KubeConfig) *serverContext {
 			log.Fatalf("Error loading client cert/key: %v", err)
 		}
 
-		sa := &serverContext{
+		saf := &serverContextFields{
 			username:   user.Name,
 			clientCert: &clientKeypair,
 			serverURL:  cluster.Cluster.Server,
@@ -362,10 +381,10 @@ func makeServerConfig(kconfig *kubeconfig.KubeConfig) *serverContext {
 			if err != nil {
 				log.Fatalf("Error parsing server certificate: %v", err)
 			}
-			sa.serverCA = serverCert
+			saf.serverCA = serverCert
 		}
 
-		return sa
+		return saf
 	}
 
 	log.Fatalf("Default context not found in kubeconfig")
@@ -373,46 +392,38 @@ func makeServerConfig(kconfig *kubeconfig.KubeConfig) *serverContext {
 	return nil
 }
 
-func loadServiceAccount() *serverContext {
-
+func loadServiceAccount() (*serverContextFields, error) {
 	token, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/token")
 	if err != nil {
-		log.Printf("Unable to read service account token, falling back to kubectl config file")
-		return nil
+		return nil, err
 	}
 
 	serverCA, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/ca.crt")
 	if err != nil {
-		log.Printf("Unable to read service account ca.crt, falling back to kubectl config file")
-		return nil
+		return nil, err
 	}
 	pemBlock, _ := pem.Decode(serverCA)
 	serverCert, err := x509.ParseCertificate(pemBlock.Bytes)
 	if err != nil {
-		log.Fatalf("Error parsing server certificate: %v", err)
+		return nil, err
 	}
 
 	servicePort := os.Getenv("KUBERNETES_SERVICE_PORT")
 	if len(servicePort) == 0 {
-		log.Printf("Unable to locate API server from KUBERNETES_SERVICE_PORT environment variable")
-		return nil
+		return nil, fmt.Errorf("Unable to locate API server from KUBERNETES_SERVICE_PORT environment variable")
 	}
 	serviceHost := os.Getenv("KUBERNETES_SERVICE_HOST")
 	if len(serviceHost) == 0 {
-		log.Printf("Unable to locate API server from KUBERNETES_SERVICE_HOST environment variable")
-		return nil
+		return nil, fmt.Errorf("Unable to locate API server from KUBERNETES_SERVICE_HOST environment variable")
 	}
 
-	log.Printf("Using this pod's ServiceAccount to authenticate to Kubernetes API")
-
-	sa := &serverContext{
+	return &serverContextFields{
 		username:  "ServiceAccount",
 		serverURL: "https://" + serviceHost + ":" + servicePort,
 		serverCA:  serverCert,
 		token:     string(token),
 		insecure:  true,
-	}
-	return sa
+	}, nil
 }
 
 func loadCert() []byte {
@@ -428,6 +439,35 @@ func loadCert() []byte {
 		log.Fatal("Unable to decode CA cert base64 from config")
 	}
 	return cert
+}
+
+func loadSecurity() *serverContextFields {
+	yamlString, err := os.Open(*kubeConfigFilename)
+	if err == nil {
+		kconfig, err := kubeconfig.ReadKubeConfig(yamlString)
+		if err != nil {
+			log.Fatalf("Unable to read kubeconfig: %v", err)
+		}
+		return serverContextFromKubeconfig(kconfig)
+	}
+	sa, err := loadServiceAccount()
+	if err != nil {
+		log.Fatalf("No kubeconfig and no Kubernetes account found: %v", err)
+	}
+	return sa
+}
+
+func updateServerContextTicker(sa *serverContext) {
+	for {
+		saf := loadSecurity()
+		sa.Lock()
+		if sa.f != *saf {
+			log.Printf("Updating security context for API calls to Kubernetes")
+			sa.f = *saf
+		}
+		sa.Unlock()
+		time.Sleep(time.Second * 600)
+	}
 }
 
 func main() {
@@ -457,20 +497,10 @@ func main() {
 	})
 
 	// First, try to see if we have a kubeconfig.yaml
-	var sa *serverContext
-	yamlString, err := os.Open(*kubeConfigFilename)
-	if err != nil {
-		sa = loadServiceAccount()
-		if sa == nil {
-			log.Fatalf("No kubeconfig and no Kubernetes account found")
-		}
-	} else {
-		kconfig, err := kubeconfig.ReadKubeConfig(yamlString)
-		if err != nil {
-			log.Fatalf("Unable to read kubeconfig: %v", err)
-		}
-		sa = makeServerConfig(kconfig)
-	}
+	saf := loadSecurity()
+	sa := &serverContext{f: *saf}
+
+	go updateServerContextTicker(sa)
 
 	opts := []grpc.DialOption{
 		grpc.WithTransportCredentials(ta),
