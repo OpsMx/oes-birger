@@ -489,8 +489,6 @@ func updateServerContextTicker(sa *serverContext) {
 		sa.Lock()
 		if !sa.f.isSameAs(saf) {
 			log.Printf("Updating security context for API calls to Kubernetes")
-			log.Printf("Orig: %v", sa.f)
-			log.Printf("New: %v", *saf)
 			sa.f = *saf
 		}
 		sa.Unlock()
