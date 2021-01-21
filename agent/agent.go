@@ -321,6 +321,32 @@ type serverContextFields struct {
 	insecure   bool
 }
 
+func (scf *serverContextFields) isSameAs(scf2 *serverContextFields) bool {
+	if scf.username != scf2.username || scf.serverURL != scf2.serverURL || scf.token != scf2.token || scf.insecure != scf2.insecure {
+		return false
+	}
+
+	if (scf.serverCA == nil && scf2.serverCA != nil) || (scf.serverCA != nil && scf2.serverCA == nil) {
+		return false
+	}
+	if scf.serverCA != nil && scf2.serverCA != nil {
+		if !scf.serverCA.Equal(scf2.serverCA) {
+			return false
+		}
+	}
+
+	if (scf.clientCert == nil && scf2.clientCert != nil) || (scf.clientCert != nil && scf2.clientCert == nil) {
+		return false
+	}
+	if scf.clientCert != nil && scf2.clientCert != nil {
+		if bytes.Compare(scf.clientCert.Certificate[0], scf2.clientCert.Certificate[0]) != 0 {
+			return false
+		}
+	}
+
+	return true
+}
+
 type serverContext struct {
 	sync.RWMutex
 	f serverContextFields
@@ -461,8 +487,10 @@ func updateServerContextTicker(sa *serverContext) {
 	for {
 		saf := loadSecurity()
 		sa.Lock()
-		if sa.f != *saf {
+		if !sa.f.isSameAs(saf) {
 			log.Printf("Updating security context for API calls to Kubernetes")
+			log.Printf("Orig: %v", sa.f)
+			log.Printf("New: %v", *saf)
 			sa.f = *saf
 		}
 		sa.Unlock()
