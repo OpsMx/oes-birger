@@ -27,16 +27,9 @@ RUN mkdir /out
 RUN go build -o /out/controller controller/*.go
 
 #
-# Base OS image for both published images
-#
-FROM alpine AS base
-RUN apk update && apk upgrade
-RUN mkdir /app
-
-#
 # Build the agent image.  This should be a --target on docker build.
 #
-FROM base AS agent-image
+FROM scratch AS agent-image
 WORKDIR /app
 COPY --from=build-agent /out/agent /app
 EXPOSE 9102
@@ -45,7 +38,7 @@ CMD ["/app/agent"]
 #
 # Build the controller image.  This should be a --target on docker build.
 #
-FROM base AS controller-image
+FROM scratch AS controller-image
 WORKDIR /app
 COPY --from=build-controller /out/controller /app
 EXPOSE 9001-9002 9102
