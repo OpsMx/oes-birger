@@ -25,7 +25,7 @@ func NewContext() *Context {
 
 // Ulid - return a new ULID as a string.
 func (ctx *Context) Ulid() string {
-	t := time.Now().UnixNano()
+	t := time.Now().Unix()
 	ctx.Lock()
 	defer ctx.Unlock()
 	return ulid.MustNew(uint64(t), ctx.entropy).String()
