@@ -4,29 +4,29 @@ BUILDX=docker buildx build --pull --platform ${PLATFORM}
 IMAGE_PREFIX=docker.flame.org/library/
 
 # Generated protobuf outputs.  These are removed with "make clean"
-pb_deps = tunnel/tunnel.pb.go
+pb_deps = pkg/tunnel/tunnel.pb.go
 
 controller_deps = ${pb_deps} \
-	ca/ca.go \
+	pkg/ca/ca.go \
 	app/controller/agent-tracker.go \
 	app/controller/config.go \
 	app/controller/controller.go \
 	app/controller/grpc-server.go \
 	app/controller/cnc-server.go \
 	app/controller/webhook/webhook.go \
-	tunnel/time.go \
-	tunnel/defaults.go \
-	kubeconfig/config.go \
-    ulid/ulid.go
+	pkg/tunnel/time.go \
+	pkg/tunnel/defaults.go \
+	pkg/kubeconfig/config.go \
+    pkg/ulid/ulid.go
 
 agent_deps = ${pb_deps} \
 	app/agent/agent.go \
 	app/agent/config.go \
-    kubeconfig/config.go
+    pkg/kubeconfig/config.go
 
 make_ca_deps = \
 	app/make-ca/make-ca.go \
-	ca/ca.go
+	pkg/ca/ca.go
 
 now = `date -u +%Y%m%dT%H%M%S`
 
@@ -41,8 +41,8 @@ all: ${TARGETS}
 # Common components, like GRPC client code generation.
 #
 
-tunnel/tunnel.pb.go: go.mod tunnel/tunnel.proto
-	protoc --go_out=plugins=grpc:tunnel tunnel/tunnel.proto
+pkg/tunnel/tunnel.pb.go: go.mod pkg/tunnel/tunnel.proto
+	protoc --go_out=plugins=grpc:pkg/tunnel pkg/tunnel/tunnel.proto
 
 #
 # Build locally, mostly for development speed.

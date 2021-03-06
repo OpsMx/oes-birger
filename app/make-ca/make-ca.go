@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/opsmx/grpc-bidir/ca"
+	"github.com/opsmx/grpc-bidir/pkg/ca"
 )
 
 var (

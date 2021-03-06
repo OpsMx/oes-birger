@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/oklog/ulid/v2"
-	"github.com/opsmx/grpc-bidir/tunnel"
+	"github.com/opsmx/grpc-bidir/pkg/tunnel"
 )
 
 // Context holds the state needed to generate a ULID using random values.  This

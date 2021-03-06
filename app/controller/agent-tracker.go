@@ -5,7 +5,7 @@ import (
 	"log"
 	"sync"
 
-	"github.com/opsmx/grpc-bidir/tunnel"
+	"github.com/opsmx/grpc-bidir/pkg/tunnel"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )

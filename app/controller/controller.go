@@ -18,9 +18,9 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/opsmx/grpc-bidir/app/controller/webhook"
-	"github.com/opsmx/grpc-bidir/ca"
-	"github.com/opsmx/grpc-bidir/tunnel"
-	"github.com/opsmx/grpc-bidir/ulid"
+	"github.com/opsmx/grpc-bidir/pkg/ca"
+	"github.com/opsmx/grpc-bidir/pkg/tunnel"
+	"github.com/opsmx/grpc-bidir/pkg/ulid"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
