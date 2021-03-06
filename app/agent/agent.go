@@ -34,6 +34,8 @@ var (
 	kubeConfigFilename = flag.String("kubeconfig", "/app/config/kubeconfig.yaml", "The location of a kubeconfig file to define endpoints and kube API auth")
 	configFile         = flag.String("configFile", "/app/config/config.yaml", "The file with the controller config")
 
+	emptyBytes = []byte("")
+
 	config *AgentConfig
 )
 
@@ -77,6 +79,46 @@ func callCancelFunction(id string) {
 	cancelRegistry.Unlock()
 }
 
+func makeChunkedResponse(id string, target string, data []byte) *tunnel.ASEventWrapper {
+	return &tunnel.ASEventWrapper{
+		Event: &tunnel.ASEventWrapper_HttpChunkedResponse{
+			HttpChunkedResponse: &tunnel.HttpChunkedResponse{
+				Id:     id,
+				Target: target,
+				Body:   data,
+			},
+		},
+	}
+}
+
+func makeBadGatewayResponse(id string, target string) *tunnel.ASEventWrapper {
+	return &tunnel.ASEventWrapper{
+		Event: &tunnel.ASEventWrapper_HttpResponse{
+			HttpResponse: &tunnel.HttpResponse{
+				Id:            id,
+				Target:        target,
+				Status:        http.StatusBadGateway,
+				ContentLength: 0,
+			},
+		},
+	}
+}
+
+func makeResponse(id string, target string, response *http.Response) *tunnel.ASEventWrapper {
+	return &tunnel.ASEventWrapper{
+		Event: &tunnel.ASEventWrapper_HttpResponse{
+			HttpResponse: &tunnel.HttpResponse{
+				Id:            id,
+				Target:        target,
+				Status:        int32(response.StatusCode),
+				ContentLength: response.ContentLength,
+				Headers:       makeHeaders(response.Header),
+			},
+		},
+	}
+
+}
+
 func executeRequest(dataflow chan *tunnel.ASEventWrapper, c *serverContextFields, req *tunnel.HttpRequest) {
 	// TODO: A ServerCA is technically optional, but we might want to fail if it's not present...
 	log.Printf("Running request %v", req)
@@ -113,16 +155,7 @@ func executeRequest(dataflow chan *tunnel.ASEventWrapper, c *serverContextFields
 	httpRequest, err := http.NewRequestWithContext(ctx, req.Method, c.serverURL+req.URI, bytes.NewBuffer(req.Body))
 	if err != nil {
 		log.Printf("Failed to build request for %s to %s: %v", req.Method, c.serverURL+req.URI, err)
-		resp := &tunnel.ASEventWrapper{
-			Event: &tunnel.ASEventWrapper_HttpResponse{
-				HttpResponse: &tunnel.HttpResponse{
-					Id:            req.Id,
-					Target:        req.Target,
-					Status:        http.StatusBadGateway,
-					ContentLength: 0,
-				},
-			},
-		}
+		resp := makeBadGatewayResponse(req.Id, req.Target)
 		dataflow <- resp
 		return
 	}
@@ -138,32 +171,13 @@ func executeRequest(dataflow chan *tunnel.ASEventWrapper, c *serverContextFields
 	get, err := client.Do(httpRequest)
 	if err != nil {
 		log.Printf("Failed to execute request for %s to %s: %v", req.Method, c.serverURL+req.URI, err)
-		resp := &tunnel.ASEventWrapper{
-			Event: &tunnel.ASEventWrapper_HttpResponse{
-				HttpResponse: &tunnel.HttpResponse{
-					Id:            req.Id,
-					Target:        req.Target,
-					Status:        http.StatusBadGateway,
-					ContentLength: 0,
-				},
-			},
-		}
+		resp := makeBadGatewayResponse(req.Id, req.Target)
 		dataflow <- resp
 		return
 	}
 
 	// First, send the headers.
-	resp := &tunnel.ASEventWrapper{
-		Event: &tunnel.ASEventWrapper_HttpResponse{
-			HttpResponse: &tunnel.HttpResponse{
-				Id:            req.Id,
-				Target:        req.Target,
-				Status:        int32(get.StatusCode),
-				ContentLength: get.ContentLength,
-				Headers:       makeHeaders(get.Header),
-			},
-		},
-	}
+	resp := makeResponse(req.Id, req.Target, get)
 	dataflow <- resp
 
 	// Now, send one or more data packet.
@@ -171,27 +185,11 @@ func executeRequest(dataflow chan *tunnel.ASEventWrapper, c *serverContextFields
 		buf := make([]byte, 10240)
 		n, err := get.Body.Read(buf)
 		if n > 0 {
-			resp := &tunnel.ASEventWrapper{
-				Event: &tunnel.ASEventWrapper_HttpChunkedResponse{
-					HttpChunkedResponse: &tunnel.HttpChunkedResponse{
-						Id:     req.Id,
-						Target: req.Target,
-						Body:   buf[:n],
-					},
-				},
-			}
+			resp := makeChunkedResponse(req.Id, req.Target, buf[:n])
 			dataflow <- resp
 		}
 		if err == io.EOF {
-			resp := &tunnel.ASEventWrapper{
-				Event: &tunnel.ASEventWrapper_HttpChunkedResponse{
-					HttpChunkedResponse: &tunnel.HttpChunkedResponse{
-						Id:     req.Id,
-						Target: req.Target,
-						Body:   []byte(""),
-					},
-				},
-			}
+			resp := makeChunkedResponse(req.Id, req.Target, emptyBytes)
 			dataflow <- resp
 			return
 		}
@@ -202,15 +200,7 @@ func executeRequest(dataflow chan *tunnel.ASEventWrapper, c *serverContextFields
 		if err != nil {
 			log.Printf("Got error on HTTP read: %v", err)
 			// todo: send an error message somehow.  For now, just send EOF
-			resp := &tunnel.ASEventWrapper{
-				Event: &tunnel.ASEventWrapper_HttpChunkedResponse{
-					HttpChunkedResponse: &tunnel.HttpChunkedResponse{
-						Id:     req.Id,
-						Target: req.Target,
-						Body:   []byte(""),
-					},
-				},
-			}
+			resp := makeChunkedResponse(req.Id, req.Target, emptyBytes)
 			dataflow <- resp
 			return
 		}

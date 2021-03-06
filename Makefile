@@ -13,7 +13,7 @@ controller_deps = ${pb_deps} \
 	app/controller/controller.go \
 	app/controller/grpc-server.go \
 	app/controller/cnc-server.go \
-	app/controller/webhook/webhook.go \
+	pkg/webhook/webhook.go \
 	pkg/tunnel/time.go \
 	pkg/tunnel/defaults.go \
 	pkg/kubeconfig/config.go \

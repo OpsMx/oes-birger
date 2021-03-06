@@ -46,6 +46,62 @@ func makePingResponse(req *tunnel.PingRequest) *tunnel.SAEventWrapper {
 	return resp
 }
 
+type sessionList struct {
+	sync.RWMutex
+	m map[string]chan *tunnel.ASEventWrapper
+}
+
+func removeHttpId(httpids *sessionList, id string) {
+	httpids.Lock()
+	defer httpids.Unlock()
+	delete(httpids.m, id)
+}
+
+func addHttpId(httpids *sessionList, id string, c chan *tunnel.ASEventWrapper) {
+	httpids.Lock()
+	defer httpids.Unlock()
+	httpids.m[id] = c
+}
+
+func handleHttpRequests(session string, httpRequestChan chan *httpMessage, httpids *sessionList, stream tunnel.TunnelService_EventTunnelServer) {
+	for request := range(httpRequestChan) {
+		addHttpId(httpids, request.cmd.Id, request.out)
+		resp := &tunnel.SAEventWrapper{
+			Event: &tunnel.SAEventWrapper_HttpRequest{
+				HttpRequest: request.cmd,
+			},
+		}
+		if err := stream.Send(resp); err != nil {
+			log.Printf("Unable to send to agent %s for HTTP request %s", session, request.cmd.Id)
+		}
+	}
+	log.Printf("Request channel closed for %s", session)
+}
+
+func handleHttpAgentResponse(session string, identity string, cancelChan chan *cancelRequest, httpids *sessionList, stream tunnel.TunnelService_EventTunnelServer) {
+	for request := range(cancelChan) {
+		removeHttpId(httpids, request.id)
+		resp := &tunnel.SAEventWrapper{
+			Event: &tunnel.SAEventWrapper_HttpRequestCancel{
+				HttpRequestCancel: &tunnel.HttpRequestCancel{Id: request.id, Target: identity},
+			},
+		}
+		if err := stream.Send(resp); err != nil {
+			log.Printf("Unable to send to agent %s for cancel request %s", session, request.id)
+		}
+	}
+	log.Printf("cancel channel closed for agent %s", session)
+}
+
+func closeAllHttp(httpids *sessionList) {
+	httpids.Lock()
+	defer httpids.Unlock()
+	for _, v := range httpids.m {
+		close(v)
+	}
+}
+
+// This runs in its own goroutine, one per GRPC connection from an agent.
 func (s *tunnelServer) EventTunnel(stream tunnel.TunnelService_EventTunnelServer) error {
 	agentIdentity, err := getAgentNameFromContext(stream.Context())
 	if err != nil {
@@ -56,10 +112,7 @@ func (s *tunnelServer) EventTunnel(stream tunnel.TunnelService_EventTunnelServer
 
 	inHTTPRequest := make(chan *httpMessage, 1)
 	inCancelRequest := make(chan *cancelRequest, 1)
-	httpids := struct {
-		sync.RWMutex
-		m map[string]chan *tunnel.ASEventWrapper
-	}{m: make(map[string]chan *tunnel.ASEventWrapper)}
+	httpids := &sessionList{m: make(map[string]chan *tunnel.ASEventWrapper)}
 
 	state := &agentState{
 		ep:              endpoint{name: agentIdentity, protocol: "UNKNOWN"},
@@ -71,67 +124,21 @@ func (s *tunnelServer) EventTunnel(stream tunnel.TunnelService_EventTunnelServer
 
 	log.Printf("Agent %s connected, awaiting hello message", state)
 
-	go func() {
-		for {
-			request, more := <-inHTTPRequest
-			if !more {
-				log.Printf("Request channel closed for %s", state)
-				return
-			}
-			httpids.Lock()
-			httpids.m[request.cmd.Id] = request.out
-			httpids.Unlock()
-			resp := &tunnel.SAEventWrapper{
-				Event: &tunnel.SAEventWrapper_HttpRequest{
-					HttpRequest: request.cmd,
-				},
-			}
-			if err := stream.Send(resp); err != nil {
-				log.Printf("Unable to send to agent %s for HTTP request %s", state, request.cmd.Id)
-			}
-		}
-	}()
+	go handleHttpRequests(sessionIdentity, inHTTPRequest, httpids, stream)
 
-	go func() {
-		for {
-			request, more := <-inCancelRequest
-			if !more {
-				log.Printf("cancel channel closed for agent %s", state)
-				return
-			}
-			httpids.Lock()
-			delete(httpids.m, request.id)
-			httpids.Unlock()
-			resp := &tunnel.SAEventWrapper{
-				Event: &tunnel.SAEventWrapper_HttpRequestCancel{
-					HttpRequestCancel: &tunnel.HttpRequestCancel{Id: request.id, Target: agentIdentity},
-				},
-			}
-			if err := stream.Send(resp); err != nil {
-				log.Printf("Unable to send to agent %s for cancel request %s", state, request.id)
-			}
-		}
-	}()
+	go handleHttpAgentResponse(sessionIdentity, agentIdentity, inCancelRequest, httpids, stream)
 
 	for {
 		in, err := stream.Recv()
 		if err == io.EOF {
 			log.Printf("Closing %s", state)
-			httpids.Lock()
-			for _, v := range httpids.m {
-				close(v)
-			}
-			httpids.Unlock()
+			closeAllHttp(httpids)
 			agents.RemoveAgent(state)
 			return nil
 		}
 		if err != nil {
 			log.Printf("Agent closed connection: %s", state)
-			httpids.Lock()
-			for _, v := range httpids.m {
-				close(v)
-			}
-			httpids.Unlock()
+			closeAllHttp(httpids)
 			agents.RemoveAgent(state)
 			return err
 		}
