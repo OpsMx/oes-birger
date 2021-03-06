@@ -17,10 +17,10 @@ import (
 	"google.golang.org/grpc/peer"
 	"google.golang.org/grpc/status"
 
-	"github.com/opsmx/grpc-bidir/app/controller/webhook"
 	"github.com/opsmx/grpc-bidir/pkg/ca"
 	"github.com/opsmx/grpc-bidir/pkg/tunnel"
 	"github.com/opsmx/grpc-bidir/pkg/ulid"
+	"github.com/opsmx/grpc-bidir/pkg/webhook"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"

@@ -9,8 +9,8 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/opsmx/grpc-bidir/app/controller/webhook"
 	"github.com/opsmx/grpc-bidir/pkg/tunnel"
+	"github.com/opsmx/grpc-bidir/pkg/webhook"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 )
