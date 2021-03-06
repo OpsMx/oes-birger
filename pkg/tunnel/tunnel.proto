@@ -28,7 +28,7 @@ message HttpRequest {
     bytes body = 7;
 }
 
-message HttpRequestCancel {
+message CancelRequest {
     string id = 1;
     string target = 2;
 }
@@ -53,6 +53,7 @@ message HttpChunkedResponse {
 message AgentHello {
     repeated string protocols = 1;
     repeated string kubernetesNamespaces = 2;
+    repeated string commandNames = 3;
 }
 
 // Messages sent from server to agent
@@ -60,7 +61,7 @@ message SAEventWrapper {
     oneof event {
         PingResponse pingResponse = 1;
         HttpRequest httpRequest = 2;
-        HttpRequestCancel httpRequestCancel = 3;
+        CancelRequest CancelRequest = 3;
     }
 }
 

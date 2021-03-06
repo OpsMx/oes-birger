@@ -64,7 +64,7 @@ func addHttpId(httpids *sessionList, id string, c chan *tunnel.ASEventWrapper) {
 }
 
 func handleHttpRequests(session string, httpRequestChan chan *httpMessage, httpids *sessionList, stream tunnel.TunnelService_EventTunnelServer) {
-	for request := range(httpRequestChan) {
+	for request := range httpRequestChan {
 		addHttpId(httpids, request.cmd.Id, request.out)
 		resp := &tunnel.SAEventWrapper{
 			Event: &tunnel.SAEventWrapper_HttpRequest{
@@ -79,11 +79,11 @@ func handleHttpRequests(session string, httpRequestChan chan *httpMessage, httpi
 }
 
 func handleHttpAgentResponse(session string, identity string, cancelChan chan *cancelRequest, httpids *sessionList, stream tunnel.TunnelService_EventTunnelServer) {
-	for request := range(cancelChan) {
+	for request := range cancelChan {
 		removeHttpId(httpids, request.id)
 		resp := &tunnel.SAEventWrapper{
-			Event: &tunnel.SAEventWrapper_HttpRequestCancel{
-				HttpRequestCancel: &tunnel.HttpRequestCancel{Id: request.id, Target: identity},
+			Event: &tunnel.SAEventWrapper_CancelRequest{
+				CancelRequest: &tunnel.CancelRequest{Id: request.id, Target: identity},
 			},
 		}
 		if err := stream.Send(resp); err != nil {

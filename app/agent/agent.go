@@ -47,7 +47,8 @@ func runTunnel(sa *serverContext, client tunnel.TunnelServiceClient, ticker chan
 	hello := &tunnel.ASEventWrapper{
 		Event: &tunnel.ASEventWrapper_AgentHello{
 			AgentHello: &tunnel.AgentHello{
-				Protocols:            []string{"kubernetes"},
+				Protocols:            []string{"kubernetes", "command"},
+				CommandNames:         []string{},
 				KubernetesNamespaces: config.Namespaces,
 			},
 		},
@@ -96,8 +97,8 @@ func runTunnel(sa *serverContext, client tunnel.TunnelServiceClient, ticker chan
 			switch x := in.Event.(type) {
 			case *tunnel.SAEventWrapper_PingResponse:
 				continue
-			case *tunnel.SAEventWrapper_HttpRequestCancel:
-				req := in.GetHttpRequestCancel()
+			case *tunnel.SAEventWrapper_CancelRequest:
+				req := in.GetCancelRequest()
 				callCancelFunction(req.Id)
 			case *tunnel.SAEventWrapper_HttpRequest:
 				req := in.GetHttpRequest()
