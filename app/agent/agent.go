@@ -116,7 +116,6 @@ func makeResponse(id string, target string, response *http.Response) *tunnel.ASE
 			},
 		},
 	}
-
 }
 
 func executeRequest(dataflow chan *tunnel.ASEventWrapper, c *serverContextFields, req *tunnel.HttpRequest) {
@@ -153,8 +152,7 @@ func executeRequest(dataflow chan *tunnel.ASEventWrapper, c *serverContextFields
 	httpRequest, err := http.NewRequestWithContext(ctx, req.Method, c.serverURL+req.URI, bytes.NewBuffer(req.Body))
 	if err != nil {
 		log.Printf("Failed to build request for %s to %s: %v", req.Method, c.serverURL+req.URI, err)
-		resp := makeBadGatewayResponse(req.Id, req.Target)
-		dataflow <- resp
+		dataflow <- makeBadGatewayResponse(req.Id, req.Target)
 		return
 	}
 	for _, header := range req.Headers {
@@ -169,8 +167,7 @@ func executeRequest(dataflow chan *tunnel.ASEventWrapper, c *serverContextFields
 	get, err := client.Do(httpRequest)
 	if err != nil {
 		log.Printf("Failed to execute request for %s to %s: %v", req.Method, c.serverURL+req.URI, err)
-		resp := makeBadGatewayResponse(req.Id, req.Target)
-		dataflow <- resp
+		dataflow <- makeBadGatewayResponse(req.Id, req.Target)
 		return
 	}
 
