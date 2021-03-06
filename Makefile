@@ -8,24 +8,24 @@ pb_deps = tunnel/tunnel.pb.go
 
 controller_deps = ${pb_deps} \
 	ca/ca.go \
-	controller/agent-tracker.go \
-	controller/config.go \
-	controller/controller.go \
-	controller/grpc-server.go \
-	controller/cnc-server.go \
-	controller/webhook/webhook.go \
+	app/controller/agent-tracker.go \
+	app/controller/config.go \
+	app/controller/controller.go \
+	app/controller/grpc-server.go \
+	app/controller/cnc-server.go \
+	app/controller/webhook/webhook.go \
 	tunnel/time.go \
 	tunnel/defaults.go \
 	kubeconfig/config.go \
     ulid/ulid.go
 
 agent_deps = ${pb_deps} \
-	agent/agent.go \
-	agent/config.go \
+	app/agent/agent.go \
+	app/agent/config.go \
     kubeconfig/config.go
 
 make_ca_deps = \
-	make-ca/make-ca.go \
+	app/make-ca/make-ca.go \
 	ca/ca.go
 
 now = `date -u +%Y%m%dT%H%M%S`
@@ -53,15 +53,15 @@ local: bin/agent bin/controller bin/make-ca
 
 bin/agent: ${agent_deps}
 	@[ -d bin ] || mkdir bin
-	go build -o bin/agent agent/*.go
+	go build -o bin/agent app/agent/*.go
 
 bin/controller: ${controller_deps}
 	@[ -d bin ] || mkdir bin
-	go build -o bin/controller controller/*.go
+	go build -o bin/controller app/controller/*.go
 
 bin/make-ca: ${make_ca_deps}
 	@[ -d bin ] || mkdir bin
-	go build -o bin/make-ca make-ca/*.go
+	go build -o bin/make-ca app/make-ca/*.go
 
 #
 # Multi-architecture image builds

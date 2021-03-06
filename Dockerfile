@@ -2,7 +2,7 @@
 # Install the latest versions of our mods.  This is done as a separate step
 # so it will pull from an image cache if possible, unless there are changes.
 #
-FROM golang:1.15.6-alpine AS buildmod
+FROM golang:1.16.0-alpine AS buildmod
 ENV CGO_ENABLED=0
 RUN mkdir /build
 WORKDIR /build
@@ -16,7 +16,7 @@ RUN go mod download
 FROM buildmod AS build-agent
 COPY . .
 RUN mkdir /out
-RUN go build -o /out/agent agent/*.go
+RUN go build -o /out/agent app/agent/*.go
 
 #
 # Compile the controller.
@@ -24,7 +24,7 @@ RUN go build -o /out/agent agent/*.go
 FROM buildmod AS build-controller
 COPY . .
 RUN mkdir /out
-RUN go build -o /out/controller controller/*.go
+RUN go build -o /out/controller app/controller/*.go
 
 #
 # Build the agent image.  This should be a --target on docker build.
