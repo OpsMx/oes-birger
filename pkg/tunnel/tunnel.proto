@@ -53,7 +53,27 @@ message HttpChunkedResponse {
 message CommandRequest {
     string id = 1;
     string target = 2;
-    string commandName = 3;
+    string name = 3;
+    repeated string arguments = 4;
+    map<string, string> environment = 5;
+}
+
+message CommandData {
+    string id = 1;
+    string target = 2;
+    string body = 3;
+    enum Channel {
+        STDIN = 0;
+        STDOUT = 1;
+        STDERR = 2;
+    }
+    Channel channel = 4;
+}
+
+message CommandTermination {
+    string id = 1;
+    string target = 2;
+    int32 exitCode = 3;
 }
 
 message AgentHello {
@@ -67,7 +87,9 @@ message SAEventWrapper {
     oneof event {
         PingResponse pingResponse = 1;
         HttpRequest httpRequest = 2;
-        CancelRequest CancelRequest = 3;
+        CancelRequest cancelRequest = 3;
+        CommandRequest commandRequest = 4;
+        CommandData commandData = 5;
     }
 }
 
@@ -78,6 +100,8 @@ message ASEventWrapper {
         HttpResponse httpResponse = 2;
         HttpChunkedResponse httpChunkedResponse = 3;
         AgentHello agentHello = 4;
+        CommandData commandData = 5;
+        CommandTermination commandTermination = 6;
     }
 }
 

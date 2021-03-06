@@ -22,6 +22,7 @@ controller_deps = ${pb_deps} \
 agent_deps = ${pb_deps} \
 	app/agent/agent.go \
 	app/agent/cancel.go \
+	app/agent/command.go \
 	app/agent/config.go \
 	app/agent/kubernetes.go \
 	app/agent/http.go \

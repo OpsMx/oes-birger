@@ -40,7 +40,6 @@ func executeKubernetesRequest(dataflow chan *tunnel.ASEventWrapper, c *serverCon
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
-
 	registerCancelFunction(req.Id, cancel)
 	defer unregisterCancelFunction(req.Id)
 

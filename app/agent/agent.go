@@ -108,6 +108,14 @@ func runTunnel(sa *serverContext, client tunnel.TunnelServiceClient, ticker chan
 					log.Printf("Request for unsupported HTTP tunnel: %s", req.Protocol)
 					dataflow <- makeBadGatewayResponse(req.Id, req.Target)
 				}
+			case *tunnel.SAEventWrapper_CommandRequest:
+				req := in.GetCommandRequest()
+				switch req.Name {
+				case "bash":
+					go runCommand(dataflow, req)
+				default:
+					dataflow <- makeCommandFailed(req)
+				}
 			case nil:
 				continue
 			default:
