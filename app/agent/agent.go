@@ -102,7 +102,12 @@ func runTunnel(sa *serverContext, client tunnel.TunnelServiceClient, ticker chan
 				callCancelFunction(req.Id)
 			case *tunnel.SAEventWrapper_HttpRequest:
 				req := in.GetHttpRequest()
-				go executeHttpRequest(dataflow, makeServerContextFields(sa), req)
+				if req.Protocol == "kubernetes" {
+					go executeKubernetesRequest(dataflow, makeServerContextFields(sa), req)
+				} else {
+					log.Printf("Request for unsupported HTTP tunnel: %s", req.Protocol)
+					dataflow <- makeBadGatewayResponse(req.Id, req.Target)
+				}
 			case nil:
 				continue
 			default:

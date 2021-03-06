@@ -24,6 +24,7 @@ agent_deps = ${pb_deps} \
 	app/agent/cancel.go \
 	app/agent/config.go \
 	app/agent/kubernetes.go \
+	app/agent/http.go \
     pkg/kubeconfig/config.go
 
 make_ca_deps = \

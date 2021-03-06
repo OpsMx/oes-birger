@@ -50,6 +50,12 @@ message HttpChunkedResponse {
     bytes body = 3;
 }
 
+message CommandRequest {
+    string id = 1;
+    string target = 2;
+    string commandName = 3;
+}
+
 message AgentHello {
     repeated string protocols = 1;
     repeated string kubernetesNamespaces = 2;
