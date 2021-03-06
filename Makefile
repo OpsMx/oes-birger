@@ -21,7 +21,9 @@ controller_deps = ${pb_deps} \
 
 agent_deps = ${pb_deps} \
 	app/agent/agent.go \
+	app/agent/cancel.go \
 	app/agent/config.go \
+	app/agent/kubernetes.go \
     pkg/kubeconfig/config.go
 
 make_ca_deps = \
