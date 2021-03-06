@@ -59,24 +59,24 @@ var cancelRegistry = struct {
 
 func registerCancelFunction(id string, cancel context.CancelFunc) {
 	cancelRegistry.Lock()
+	defer cancelRegistry.Unlock()
 	cancelRegistry.m[id] = cancel
-	cancelRegistry.Unlock()
 }
 
 func unregisterCancelFunction(id string) {
 	cancelRegistry.Lock()
+	defer cancelRegistry.Unlock()
 	delete(cancelRegistry.m, id)
-	cancelRegistry.Unlock()
 }
 
 func callCancelFunction(id string) {
 	cancelRegistry.Lock()
+	defer cancelRegistry.Unlock()
 	cancel, ok := cancelRegistry.m[id]
 	if ok {
 		cancel()
 		log.Printf("Cancelling request %s", id)
 	}
-	cancelRegistry.Unlock()
 }
 
 func makeChunkedResponse(id string, target string, data []byte) *tunnel.ASEventWrapper {
@@ -148,9 +148,7 @@ func executeRequest(dataflow chan *tunnel.ASEventWrapper, c *serverContextFields
 	ctx, cancel := context.WithCancel(context.Background())
 
 	registerCancelFunction(req.Id, cancel)
-	defer func() {
-		unregisterCancelFunction(req.Id)
-	}()
+	defer unregisterCancelFunction(req.Id)
 
 	httpRequest, err := http.NewRequestWithContext(ctx, req.Method, c.serverURL+req.URI, bytes.NewBuffer(req.Body))
 	if err != nil {
@@ -229,11 +227,7 @@ func runTunnel(sa *serverContext, client tunnel.TunnelServiceClient, ticker chan
 
 	// Handle periodic pings from the ticker.
 	go func() {
-		for {
-			ts, more := <-ticker
-			if !more {
-				return
-			}
+		for ts := range ticker {
 			req := &tunnel.ASEventWrapper{
 				Event: &tunnel.ASEventWrapper_PingRequest{
 					PingRequest: &tunnel.PingRequest{Ts: ts},
@@ -247,11 +241,7 @@ func runTunnel(sa *serverContext, client tunnel.TunnelServiceClient, ticker chan
 
 	// Handle HTTP fetch responses
 	go func() {
-		for {
-			ew, more := <-dataflow
-			if !more {
-				return
-			}
+		for ew := range dataflow {
 			if err = stream.Send(ew); err != nil {
 				log.Printf("Unable to respond over GRPC: %v", err)
 			}
