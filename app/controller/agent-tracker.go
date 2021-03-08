@@ -22,7 +22,7 @@ var (
 // through another controller.
 //
 type Agent interface {
-	Send(*httpMessage)
+	Send(interface{})
 	CancelRequest(*cancelRequest)
 
 	Endpoint() endpoint
@@ -53,7 +53,7 @@ type cancelRequest struct {
 type agentState struct {
 	ep              endpoint
 	session         string
-	inRequest       chan *httpMessage
+	inRequest       chan interface{}
 	inCancelRequest chan *cancelRequest
 	connectedAt     uint64
 	lastPing        uint64
@@ -219,7 +219,7 @@ func (s *AgentList) CancelRequest(ep endpoint, message *cancelRequest) bool {
 //
 // Send sends a message to a specific Agent
 //
-func (s *agentState) Send(message *httpMessage) {
+func (s *agentState) Send(message interface{}) {
 	s.inRequest <- message
 }
 

@@ -62,8 +62,9 @@ func addHTTPId(httpids *sessionList, id string, c chan *tunnel.AgentToController
 	httpids.m[id] = c
 }
 
-func handleHTTPRequests(session string, httpRequestChan chan *httpMessage, httpids *sessionList, stream tunnel.AgentTunnelService_EventTunnelServer) {
-	for request := range httpRequestChan {
+func handleHTTPRequests(session string, httpRequestChan chan interface{}, httpids *sessionList, stream tunnel.AgentTunnelService_EventTunnelServer) {
+	for interfacedRequest := range httpRequestChan {
+		request := interfacedRequest.(httpMessage)
 		addHTTPId(httpids, request.cmd.Id, request.out)
 		resp := &tunnel.ControllerToAgentWrapper{
 			Event: &tunnel.ControllerToAgentWrapper_HttpRequest{
@@ -109,21 +110,21 @@ func (s *agentTunnelServer) EventTunnel(stream tunnel.AgentTunnelService_EventTu
 
 	sessionIdentity := ulidContext.Ulid()
 
-	inHTTPRequest := make(chan *httpMessage, 1)
+	inRequest := make(chan interface{}, 1)
 	inCancelRequest := make(chan *cancelRequest, 1)
 	httpids := &sessionList{m: make(map[string]chan *tunnel.AgentToControllerWrapper)}
 
 	state := &agentState{
 		ep:              endpoint{name: agentIdentity, protocol: "UNKNOWN"},
 		session:         sessionIdentity,
-		inRequest:       inHTTPRequest,
+		inRequest:       inRequest,
 		inCancelRequest: inCancelRequest,
 		connectedAt:     tunnel.Now(),
 	}
 
 	log.Printf("Agent %s connected, awaiting hello message", state)
 
-	go handleHTTPRequests(sessionIdentity, inHTTPRequest, httpids, stream)
+	go handleHTTPRequests(sessionIdentity, inRequest, httpids, stream)
 
 	go handleHTTPCancelRequest(sessionIdentity, agentIdentity, inCancelRequest, httpids, stream)
 
