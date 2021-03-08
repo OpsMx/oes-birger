@@ -279,7 +279,7 @@ func runCmdToolGRPCServer(serverCert tls.Certificate) {
 	//
 	// Set up GRPC server
 	//
-	log.Printf("Starting Agent GRPC server on port %d...", config.CmdToolPort)
+	log.Printf("Starting CmdTool GRPC server on port %d...", config.CmdToolPort)
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", config.CmdToolPort))
 	if err != nil {
 		log.Fatalf("Failed to listen: %v", err)
