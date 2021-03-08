@@ -100,13 +100,13 @@ func makeHeaders(headers map[string][]string) []*tunnel.HttpHeader {
 // Impl:
 //
 // An agent uses a tunnel, which will allow messages to flow back and forth. If the connection
-// is closed, we can detect this.  Each agent has only one ID and one protocol it can handle.
+// is closed, we can detect this.  Each agent is known by a name ("Target")
+// and one protocol it can handle.
 //
 // A peer controller also uses a tunnel, where it sends a list of ( protocol, agentID, agentSession )
 // to allow proxying through this controller.  If it closes, all endpoints handled by this
 // tunnel are closed.
 //
-// Endpoints always receive the full list of
 
 func kubernetesAPIHandler(w http.ResponseWriter, r *http.Request) {
 	agentname := firstLabel(r.TLS.PeerCertificates[0].Subject.CommonName)
