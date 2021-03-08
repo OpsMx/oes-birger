@@ -62,9 +62,13 @@ func addHTTPId(httpids *sessionList, id string, c chan *tunnel.AgentToController
 	httpids.m[id] = c
 }
 
-func handleHTTPRequests(session string, httpRequestChan chan interface{}, httpids *sessionList, stream tunnel.AgentTunnelService_EventTunnelServer) {
-	for interfacedRequest := range httpRequestChan {
-		request := interfacedRequest.(httpMessage)
+func handleHTTPRequests(session string, requestChan chan interface{}, httpids *sessionList, stream tunnel.AgentTunnelService_EventTunnelServer) {
+	for interfacedRequest := range requestChan {
+		request, ok := interfacedRequest.(httpMessage)
+		if !ok {
+			log.Printf("Got type other than httpMessage: %T", request)
+			continue
+		}
 		addHTTPId(httpids, request.cmd.Id, request.out)
 		resp := &tunnel.ControllerToAgentWrapper{
 			Event: &tunnel.ControllerToAgentWrapper_HttpRequest{
@@ -240,33 +244,33 @@ func newCmdToolServer() *cmdToolTunnelServer {
 }
 
 func (s *cmdToolTunnelServer) EventTunnel(stream tunnel.CmdToolTunnelService_EventTunnelServer) error {
-	agentIdentity, err := getAgentNameFromContext(stream.Context())
+	identity, err := getAgentNameFromContext(stream.Context())
 	if err != nil {
 		return err
 	}
-	log.Printf("Agent %s connected", agentIdentity)
+	log.Printf("CmdTool %s connected", identity)
 
 	sessionIdentity := ulidContext.Ulid()
 
 	for {
 		in, err := stream.Recv()
 		if err == io.EOF {
-			log.Printf("CmdTool closed connection %s", sessionIdentity)
+			log.Printf("CmdTool %s closed connection %s", identity, sessionIdentity)
 			return nil
 		}
 		if err != nil {
-			log.Printf("CmdTool closed connection: %s", sessionIdentity)
+			log.Printf("CmdTool %s closed connection: %s", identity, sessionIdentity)
 			return err
 		}
 
 		switch x := in.Event.(type) {
 		case *tunnel.CmdToolToControllerWrapper_CommandRequest:
 			req := in.GetCommandRequest()
-			log.Printf("CmdTool request: %v", req)
+			log.Printf("CmdTool %s request: %v", identity, req)
 		case nil:
 			// ignore for now
 		default:
-			log.Printf("CmdTool: unknown message: %s: %T", sessionIdentity, x)
+			log.Printf("CmdTool %s unknown message: %s: %T", identity, sessionIdentity, x)
 		}
 	}
 }
