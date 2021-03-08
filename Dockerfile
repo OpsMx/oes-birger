@@ -44,11 +44,23 @@ EXPOSE 9102
 CMD ["/app/agent"]
 
 #
+# Build the agent-alpine image.  This should be a --target on docker build.
+#
+FROM alpine:3.12 AS agent-alpine-image
+WORKDIR /app
+COPY --from=build-agent /out/agent /app
+EXPOSE 9102
+CMD ["/app/agent"]
+
+#
 # Build the controller image.  This should be a --target on docker build.
+# Note that the agent is also added, so the binary can be served from
+# the controller to auto-update the remote agent.
 #
 FROM scratch AS controller-image
 WORKDIR /app
 COPY --from=build-controller /out/controller /app
+COPY --from=build-agent /out/agent /app/agent-binaries/agent.latest
 EXPOSE 9001-9002 9102
 CMD ["/app/controller"]
 
