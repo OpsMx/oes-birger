@@ -44,6 +44,11 @@ now = `date -u +%Y%m%dT%H%M%S`
 all: ${TARGETS}
 
 #
+# make a buildtime directory to hold the build timestamp files
+buildtime:
+	[ ! -d buildtime ] && mkdir buildtime
+
+#
 # Common components, like GRPC client code generation.
 #
 
@@ -76,40 +81,40 @@ bin/make-ca: ${make_ca_deps}
 images-ma: forwarder-controller-ma-image forwarder-agent-ma-image forwarder-make-ca-ma-image
 
 .PHONY: forwarder-agent-ma-image
-forwarder-agent-ma-image: forwarder-agent-ma-image.buildtime
+forwarder-agent-ma-image: buildtime buildtime/forwarder-agent-ma-image.buildtime
 
 .PHONY: forwarder-controller-ma-image
-forwarder-controller-ma-image: forwarder-controller-ma-image.buildtime
+forwarder-controller-ma-image: buildtime buildtime/forwarder-controller-ma-image.buildtime
 
 .PHONY: forwarder-make-ca-ma-image
-forwarder-make-ca-ma-image: forwarder-make-ca-ma-image.buildtime
+forwarder-make-ca-ma-image: buildtime buildtime/forwarder-make-ca-ma-image.buildtime
 
-forwarder-agent-ma-image.buildtime: ${agent_deps} Dockerfile.multi
+buildtime/forwarder-agent-ma-image.buildtime: ${agent_deps} Dockerfile.multi
 	@${BUILDX} \
 		--tag ${IMAGE_PREFIX}forwarder-agent:latest \
 		--tag ${IMAGE_PREFIX}forwarder-agent:v${now} \
 		--target agent-image \
 		-f Dockerfile.multi \
 		--push .
-	touch forwarder-agent-ma-image.buildtime
+	touch buildtime/forwarder-agent-ma-image.buildtime
 
-forwarder-controller-ma-image.buildtime: ${controller_deps} Dockerfile.multi
+buildtime/forwarder-controller-ma-image.buildtime: ${controller_deps} Dockerfile.multi
 	@${BUILDX} \
 	    --tag ${IMAGE_PREFIX}forwarder-controller:latest \
 		--tag ${IMAGE_PREFIX}forwarder-controller:v${now} \
 		--target controller-image \
 		-f Dockerfile.multi \
 		--push .
-	touch forwarder-controller-ma-image.buildtime
+	touch buildtime/forwarder-controller-ma-image.buildtime
 
-forwarder-make-ca-ma-image.buildtime: ${make_ca_deps} Dockerfile.multi
+buildtime/forwarder-make-ca-ma-image.buildtime: ${make_ca_deps} Dockerfile.multi
 	@${BUILDX} \
 	    --tag ${IMAGE_PREFIX}forwarder-make-ca:latest \
 		--tag ${IMAGE_PREFIX}forwarder-make-ca:v${now} \
 		--target make-ca-image \
 		-f Dockerfile.multi \
 		--push .
-	touch forwarder-make-ca-ma-image.buildtime
+	touch buildtime/forwarder-make-ca-ma-image.buildtime
 
 #
 # Standard "whatever we are on now" image builds
@@ -118,40 +123,40 @@ forwarder-make-ca-ma-image.buildtime: ${make_ca_deps} Dockerfile.multi
 images: forwarder-controller-image forwarder-agent-image forwarder-make-ca-image
 
 .PHONY: forwarder-agent-image
-forwarder-agent-image: forwarder-agent-image.buildtime
+forwarder-agent-image: buildtime buildtime/forwarder-agent-image.buildtime
 
 .PHONY: forwarder-controller-image
-forwarder-controller-image: forwarder-controller-image.buildtime
+forwarder-controller-image: buildtime buildtime/forwarder-controller-image.buildtime
 
 .PHONY: forwarder-make-ca-image
-forwarder-make-ca-image: forwarder-make-ca-image.buildtime
+forwarder-make-ca-image: buildtime buildtime/forwarder-make-ca-image.buildtime
 
-forwarder-agent-image.buildtime: ${agent_deps} Dockerfile
+buildtime/forwarder-agent-image.buildtime: ${agent_deps} Dockerfile
 	@docker build \
 		--tag ${IMAGE_PREFIX}forwarder-agent:latest \
 		--tag ${IMAGE_PREFIX}forwarder-agent:v${now} \
 		--target agent-image \
 		.
 	@echo Tags: ${IMAGE_PREFIX}forwarder-agent:latest ${IMAGE_PREFIX}forwarder-agent:v${now}
-	touch forwarder-agent-image.buildtime
+	touch buildtime/forwarder-agent-image.buildtime
 
-forwarder-controller-image.buildtime: ${controller_deps} Dockerfile
+buildtime/forwarder-controller-image.buildtime: ${controller_deps} Dockerfile
 	@docker build \
 	    --tag ${IMAGE_PREFIX}forwarder-controller:latest \
 		--tag ${IMAGE_PREFIX}forwarder-controller:v${now} \
 		--target controller-image \
 		.
 	@echo Tags: ${IMAGE_PREFIX}forwarder-controller:latest ${IMAGE_PREFIX}forwarder-controller:v${now}
-	touch forwarder-controller-image.buildtime
+	touch buildtime/forwarder-controller-image.buildtime
 
-forwarder-make-ca-image.buildtime: ${make_ca_deps} Dockerfile
+buildtime/forwarder-make-ca-image.buildtime: ${make_ca_deps} Dockerfile
 	@docker build \
 	    --tag ${IMAGE_PREFIX}forwarder-make-ca:latest \
 		--tag ${IMAGE_PREFIX}forwarder-make-ca:v${now} \
 		--target make-ca-image \
 		.
 	@echo Tags: ${IMAGE_PREFIX}forwarder-make-ca:latest ${IMAGE_PREFIX}forwarder-make-ca:v${now}
-	touch forwarder-make-ca-image.buildtime
+	touch buildtime/forwarder-make-ca-image.buildtime
 
 #
 # Test targets
@@ -167,6 +172,6 @@ test: ${pb_deps}
 
 .PHONY: clean
 clean:
-	rm -f *.buildtime
+	rm -f buildtime/*.buildtime
 	rm -f ${pb_deps}
 	rm -f bin/*
