@@ -17,7 +17,10 @@ func outputSender(channel tunnel.CommandData_Channel, c chan *outputMessage, in 
 	for {
 		n, err := in.Read(buffer)
 		if n > 0 {
-			c <- &outputMessage{channel: channel, value: buffer[:n], closed: false}
+			// we need to copy the underlying data, since we will re-use it.
+			tmp := make([]byte, n)
+			copy(tmp, buffer[:n])
+			c <- &outputMessage{channel: channel, value: tmp, closed: false}
 		}
 		if err == io.EOF {
 			c <- &outputMessage{channel: channel, value: emptyBytes, closed: true}
