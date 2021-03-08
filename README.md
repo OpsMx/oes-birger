@@ -35,3 +35,27 @@ Start the controller:
 
 Start a agent:
 `go run agent/agent.go -identity skan1`
+
+# Certificates
+
+There is a binary called `make-ca` which will generate a new certificate authority,
+and an initial "control" client key.  These keys and certificates are created in
+the Kubernetes secret YAML format.
+
+The CA key and certificate will be used by the controller to generate a
+server certificate on startup with all the defined server names it may be using.
+It will also use this to generate additional keys for control, command-requests,
+kubernetes API requests, and agents on request.
+
+## Certificate Names
+
+The server certificate is a standard server cert, which will be used by the
+usual Go libraries to verify that the server is presenting an identity
+that matches the URL being used to contact it.
+
+For agent, command, remote-command, and agent certificates, the CommonName is
+treated specially.  The format is "agentName.type" where "agentName" is used to
+match incoming Kubernetes API requests and remote-command requests to a connected
+agent, by name.  That is, if an agent connects with a certificate named "foo.agent",
+then a certificate called "foo.remote-command" or "foo.client" can connect and send
+it Kubernets API requests or remote-command requests.
