@@ -73,13 +73,16 @@ bin/make-ca: ${make_ca_deps}
 # Multi-architecture image builds
 #
 .PHONY: images-ma
-images-ma: forwarder-controller-ma-image forwarder-agent-ma-image
+images-ma: forwarder-controller-ma-image forwarder-agent-ma-image forwarder-make-ca-ma-image
 
 .PHONY: forwarder-agent-ma-image
 forwarder-agent-ma-image: forwarder-agent-ma-image.buildtime
 
 .PHONY: forwarder-controller-ma-image
 forwarder-controller-ma-image: forwarder-controller-ma-image.buildtime
+
+.PHONY: forwarder-make-ca-ma-image
+forwarder-make-ca-ma-image: forwarder-make-ca-ma-image.buildtime
 
 forwarder-agent-ma-image.buildtime: ${agent_deps} Dockerfile.multi
 	@${BUILDX} \
@@ -99,17 +102,29 @@ forwarder-controller-ma-image.buildtime: ${controller_deps} Dockerfile.multi
 		--push .
 	touch forwarder-controller-ma-image.buildtime
 
+forwarder-make-ca-ma-image.buildtime: ${make_ca_deps} Dockerfile.multi
+	@${BUILDX} \
+	    --tag ${IMAGE_PREFIX}forwarder-make-ca:latest \
+		--tag ${IMAGE_PREFIX}forwarder-make-ca:v${now} \
+		--target make-ca-image \
+		-f Dockerfile.multi \
+		--push .
+	touch forwarder-make-ca-ma-image.buildtime
+
 #
 # Standard "whatever we are on now" image builds
 #
 .PHONY: images
-images: forwarder-controller-image forwarder-agent-image
+images: forwarder-controller-image forwarder-agent-image forwarder-make-ca-image
 
 .PHONY: forwarder-agent-image
 forwarder-agent-image: forwarder-agent-image.buildtime
 
 .PHONY: forwarder-controller-image
 forwarder-controller-image: forwarder-controller-image.buildtime
+
+.PHONY: forwarder-make-ca-image
+forwarder-make-ca-image: forwarder-make-ca-image.buildtime
 
 forwarder-agent-image.buildtime: ${agent_deps} Dockerfile
 	@docker build \
@@ -129,13 +144,22 @@ forwarder-controller-image.buildtime: ${controller_deps} Dockerfile
 	@echo Tags: ${IMAGE_PREFIX}forwarder-controller:latest ${IMAGE_PREFIX}forwarder-controller:v${now}
 	touch forwarder-controller-image.buildtime
 
+forwarder-make-ca-image.buildtime: ${make_ca_deps} Dockerfile
+	@docker build \
+	    --tag ${IMAGE_PREFIX}forwarder-make-ca:latest \
+		--tag ${IMAGE_PREFIX}forwarder-make-ca:v${now} \
+		--target make-ca-image \
+		.
+	@echo Tags: ${IMAGE_PREFIX}forwarder-make-ca:latest ${IMAGE_PREFIX}forwarder-make-ca:v${now}
+	touch forwarder-make-ca-image.buildtime
+
 #
 # Test targets
 #
 
 .PHONY: test
 test: ${pb_deps}
-	go test  -race ./...
+	go test -race ./...
 
 #
 # Clean the world.

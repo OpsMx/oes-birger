@@ -27,6 +27,14 @@ RUN mkdir /out
 RUN go build -o /out/controller app/controller/*.go
 
 #
+# Compile make-ca.
+#
+FROM buildmod AS build-make-ca
+COPY . .
+RUN mkdir /out
+RUN go build -o /out/make-ca app/make-ca/*.go
+
+#
 # Build the agent image.  This should be a --target on docker build.
 #
 FROM scratch AS agent-image
@@ -43,3 +51,11 @@ WORKDIR /app
 COPY --from=build-controller /out/controller /app
 EXPOSE 9001-9002 9102
 CMD ["/app/controller"]
+
+#
+# Build the make-ca image.  This should be a --target on docker build.
+#
+FROM scratch AS make-ca-image
+WORKDIR /app
+COPY --from=build-make-ca /out/make-ca /app
+CMD ["/app/make-ca"]
