@@ -25,6 +25,7 @@ type ControllerConfig struct {
 	CommandPort           uint16                  `yaml:"commandPort"`
 	AgentHostname         *string                 `yaml:"agentHostname"`
 	AgentPort             uint16                  `yaml:"agentPort"`
+	CmdToolPort           uint16                  `yaml:"cmdToolPort"`
 }
 
 type agentConfig struct {
@@ -49,12 +50,19 @@ func LoadConfig(filename string) (*ControllerConfig, error) {
 	if config.AgentPort == 0 {
 		config.AgentPort = 9001
 	}
+
 	if config.KubernetesAPIPort == 0 {
 		config.KubernetesAPIPort = 9002
 	}
+
 	if config.CommandPort == 0 {
 		config.CommandPort = 9003
 	}
+
+	if config.CmdToolPort == 0 {
+		config.CmdToolPort = 9004
+	}
+
 	if config.PrometheusPort == 0 {
 		config.PrometheusPort = 9102
 	}

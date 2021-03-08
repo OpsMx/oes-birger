@@ -38,9 +38,9 @@ var (
 	config *AgentConfig
 )
 
-func runTunnel(sa *serverContext, client tunnel.TunnelServiceClient, ticker chan uint64, identity string) {
+func runTunnel(sa *serverContext, client tunnel.AgentTunnelServiceClient, ticker chan uint64, identity string) {
 	ctx := context.Background()
-	stream, err := client.AgentEventTunnel(ctx)
+	stream, err := client.EventTunnel(ctx)
 	if err != nil {
 		log.Fatalf("%v.EventTunnel(_) = _, %v", client, err)
 	}
@@ -368,7 +368,7 @@ func main() {
 	}
 	defer conn.Close()
 
-	client := tunnel.NewTunnelServiceClient(conn)
+	client := tunnel.NewAgentTunnelServiceClient(conn)
 
 	ticker := make(chan uint64)
 	runTicker(*tickTime, ticker)

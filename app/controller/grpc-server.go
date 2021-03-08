@@ -15,12 +15,20 @@ import (
 	"google.golang.org/grpc/credentials"
 )
 
-type tunnelServer struct {
-	tunnel.UnimplementedTunnelServiceServer
+type agentTunnelServer struct {
+	tunnel.UnimplementedAgentTunnelServiceServer
 }
 
-func newServer() *tunnelServer {
-	return &tunnelServer{}
+func newAgentServer() *agentTunnelServer {
+	return &agentTunnelServer{}
+}
+
+type cmdToolTunnelServer struct {
+	tunnel.UnimplementedCmdToolTunnelServiceServer
+}
+
+func newCmdToolServer() *cmdToolTunnelServer {
+	return &cmdToolTunnelServer{}
 }
 
 func sendWebhook(state *agentState, namespaces []string, commandNames []string) {
@@ -63,7 +71,7 @@ func addHTTPId(httpids *sessionList, id string, c chan *tunnel.ASEventWrapper) {
 	httpids.m[id] = c
 }
 
-func handleHTTPRequests(session string, httpRequestChan chan *httpMessage, httpids *sessionList, stream tunnel.TunnelService_AgentEventTunnelServer) {
+func handleHTTPRequests(session string, httpRequestChan chan *httpMessage, httpids *sessionList, stream tunnel.AgentTunnelService_EventTunnelServer) {
 	for request := range httpRequestChan {
 		addHTTPId(httpids, request.cmd.Id, request.out)
 		resp := &tunnel.SAEventWrapper{
@@ -78,7 +86,7 @@ func handleHTTPRequests(session string, httpRequestChan chan *httpMessage, httpi
 	log.Printf("Request channel closed for %s", session)
 }
 
-func handleHTTPCancelRequest(session string, identity string, cancelChan chan *cancelRequest, httpids *sessionList, stream tunnel.TunnelService_AgentEventTunnelServer) {
+func handleHTTPCancelRequest(session string, identity string, cancelChan chan *cancelRequest, httpids *sessionList, stream tunnel.AgentTunnelService_EventTunnelServer) {
 	for request := range cancelChan {
 		removeHTTPId(httpids, request.id)
 		resp := &tunnel.SAEventWrapper{
@@ -102,7 +110,7 @@ func closeAllHTTP(httpids *sessionList) {
 }
 
 // This runs in its own goroutine, one per GRPC connection from an agent.
-func (s *tunnelServer) AgentEventTunnel(stream tunnel.TunnelService_AgentEventTunnelServer) error {
+func (s *agentTunnelServer) AgentEventTunnel(stream tunnel.AgentTunnelService_EventTunnelServer) error {
 	agentIdentity, err := getAgentNameFromContext(stream.Context())
 	if err != nil {
 		return err
@@ -214,10 +222,37 @@ func runAgentGRPCServer(serverCert tls.Certificate) {
 		ClientCAs:    certPool,
 		ClientAuth:   tls.RequireAndVerifyClientCert,
 		Certificates: []tls.Certificate{serverCert},
-		MinVersion:   tls.VersionTLS12,
+		MinVersion:   tls.VersionTLS13,
 	})
 	grpcServer := grpc.NewServer(grpc.Creds(creds))
-	tunnel.RegisterTunnelServiceServer(grpcServer, newServer())
+	tunnel.RegisterAgentTunnelServiceServer(grpcServer, newAgentServer())
+	if err := grpcServer.Serve(lis); err != nil {
+		log.Fatalf("Failed to start Agent GRPC server: %v", err)
+	}
+}
+
+func runCmdToolGRPCServer(serverCert tls.Certificate) {
+	//
+	// Set up GRPC server
+	//
+	log.Printf("Starting Agent GRPC server on port %d...", config.CmdToolPort)
+	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", config.CmdToolPort))
+	if err != nil {
+		log.Fatalf("Failed to listen: %v", err)
+	}
+
+	certPool, err := authority.MakeCertPool()
+	if err != nil {
+		log.Fatalf("While making certpool: %v", err)
+	}
+	creds := credentials.NewTLS(&tls.Config{
+		ClientCAs:    certPool,
+		ClientAuth:   tls.RequireAndVerifyClientCert,
+		Certificates: []tls.Certificate{serverCert},
+		MinVersion:   tls.VersionTLS13,
+	})
+	grpcServer := grpc.NewServer(grpc.Creds(creds))
+	tunnel.RegisterCmdToolTunnelServiceServer(grpcServer, newCmdToolServer())
 	if err := grpcServer.Serve(lis); err != nil {
 		log.Fatalf("Failed to start Agent GRPC server: %v", err)
 	}

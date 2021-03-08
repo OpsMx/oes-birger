@@ -155,7 +155,10 @@ message ControllerToCmdToolEventWrapper {
 // Service (runs on the controller)
 //
 
-service TunnelService {
-    rpc AgentEventTunnel(stream ASEventWrapper) returns (stream SAEventWrapper) {}
-    rpc CmdToolEventTunnel(stream CmdToolToControllerEventWrapper) returns (stream ControllerToCmdToolEventWrapper) {}
+service AgentTunnelService {
+    rpc EventTunnel(stream ASEventWrapper) returns (stream SAEventWrapper) {}
+}
+
+service CmdToolTunnelService {
+    rpc EventTunnel(stream CmdToolToControllerEventWrapper) returns (stream ControllerToCmdToolEventWrapper) {}
 }
