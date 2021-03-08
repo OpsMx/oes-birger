@@ -58,22 +58,49 @@ message CommandRequest {
     repeated string environment = 5;
 }
 
+// A simplified message, used for command-tool <-> controller communication.
+// This does not have the "id" or "target" field, as these are set by
+// the controller based on authentication used.
+message CmdToolCommandRequest {
+    string name = 3;
+    repeated string arguments = 4;
+    repeated string environment = 5;
+}
+
+enum ChannelDirection {
+    STDIN = 0;
+    STDOUT = 1;
+    STDERR = 2;
+}
+
 message CommandData {
     string id = 1;
     string target = 2;
     bytes body = 3;
-    enum Channel {
-        STDIN = 0;
-        STDOUT = 1;
-        STDERR = 2;
-    }
-    Channel channel = 4;
+    ChannelDirection channel = 4;
+    bool Closed = 5;
+}
+
+// A simplified message, used for command-tool <-> controller communication.
+// This does not have the "id" or "target" field, as these are set by
+// the controller based on authentication used.
+message CmdToolCommandData {
+    bytes body = 3;
+    ChannelDirection channel = 4;
     bool Closed = 5;
 }
 
 message CommandTermination {
     string id = 1;
     string target = 2;
+    int32 exitCode = 3;
+    string message = 4;
+}
+
+// A simplified message, used for command-tool <-> controller communication.
+// This does not have the "id" or "target" field, as these are set by
+// the controller based on authentication used.
+message CmdToolCommandTermination {
     int32 exitCode = 3;
     string message = 4;
 }
@@ -104,6 +131,22 @@ message ASEventWrapper {
         AgentHello agentHello = 4;
         CommandData commandData = 5;
         CommandTermination commandTermination = 6;
+    }
+}
+
+// Messages sent from command-tool to controller
+message CmdToolToControllerEventWrapper {
+    oneof event {
+        CmdToolCommandRequest commandRequest = 1;
+        CmdToolCommandData commandData = 2;
+    }
+}
+
+// Messages sent from the controller to the command-tool
+message ControllerToCmdToolEventWrapper {
+    oneof event {
+        CmdToolCommandTermination commandTermination = 1;
+        CmdToolCommandData commandData = 2;
     }
 }
 

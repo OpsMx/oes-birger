@@ -12,7 +12,7 @@ import (
 	"golang.org/x/net/context"
 )
 
-func outputSender(channel tunnel.CommandData_Channel, c chan *outputMessage, in io.Reader) {
+func outputSender(channel tunnel.ChannelDirection, c chan *outputMessage, in io.Reader) {
 	buffer := make([]byte, 10240)
 	for {
 		n, err := in.Read(buffer)
@@ -32,14 +32,8 @@ func outputSender(channel tunnel.CommandData_Channel, c chan *outputMessage, in 
 	}
 }
 
-const (
-	cmdStdin  = 0
-	cmdStdout = 1
-	cmdStderr = 2
-)
-
 type outputMessage struct {
-	channel tunnel.CommandData_Channel
+	channel tunnel.ChannelDirection
 	value   []byte
 	closed  bool
 }
@@ -75,7 +69,7 @@ func makeCommandTermination(req *tunnel.CommandRequest, exitstatus int) *tunnel.
 	}
 }
 
-func makeCommandData(req *tunnel.CommandRequest, channel tunnel.CommandData_Channel, data []byte) *tunnel.ASEventWrapper {
+func makeCommandData(req *tunnel.CommandRequest, channel tunnel.ChannelDirection, data []byte) *tunnel.ASEventWrapper {
 	return &tunnel.ASEventWrapper{
 		Event: &tunnel.ASEventWrapper_CommandData{
 			CommandData: &tunnel.CommandData{
@@ -88,7 +82,7 @@ func makeCommandData(req *tunnel.CommandRequest, channel tunnel.CommandData_Chan
 	}
 }
 
-func makeCommandDataClosed(req *tunnel.CommandRequest, channel tunnel.CommandData_Channel) *tunnel.ASEventWrapper {
+func makeCommandDataClosed(req *tunnel.CommandRequest, channel tunnel.ChannelDirection) *tunnel.ASEventWrapper {
 	return &tunnel.ASEventWrapper{
 		Event: &tunnel.ASEventWrapper_CommandData{
 			CommandData: &tunnel.CommandData{
@@ -125,8 +119,8 @@ func runCommand(dataflow chan *tunnel.ASEventWrapper, req *tunnel.CommandRequest
 		return
 	}
 
-	go outputSender(cmdStdout, agg, stdout)
-	go outputSender(cmdStderr, agg, stderr)
+	go outputSender(tunnel.ChannelDirection_STDOUT, agg, stdout)
+	go outputSender(tunnel.ChannelDirection_STDERR, agg, stderr)
 
 	err = cmd.Start()
 	if err != nil {
