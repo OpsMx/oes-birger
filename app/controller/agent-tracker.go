@@ -53,7 +53,7 @@ type cancelRequest struct {
 type agentState struct {
 	ep              endpoint
 	session         string
-	inHTTPRequest   chan *httpMessage
+	inRequest       chan *httpMessage
 	inCancelRequest chan *cancelRequest
 	connectedAt     uint64
 	lastPing        uint64
@@ -166,7 +166,7 @@ func (s *Agents) RemoveAgent(state *agentState) {
 		return
 	}
 
-	close(state.inHTTPRequest)
+	close(state.inRequest)
 	close(state.inCancelRequest)
 
 	// TODO: We should always find our entry...
@@ -217,10 +217,10 @@ func (s *Agents) CancelRequest(ep endpoint, message *cancelRequest) bool {
 }
 
 //
-// Send sends a message to a spceific Agent
+// Send sends a message to a specific Agent
 //
 func (s *agentState) Send(message *httpMessage) {
-	s.inHTTPRequest <- message
+	s.inRequest <- message
 }
 
 //

@@ -15,8 +15,10 @@ RUN go mod download
 #
 FROM buildmod AS build-agent
 COPY . .
-RUN mkdir /out
+RUN mkdir /out /out/agent-binaries
 RUN go build -o /out/agent app/agent/*.go
+RUN GOOS=linux GOARCH=amd64 go build -o /out/agent-binaries/agent.amd64.latest app/agent/*.go
+RUN GOOS=linux GOARCH=arm64 go build -o /out/agent-binaries/agent.arm64.latest app/agent/*.go
 
 #
 # Compile the controller.
@@ -60,7 +62,7 @@ CMD ["/app/agent"]
 FROM scratch AS controller-image
 WORKDIR /app
 COPY --from=build-controller /out/controller /app
-COPY --from=build-agent /out/agent /app/agent-binaries/agent.latest
+COPY --from=build-agent /out/agent-binaries /app/agent-binaries
 EXPOSE 9001-9002 9102
 CMD ["/app/controller"]
 

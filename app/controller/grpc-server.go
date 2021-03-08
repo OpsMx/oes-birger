@@ -116,7 +116,7 @@ func (s *agentTunnelServer) EventTunnel(stream tunnel.AgentTunnelService_EventTu
 	state := &agentState{
 		ep:              endpoint{name: agentIdentity, protocol: "UNKNOWN"},
 		session:         sessionIdentity,
-		inHTTPRequest:   inHTTPRequest,
+		inRequest:       inHTTPRequest,
 		inCancelRequest: inCancelRequest,
 		connectedAt:     tunnel.Now(),
 	}
@@ -239,7 +239,35 @@ func newCmdToolServer() *cmdToolTunnelServer {
 }
 
 func (s *cmdToolTunnelServer) EventTunnel(stream tunnel.CmdToolTunnelService_EventTunnelServer) error {
-	return fmt.Errorf("Unimplemented")
+	agentIdentity, err := getAgentNameFromContext(stream.Context())
+	if err != nil {
+		return err
+	}
+	log.Printf("Agent %s connected", agentIdentity)
+
+	sessionIdentity := ulidContext.Ulid()
+
+	for {
+		in, err := stream.Recv()
+		if err == io.EOF {
+			log.Printf("CmdTool closed connection %s", sessionIdentity)
+			return nil
+		}
+		if err != nil {
+			log.Printf("CmdTool closed connection: %s", sessionIdentity)
+			return err
+		}
+
+		switch x := in.Event.(type) {
+		case *tunnel.CmdToolToControllerWrapper_CommandRequest:
+			req := in.GetCommandRequest()
+			log.Printf("CmdTool request: %v", req)
+		case nil:
+			// ignore for now
+		default:
+			log.Printf("CmdTool: unknown message: %s: %T", sessionIdentity, x)
+		}
+	}
 }
 
 func runCmdToolGRPCServer(serverCert tls.Certificate) {

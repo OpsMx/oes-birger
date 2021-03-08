@@ -19,3 +19,4 @@ minica
 pkg/tunnel/tunnel.pb.go
 buildtime
 *.buildtime
+deploy-sample

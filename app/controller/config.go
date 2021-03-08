@@ -22,6 +22,7 @@ type ControllerConfig struct {
 	KubernetesAPIPort     uint16                  `yaml:"kubernetesAPIPort"`
 	KubernetesAPIHostname *string                 `yaml:"kubernetesAPIHostname"`
 	CommandHostname       *string                 `yaml:"commandHostname"`
+	CmdToolHostname       *string                 `yaml:"cmdToolHostname"`
 	CommandPort           uint16                  `yaml:"commandPort"`
 	AgentHostname         *string                 `yaml:"agentHostname"`
 	AgentPort             uint16                  `yaml:"agentPort"`
@@ -82,11 +83,9 @@ func (c *ControllerConfig) hasServerName(target string) bool {
 }
 
 func (c *ControllerConfig) addIfMissing(target *string, reason string) {
-	if target != nil {
-		if !c.hasServerName(*target) {
-			c.ServerNames = append(c.ServerNames, *target)
-			log.Printf("Adding %s to ServerNames (for %s configuration setting)", *target, reason)
-		}
+	if target != nil && !c.hasServerName(*target) {
+		c.ServerNames = append(c.ServerNames, *target)
+		log.Printf("Adding %s to ServerNames (for %s configuration setting)", *target, reason)
 	}
 }
 
@@ -94,6 +93,7 @@ func (c *ControllerConfig) addAllHostnames() {
 	c.addIfMissing(c.AgentHostname, "agentHostname")
 	c.addIfMissing(c.CommandHostname, "commandHostname")
 	c.addIfMissing(c.KubernetesAPIHostname, "kubernetesAPIHostname")
+	c.addIfMissing(c.CmdToolHostname, "cmdToolHostname")
 }
 
 func (c *ControllerConfig) getAgentHostname() string {
@@ -121,6 +121,13 @@ func (c *ControllerConfig) getCommandHostname() string {
 	return c.ServerNames[0]
 }
 
+func (c *ControllerConfig) getCmdToolHostname() string {
+	if c.CmdToolHostname != nil {
+		return *c.CmdToolHostname
+	}
+	return c.ServerNames[0]
+}
+
 //
 // Dump will display MOST of the controller's configuration.
 //
@@ -130,4 +137,5 @@ func (c *ControllerConfig) Dump() {
 	log.Printf("Kubernetes API URL returned for kubectl components: %s", c.getKubernetesURL())
 	log.Printf("Agent hostname: %s, port %d", c.getAgentHostname(), c.getAgentPort())
 	log.Printf("Command Hostname: %s, port %d", c.getCommandHostname(), c.CommandPort)
+	log.Printf("CmdTool Hostname: %s, port %d", c.getCmdToolHostname(), c.CmdToolPort)
 }
