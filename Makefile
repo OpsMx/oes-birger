@@ -3,39 +3,22 @@ PLATFORM=linux/amd64,linux/arm64
 BUILDX=docker buildx build --pull --platform ${PLATFORM}
 IMAGE_PREFIX=docker.flame.org/library/
 
+#
+# Build targets.  Adding to these will cause magic to occur.
+#
+
+# These are targets for "make local"
+BINARIES = agent controller make-ca remote-command
+
+
+#
+# Below here lies magic...
+#
+
 # Generated protobuf outputs.  These are removed with "make clean"
 pb_deps = pkg/tunnel/tunnel.pb.go
 
-controller_deps = ${pb_deps} \
-	pkg/ca/ca.go \
-	app/controller/agent-tracker.go \
-	app/controller/config.go \
-	app/controller/controller.go \
-	app/controller/grpc-server.go \
-	app/controller/cnc-server.go \
-	pkg/webhook/webhook.go \
-	pkg/tunnel/time.go \
-	pkg/tunnel/defaults.go \
-	pkg/kubeconfig/config.go \
-    pkg/ulid/ulid.go
-
-agent_deps = ${pb_deps} \
-	app/agent/agent.go \
-	app/agent/cancel.go \
-	app/agent/command.go \
-	app/agent/config.go \
-	app/agent/kubernetes.go \
-	app/agent/http.go \
-    pkg/kubeconfig/config.go \
-	pkg/tunnel/defaults.go \
-	pkg/tunnel/time.go
-
-make_ca_deps = \
-	app/make-ca/make-ca.go \
-	pkg/ca/ca.go
-
-remote_command_deps = ${pb_deps} \
-	app/remote-command/main.go
+gofiles = ${pb_deps} $(shell find * -name '*.go' | grep -v _test)
 
 now = `date -u +%Y%m%dT%H%M%S`
 
@@ -63,23 +46,11 @@ pkg/tunnel/tunnel.pb.go: go.mod pkg/tunnel/tunnel.proto
 #
 
 .PHONY: local
-local: bin/agent bin/controller bin/make-ca bin/remote-command
+local: $(addprefix bin/,$(BINARIES))
 
-bin/agent: ${agent_deps}
+bin/%:: ${all_deps}
 	@[ -d bin ] || mkdir bin
-	go build -o bin/agent app/agent/*.go
-
-bin/controller: ${controller_deps}
-	@[ -d bin ] || mkdir bin
-	go build -o bin/controller app/controller/*.go
-
-bin/make-ca: ${make_ca_deps}
-	@[ -d bin ] || mkdir bin
-	go build -o bin/make-ca app/make-ca/*.go
-
-bin/remote-command: ${remote_command_deps}
-	@[ -d bin ] || mkdir bin
-	go build -o bin/remote-command app/remote-command/*.go
+	go build -o bin/$@ app/$(@F)/*.go
 
 #
 # Multi-architecture image builds
@@ -89,6 +60,9 @@ images-ma: forwarder-controller-ma-image forwarder-agent-ma-image forwarder-make
 
 .PHONY: forwarder-agent-ma-image
 forwarder-agent-ma-image: buildtime buildtime/forwarder-agent-ma-image.buildtime
+
+.PHONY: forwarder-agent-ma-alpine-image
+forwarder-agent-ma-alpine-image: buildtime buildtime/forwarder-agent-ma-alpine-image.buildtime
 
 .PHONY: forwarder-controller-ma-image
 forwarder-controller-ma-image: buildtime buildtime/forwarder-controller-ma-image.buildtime
@@ -104,6 +78,15 @@ buildtime/forwarder-agent-ma-image.buildtime: ${agent_deps} Dockerfile.multi
 		-f Dockerfile.multi \
 		--push .
 	touch buildtime/forwarder-agent-ma-image.buildtime
+
+buildtime/forwarder-agent-ma-alpine-image.buildtime: ${agent_deps} Dockerfile.multi
+	@${BUILDX} \
+		--tag ${IMAGE_PREFIX}forwarder-agent-alpine:latest \
+		--tag ${IMAGE_PREFIX}forwarder-agent-alpine:v${now} \
+		--target agent-image-alpine \
+		-f Dockerfile.multi \
+		--push .
+	touch buildtime/forwarder-agent-ma-alpine-image.buildtime
 
 buildtime/forwarder-controller-ma-image.buildtime: ${controller_deps} Dockerfile.multi
 	@${BUILDX} \
