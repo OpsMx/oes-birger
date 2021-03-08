@@ -10,16 +10,23 @@ import (
 	"sync/atomic"
 
 	"github.com/opsmx/grpc-bidir/pkg/tunnel"
-	"github.com/opsmx/grpc-bidir/pkg/webhook"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 )
+
+type agentConnectionNotification struct {
+	Identity             string   `json:"identity,omitempty"`
+	Protocols            []string `json:"protocols,omitempty"`
+	Session              string   `json:"session,omitempty"`
+	KubernetesNamespaces []string `json:"namespaces,omitempty"`
+	CommandNames         []string `json:"commandNames,omitEmpty"`
+}
 
 func sendWebhook(state *agentState, namespaces []string, commandNames []string) {
 	if hook == nil {
 		return
 	}
-	req := &webhook.AgentConnectionNotification{
+	req := &agentConnectionNotification{
 		Identity:             state.ep.name,
 		Protocols:            []string{state.ep.protocol},
 		Session:              state.session,

@@ -8,21 +8,10 @@ import (
 )
 
 //
-// AgentConnectionNotification defines the data sent to a target webhook destination
-//
-type AgentConnectionNotification struct {
-	Identity             string   `json:"identity,omitempty"`
-	Protocols            []string `json:"protocols,omitempty"`
-	Session              string   `json:"session,omitempty"`
-	KubernetesNamespaces []string `json:"namespaces,omitempty"`
-	CommandNames         []string `json:"commandNames,omitEmpty"`
-}
-
-//
 // Runner holds state for the specific runner.
 type Runner struct {
 	url string
-	rc  chan *AgentConnectionNotification
+	rc  chan interface{}
 }
 
 //
@@ -30,7 +19,7 @@ type Runner struct {
 func NewRunner(url string) *Runner {
 	return &Runner{
 		url: url,
-		rc:  make(chan *AgentConnectionNotification),
+		rc:  make(chan interface{}),
 	}
 }
 
@@ -46,7 +35,7 @@ func (wr *Runner) Close() {
 // future, perhaps on a new goroutine.  There is no return status,
 // and errors are logged but otherwise silently ignored.
 //
-func (wr *Runner) Send(msg *AgentConnectionNotification) {
+func (wr *Runner) Send(msg interface{}) {
 	wr.rc <- msg
 }
 
@@ -66,7 +55,7 @@ func (wr *Runner) Run() {
 //
 // Perform an actual web request
 //
-func (wr *Runner) perform(msg *AgentConnectionNotification) {
+func (wr *Runner) perform(msg interface{}) {
 	log.Printf("Webhook request: %v", msg)
 	jsonString, err := json.Marshal(msg)
 	if err != nil {

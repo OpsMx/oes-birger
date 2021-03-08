@@ -26,7 +26,8 @@ agent_deps = ${pb_deps} \
 	app/agent/config.go \
 	app/agent/kubernetes.go \
 	app/agent/http.go \
-    pkg/kubeconfig/config.go
+    pkg/kubeconfig/config.go \
+	pkg/tunnel/defaults.go
 
 make_ca_deps = \
 	app/make-ca/make-ca.go \
