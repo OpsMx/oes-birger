@@ -110,7 +110,7 @@ func closeAllHTTP(httpids *sessionList) {
 }
 
 // This runs in its own goroutine, one per GRPC connection from an agent.
-func (s *agentTunnelServer) AgentEventTunnel(stream tunnel.AgentTunnelService_EventTunnelServer) error {
+func (s *agentTunnelServer) EventTunnel(stream tunnel.AgentTunnelService_EventTunnelServer) error {
 	agentIdentity, err := getAgentNameFromContext(stream.Context())
 	if err != nil {
 		return err
