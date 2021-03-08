@@ -21,6 +21,11 @@ func (h *Hash) String() string {
 	return h.Name + ":" + h.Hash
 }
 
+// Equals will compare one hash to another, returning true if so.
+func (h *Hash) Equals(b *Hash) bool {
+	return h.Name == b.Name && h.Hash == b.Hash
+}
+
 //
 // HashFile will generate a cryptographic hash of the given file, and
 // return a struct that contains the algorithm used, and the hash

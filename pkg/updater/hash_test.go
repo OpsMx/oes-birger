@@ -18,3 +18,27 @@ func TestHash(t *testing.T) {
 		t.Fatalf("Hash is not correct")
 	}
 }
+
+func TestEqualsActuallyEqual(t *testing.T) {
+	h1 := &Hash{Name: "foo", Hash: "bar"}
+	h2 := &Hash{Name: "foo", Hash: "bar"}
+	if !h1.Equals(h2) {
+		t.Fatalf("Expected %s to equal %s", h1, h2)
+	}
+}
+
+func TestEqualsNameDiffers(t *testing.T) {
+	h1 := &Hash{Name: "foo", Hash: "bar"}
+	h2 := &Hash{Name: "xxx", Hash: "bar"}
+	if h1.Equals(h2) {
+		t.Fatalf("Expected %s to not equal %s", h1, h2)
+	}
+}
+
+func TestEqualsHashDiffers(t *testing.T) {
+	h1 := &Hash{Name: "foo", Hash: "bar"}
+	h2 := &Hash{Name: "foo", Hash: "xxx"}
+	if h1.Equals(h2) {
+		t.Fatalf("Expected %s to not equal %s", h1, h2)
+	}
+}
