@@ -109,6 +109,7 @@ message AgentHello {
     repeated string protocols = 1;
     repeated string kubernetesNamespaces = 2;
     repeated string commandNames = 3;
+    int32 protocolVersion = 4;
 }
 
 // Messages sent from server to agent

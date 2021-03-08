@@ -50,6 +50,7 @@ func runTunnel(sa *serverContext, client tunnel.TunnelServiceClient, ticker chan
 				Protocols:            []string{"kubernetes", "command"},
 				CommandNames:         []string{},
 				KubernetesNamespaces: config.Namespaces,
+				ProtocolVersion:      tunnel.CurrentProtocolVersion,
 			},
 		},
 	}

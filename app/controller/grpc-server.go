@@ -20,11 +20,10 @@ type tunnelServer struct {
 }
 
 func newServer() *tunnelServer {
-	s := &tunnelServer{}
-	return s
+	return &tunnelServer{}
 }
 
-func sendWebhook(state *agentState, namespaces []string) {
+func sendWebhook(state *agentState, namespaces []string, commandNames []string) {
 	if hook == nil {
 		return
 	}
@@ -33,6 +32,7 @@ func sendWebhook(state *agentState, namespaces []string) {
 		Protocols:            []string{state.ep.protocol},
 		Session:              state.session,
 		KubernetesNamespaces: namespaces,
+		CommandNames:         commandNames,
 	}
 	hook.Send(req)
 }
@@ -78,7 +78,7 @@ func handleHTTPRequests(session string, httpRequestChan chan *httpMessage, httpi
 	log.Printf("Request channel closed for %s", session)
 }
 
-func handleHTTPAgentResponse(session string, identity string, cancelChan chan *cancelRequest, httpids *sessionList, stream tunnel.TunnelService_AgentEventTunnelServer) {
+func handleHTTPCancelRequest(session string, identity string, cancelChan chan *cancelRequest, httpids *sessionList, stream tunnel.TunnelService_AgentEventTunnelServer) {
 	for request := range cancelChan {
 		removeHTTPId(httpids, request.id)
 		resp := &tunnel.SAEventWrapper{
@@ -126,7 +126,7 @@ func (s *tunnelServer) EventTunnel(stream tunnel.TunnelService_AgentEventTunnelS
 
 	go handleHTTPRequests(sessionIdentity, inHTTPRequest, httpids, stream)
 
-	go handleHTTPAgentResponse(sessionIdentity, agentIdentity, inCancelRequest, httpids, stream)
+	go handleHTTPCancelRequest(sessionIdentity, agentIdentity, inCancelRequest, httpids, stream)
 
 	for {
 		in, err := stream.Recv()
@@ -154,9 +154,12 @@ func (s *tunnelServer) EventTunnel(stream tunnel.TunnelService_AgentEventTunnelS
 			}
 		case *tunnel.ASEventWrapper_AgentHello:
 			req := in.GetAgentHello()
+			if req.ProtocolVersion != tunnel.CurrentProtocolVersion {
+				return fmt.Errorf("Agent protocol version %d is older than %d", req.ProtocolVersion, tunnel.CurrentProtocolVersion)
+			}
 			state.ep.protocol = req.Protocols[0] // TODO: handle multiple protocols
 			agents.AddAgent(state)
-			sendWebhook(state, req.KubernetesNamespaces)
+			sendWebhook(state, req.KubernetesNamespaces, req.CommandNames)
 		case *tunnel.ASEventWrapper_HttpResponse:
 			resp := in.GetHttpResponse()
 			atomic.StoreUint64(&state.lastUse, tunnel.Now())

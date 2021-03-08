@@ -15,6 +15,7 @@ type AgentConnectionNotification struct {
 	Protocols            []string `json:"protocols,omitempty"`
 	Session              string   `json:"session,omitempty"`
 	KubernetesNamespaces []string `json:"namespaces,omitempty"`
+	CommandNames         []string `json:"commandNames,omitEmpty"`
 }
 
 //
