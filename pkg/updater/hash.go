@@ -1,16 +1,24 @@
 package updater
 
 import (
-	"crypto"
-	_ "crypto/sha512" // Needed to explicitly load sha512.
+	"encoding/base64"
 	"io"
 	"os"
+
+	"golang.org/x/crypto/sha3"
 )
 
 // Hash holds the name of the altorithm used and the hash bytes.
 type Hash struct {
+	// Name is the algorithm used.
 	Name string `json:"name,omitempty"`
-	Hash []byte `json:"hash,omitempty"`
+
+	// Hash is a base64 encoded string with padding
+	Hash string `json:"hash,omitempty"`
+}
+
+func (h *Hash) String() string {
+	return h.Name + ":" + h.Hash
 }
 
 //
@@ -30,9 +38,9 @@ func HashFile(filename string) (*Hash, error) {
 // HashReader will take an io.Reader, and completely consume
 // the contents, returning the hashed value.
 func HashReader(reader io.Reader) (*Hash, error) {
-	hasher := crypto.SHA512.New()
+	hasher := sha3.New512()
 	hash := &Hash{
-		Name: "sha512",
+		Name: "sha3-512",
 	}
 
 	if _, err := io.Copy(hasher, reader); err != nil {
@@ -40,6 +48,6 @@ func HashReader(reader io.Reader) (*Hash, error) {
 	}
 
 	h := hasher.Sum(nil)
-	hash.Hash = h
+	hash.Hash = base64.StdEncoding.EncodeToString(h)
 	return hash, nil
 }
