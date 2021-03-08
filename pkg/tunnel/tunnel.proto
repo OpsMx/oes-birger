@@ -55,7 +55,7 @@ message CommandRequest {
     string target = 2;
     string name = 3;
     repeated string arguments = 4;
-    map<string, string> environment = 5;
+    repeated string environment = 5;
 }
 
 message CommandData {
@@ -68,6 +68,7 @@ message CommandData {
         STDERR = 2;
     }
     Channel channel = 4;
+    bool Closed = 5;
 }
 
 message CommandTermination {

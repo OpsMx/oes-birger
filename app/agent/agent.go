@@ -73,7 +73,7 @@ func runTunnel(sa *serverContext, client tunnel.TunnelServiceClient, ticker chan
 		}
 	}()
 
-	// Handle HTTP fetch responses
+	// Handle data flowing back to the controller
 	go func() {
 		for ew := range dataflow {
 			if err = stream.Send(ew); err != nil {

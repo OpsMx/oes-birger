@@ -12,27 +12,33 @@ import (
 	"golang.org/x/net/context"
 )
 
-func outputSender(id int, c chan *outputMessage, in io.Reader) {
+func outputSender(channel tunnel.CommandData_Channel, c chan *outputMessage, in io.Reader) {
 	buffer := make([]byte, 10240)
 	for {
 		n, err := in.Read(buffer)
 		if n > 0 {
-			c <- &outputMessage{id: id, value: string(buffer[:n]), closed: false}
+			c <- &outputMessage{channel: channel, value: buffer[:n], closed: false}
 		}
 		if err == io.EOF {
-			c <- &outputMessage{id: id, value: "", closed: true}
+			c <- &outputMessage{channel: channel, value: emptyBytes, closed: true}
 		}
 		if err != nil {
 			log.Printf("Got %v in read", err)
-			c <- &outputMessage{id: id, value: "", closed: true}
+			c <- &outputMessage{channel: channel, value: emptyBytes, closed: true}
 		}
 	}
 }
 
+const (
+	cmdStdin  = 0
+	cmdStdout = 1
+	cmdStderr = 2
+)
+
 type outputMessage struct {
-	id     int
-	value  string
-	closed bool
+	channel tunnel.CommandData_Channel
+	value   []byte
+	closed  bool
 }
 
 func makeCommandFailed(req *tunnel.CommandRequest, err error, message string) *tunnel.ASEventWrapper {
@@ -66,13 +72,7 @@ func makeCommandTermination(req *tunnel.CommandRequest, exitstatus int) *tunnel.
 	}
 }
 
-func makeCommandData(req *tunnel.CommandRequest, data []byte, source int) *tunnel.ASEventWrapper {
-	var channel tunnel.CommandData_Channel
-	if source == 1 {
-		channel = tunnel.CommandData_STDOUT
-	} else {
-		channel = tunnel.CommandData_STDERR
-	}
+func makeCommandData(req *tunnel.CommandRequest, channel tunnel.CommandData_Channel, data []byte) *tunnel.ASEventWrapper {
 	return &tunnel.ASEventWrapper{
 		Event: &tunnel.ASEventWrapper_CommandData{
 			CommandData: &tunnel.CommandData{
@@ -85,12 +85,30 @@ func makeCommandData(req *tunnel.CommandRequest, data []byte, source int) *tunne
 	}
 }
 
+func makeCommandDataClosed(req *tunnel.CommandRequest, channel tunnel.CommandData_Channel) *tunnel.ASEventWrapper {
+	return &tunnel.ASEventWrapper{
+		Event: &tunnel.ASEventWrapper_CommandData{
+			CommandData: &tunnel.CommandData{
+				Id:      req.Id,
+				Target:  req.Target,
+				Channel: channel,
+				Closed:  true,
+			},
+		},
+	}
+}
+
 func runCommand(dataflow chan *tunnel.ASEventWrapper, req *tunnel.CommandRequest) {
 	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	registerCancelFunction(req.Id, cancel)
+	defer unregisterCancelFunction(req.Id)
+
+	// aggregation channel, for stdout and stderr to be send through.
 	agg := make(chan *outputMessage)
 
 	cmd := exec.CommandContext(ctx, os.Args[1], os.Args[2:]...)
+
+	cmd.Env = req.Environment
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
@@ -104,8 +122,8 @@ func runCommand(dataflow chan *tunnel.ASEventWrapper, req *tunnel.CommandRequest
 		return
 	}
 
-	go outputSender(1, agg, stdout)
-	go outputSender(2, agg, stderr)
+	go outputSender(cmdStdout, agg, stdout)
+	go outputSender(cmdStderr, agg, stderr)
 
 	err = cmd.Start()
 	if err != nil {
@@ -118,13 +136,14 @@ func runCommand(dataflow chan *tunnel.ASEventWrapper, req *tunnel.CommandRequest
 	activeCount := 2
 	for msg := range agg {
 		if msg.closed {
-			log.Printf("Channel %d closed", msg.id)
+			log.Printf("Channel %d closed", msg.channel)
+			dataflow <- makeCommandDataClosed(req, msg.channel)
 			activeCount--
 			if activeCount == 0 {
 				break
 			}
 		} else {
-			log.Printf("channel %d sent %s", msg.id, msg.value)
+			dataflow <- makeCommandData(req, msg.channel, msg.value)
 		}
 	}
 
