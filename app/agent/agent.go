@@ -114,7 +114,7 @@ func runTunnel(sa *serverContext, client tunnel.TunnelServiceClient, ticker chan
 				case "bash":
 					go runCommand(dataflow, req)
 				default:
-					dataflow <- makeCommandFailed(req)
+					dataflow <- makeCommandFailed(req, nil, "Agent: Unknown command")
 				}
 			case nil:
 				continue

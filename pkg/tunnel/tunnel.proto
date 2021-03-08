@@ -61,7 +61,7 @@ message CommandRequest {
 message CommandData {
     string id = 1;
     string target = 2;
-    string body = 3;
+    bytes body = 3;
     enum Channel {
         STDIN = 0;
         STDOUT = 1;
@@ -74,6 +74,7 @@ message CommandTermination {
     string id = 1;
     string target = 2;
     int32 exitCode = 3;
+    string message = 4;
 }
 
 message AgentHello {
