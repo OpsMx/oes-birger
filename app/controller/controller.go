@@ -293,7 +293,7 @@ func main() {
 	//
 	// Run the GRPC server itself
 	//
-	go runGRPCServer(*serverCert)
+	go runAgentGRPCServer(*serverCert)
 
 	//
 	// Run Prometheus HTTP server (never returns)

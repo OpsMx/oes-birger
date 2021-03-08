@@ -102,7 +102,7 @@ func closeAllHTTP(httpids *sessionList) {
 }
 
 // This runs in its own goroutine, one per GRPC connection from an agent.
-func (s *tunnelServer) EventTunnel(stream tunnel.TunnelService_AgentEventTunnelServer) error {
+func (s *tunnelServer) AgentEventTunnel(stream tunnel.TunnelService_AgentEventTunnelServer) error {
 	agentIdentity, err := getAgentNameFromContext(stream.Context())
 	if err != nil {
 		return err
@@ -196,11 +196,11 @@ func (s *tunnelServer) EventTunnel(stream tunnel.TunnelService_AgentEventTunnelS
 	}
 }
 
-func runGRPCServer(serverCert tls.Certificate) {
+func runAgentGRPCServer(serverCert tls.Certificate) {
 	//
 	// Set up GRPC server
 	//
-	log.Printf("Starting GRPC server on port %d...", config.AgentPort)
+	log.Printf("Starting Agent GRPC server on port %d...", config.AgentPort)
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", config.AgentPort))
 	if err != nil {
 		log.Fatalf("Failed to listen: %v", err)
@@ -219,6 +219,6 @@ func runGRPCServer(serverCert tls.Certificate) {
 	grpcServer := grpc.NewServer(grpc.Creds(creds))
 	tunnel.RegisterTunnelServiceServer(grpcServer, newServer())
 	if err := grpcServer.Serve(lis); err != nil {
-		log.Fatalf("Failed to start GRPC server: %v", err)
+		log.Fatalf("Failed to start Agent GRPC server: %v", err)
 	}
 }
