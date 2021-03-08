@@ -14,9 +14,9 @@ func makeHeaders(headers map[string][]string) []*tunnel.HttpHeader {
 	return ret
 }
 
-func makeChunkedResponse(id string, target string, data []byte) *tunnel.ASEventWrapper {
-	return &tunnel.ASEventWrapper{
-		Event: &tunnel.ASEventWrapper_HttpChunkedResponse{
+func makeChunkedResponse(id string, target string, data []byte) *tunnel.AgentToControllerWrapper {
+	return &tunnel.AgentToControllerWrapper{
+		Event: &tunnel.AgentToControllerWrapper_HttpChunkedResponse{
 			HttpChunkedResponse: &tunnel.HttpChunkedResponse{
 				Id:     id,
 				Target: target,
@@ -26,9 +26,9 @@ func makeChunkedResponse(id string, target string, data []byte) *tunnel.ASEventW
 	}
 }
 
-func makeBadGatewayResponse(id string, target string) *tunnel.ASEventWrapper {
-	return &tunnel.ASEventWrapper{
-		Event: &tunnel.ASEventWrapper_HttpResponse{
+func makeBadGatewayResponse(id string, target string) *tunnel.AgentToControllerWrapper {
+	return &tunnel.AgentToControllerWrapper{
+		Event: &tunnel.AgentToControllerWrapper_HttpResponse{
 			HttpResponse: &tunnel.HttpResponse{
 				Id:            id,
 				Target:        target,
@@ -39,9 +39,9 @@ func makeBadGatewayResponse(id string, target string) *tunnel.ASEventWrapper {
 	}
 }
 
-func makeResponse(id string, target string, response *http.Response) *tunnel.ASEventWrapper {
-	return &tunnel.ASEventWrapper{
-		Event: &tunnel.ASEventWrapper_HttpResponse{
+func makeResponse(id string, target string, response *http.Response) *tunnel.AgentToControllerWrapper {
+	return &tunnel.AgentToControllerWrapper{
+		Event: &tunnel.AgentToControllerWrapper_HttpResponse{
 			HttpResponse: &tunnel.HttpResponse{
 				Id:            id,
 				Target:        target,

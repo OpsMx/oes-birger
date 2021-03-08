@@ -113,7 +113,7 @@ message AgentHello {
 }
 
 // Messages sent from server to agent
-message SAEventWrapper {
+message ControllerToAgentWrapper {
     oneof event {
         PingResponse pingResponse = 1;
         HttpRequest httpRequest = 2;
@@ -124,7 +124,7 @@ message SAEventWrapper {
 }
 
 // Messages sent from agent to server
-message ASEventWrapper {
+message AgentToControllerWrapper {
     oneof event {
         PingRequest pingRequest = 1;
         HttpResponse httpResponse = 2;
@@ -136,7 +136,7 @@ message ASEventWrapper {
 }
 
 // Messages sent from command-tool to controller
-message CmdToolToControllerEventWrapper {
+message CmdToolToControllerWrapper {
     oneof event {
         CmdToolCommandRequest commandRequest = 1;
         CmdToolCommandData commandData = 2;
@@ -144,7 +144,7 @@ message CmdToolToControllerEventWrapper {
 }
 
 // Messages sent from the controller to the command-tool
-message ControllerToCmdToolEventWrapper {
+message ControllerToCmdToolWrapper {
     oneof event {
         CmdToolCommandTermination commandTermination = 1;
         CmdToolCommandData commandData = 2;
@@ -156,9 +156,9 @@ message ControllerToCmdToolEventWrapper {
 //
 
 service AgentTunnelService {
-    rpc EventTunnel(stream ASEventWrapper) returns (stream SAEventWrapper) {}
+    rpc EventTunnel(stream AgentToControllerWrapper) returns (stream ControllerToAgentWrapper) {}
 }
 
 service CmdToolTunnelService {
-    rpc EventTunnel(stream CmdToolToControllerEventWrapper) returns (stream ControllerToCmdToolEventWrapper) {}
+    rpc EventTunnel(stream CmdToolToControllerWrapper) returns (stream ControllerToCmdToolWrapper) {}
 }

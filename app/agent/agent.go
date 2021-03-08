@@ -44,8 +44,8 @@ func runTunnel(sa *serverContext, client tunnel.AgentTunnelServiceClient, ticker
 	if err != nil {
 		log.Fatalf("%v.EventTunnel(_) = _, %v", client, err)
 	}
-	hello := &tunnel.ASEventWrapper{
-		Event: &tunnel.ASEventWrapper_AgentHello{
+	hello := &tunnel.AgentToControllerWrapper{
+		Event: &tunnel.AgentToControllerWrapper_AgentHello{
 			AgentHello: &tunnel.AgentHello{
 				Protocols:            []string{"kubernetes", "command"},
 				CommandNames:         []string{},
@@ -58,13 +58,13 @@ func runTunnel(sa *serverContext, client tunnel.AgentTunnelServiceClient, ticker
 		log.Fatalf("Unable to send hello packet: %v", err)
 	}
 
-	dataflow := make(chan *tunnel.ASEventWrapper, 20)
+	dataflow := make(chan *tunnel.AgentToControllerWrapper, 20)
 
 	// Handle periodic pings from the ticker.
 	go func() {
 		for ts := range ticker {
-			req := &tunnel.ASEventWrapper{
-				Event: &tunnel.ASEventWrapper_PingRequest{
+			req := &tunnel.AgentToControllerWrapper{
+				Event: &tunnel.AgentToControllerWrapper_PingRequest{
 					PingRequest: &tunnel.PingRequest{Ts: ts},
 				},
 			}
@@ -96,12 +96,12 @@ func runTunnel(sa *serverContext, client tunnel.AgentTunnelServiceClient, ticker
 				log.Fatalf("Failed to receive a message: %T: %v", err, err)
 			}
 			switch x := in.Event.(type) {
-			case *tunnel.SAEventWrapper_PingResponse:
+			case *tunnel.ControllerToAgentWrapper_PingResponse:
 				continue
-			case *tunnel.SAEventWrapper_CancelRequest:
+			case *tunnel.ControllerToAgentWrapper_CancelRequest:
 				req := in.GetCancelRequest()
 				callCancelFunction(req.Id)
-			case *tunnel.SAEventWrapper_HttpRequest:
+			case *tunnel.ControllerToAgentWrapper_HttpRequest:
 				req := in.GetHttpRequest()
 				if req.Protocol == "kubernetes" {
 					go executeKubernetesRequest(dataflow, makeServerContextFields(sa), req)
@@ -109,7 +109,7 @@ func runTunnel(sa *serverContext, client tunnel.AgentTunnelServiceClient, ticker
 					log.Printf("Request for unsupported HTTP tunnel: %s", req.Protocol)
 					dataflow <- makeBadGatewayResponse(req.Id, req.Target)
 				}
-			case *tunnel.SAEventWrapper_CommandRequest:
+			case *tunnel.ControllerToAgentWrapper_CommandRequest:
 				req := in.GetCommandRequest()
 				switch req.Name {
 				case "bash":

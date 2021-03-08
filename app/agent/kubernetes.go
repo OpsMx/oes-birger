@@ -13,7 +13,7 @@ import (
 	"golang.org/x/net/context"
 )
 
-func executeKubernetesRequest(dataflow chan *tunnel.ASEventWrapper, c *serverContextFields, req *tunnel.HttpRequest) {
+func executeKubernetesRequest(dataflow chan *tunnel.AgentToControllerWrapper, c *serverContextFields, req *tunnel.HttpRequest) {
 	// TODO: A ServerCA is technically optional, but we might want to fail if it's not present...
 	log.Printf("Running request %v", req)
 	tlsConfig := &tls.Config{

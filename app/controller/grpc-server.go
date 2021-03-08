@@ -45,9 +45,9 @@ func sendWebhook(state *agentState, namespaces []string, commandNames []string) 
 	hook.Send(req)
 }
 
-func makePingResponse(req *tunnel.PingRequest) *tunnel.SAEventWrapper {
-	resp := &tunnel.SAEventWrapper{
-		Event: &tunnel.SAEventWrapper_PingResponse{
+func makePingResponse(req *tunnel.PingRequest) *tunnel.ControllerToAgentWrapper {
+	resp := &tunnel.ControllerToAgentWrapper{
+		Event: &tunnel.ControllerToAgentWrapper_PingResponse{
 			PingResponse: &tunnel.PingResponse{Ts: tunnel.Now(), EchoedTs: req.Ts},
 		},
 	}
@@ -56,7 +56,7 @@ func makePingResponse(req *tunnel.PingRequest) *tunnel.SAEventWrapper {
 
 type sessionList struct {
 	sync.RWMutex
-	m map[string]chan *tunnel.ASEventWrapper
+	m map[string]chan *tunnel.AgentToControllerWrapper
 }
 
 func removeHTTPId(httpids *sessionList, id string) {
@@ -65,7 +65,7 @@ func removeHTTPId(httpids *sessionList, id string) {
 	delete(httpids.m, id)
 }
 
-func addHTTPId(httpids *sessionList, id string, c chan *tunnel.ASEventWrapper) {
+func addHTTPId(httpids *sessionList, id string, c chan *tunnel.AgentToControllerWrapper) {
 	httpids.Lock()
 	defer httpids.Unlock()
 	httpids.m[id] = c
@@ -74,8 +74,8 @@ func addHTTPId(httpids *sessionList, id string, c chan *tunnel.ASEventWrapper) {
 func handleHTTPRequests(session string, httpRequestChan chan *httpMessage, httpids *sessionList, stream tunnel.AgentTunnelService_EventTunnelServer) {
 	for request := range httpRequestChan {
 		addHTTPId(httpids, request.cmd.Id, request.out)
-		resp := &tunnel.SAEventWrapper{
-			Event: &tunnel.SAEventWrapper_HttpRequest{
+		resp := &tunnel.ControllerToAgentWrapper{
+			Event: &tunnel.ControllerToAgentWrapper_HttpRequest{
 				HttpRequest: request.cmd,
 			},
 		}
@@ -89,8 +89,8 @@ func handleHTTPRequests(session string, httpRequestChan chan *httpMessage, httpi
 func handleHTTPCancelRequest(session string, identity string, cancelChan chan *cancelRequest, httpids *sessionList, stream tunnel.AgentTunnelService_EventTunnelServer) {
 	for request := range cancelChan {
 		removeHTTPId(httpids, request.id)
-		resp := &tunnel.SAEventWrapper{
-			Event: &tunnel.SAEventWrapper_CancelRequest{
+		resp := &tunnel.ControllerToAgentWrapper{
+			Event: &tunnel.ControllerToAgentWrapper_CancelRequest{
 				CancelRequest: &tunnel.CancelRequest{Id: request.id, Target: identity},
 			},
 		}
@@ -120,7 +120,7 @@ func (s *agentTunnelServer) AgentEventTunnel(stream tunnel.AgentTunnelService_Ev
 
 	inHTTPRequest := make(chan *httpMessage, 1)
 	inCancelRequest := make(chan *cancelRequest, 1)
-	httpids := &sessionList{m: make(map[string]chan *tunnel.ASEventWrapper)}
+	httpids := &sessionList{m: make(map[string]chan *tunnel.AgentToControllerWrapper)}
 
 	state := &agentState{
 		ep:              endpoint{name: agentIdentity, protocol: "UNKNOWN"},
@@ -152,7 +152,7 @@ func (s *agentTunnelServer) AgentEventTunnel(stream tunnel.AgentTunnelService_Ev
 		}
 
 		switch x := in.Event.(type) {
-		case *tunnel.ASEventWrapper_PingRequest:
+		case *tunnel.AgentToControllerWrapper_PingRequest:
 			req := in.GetPingRequest()
 			atomic.StoreUint64(&state.lastPing, tunnel.Now())
 			if err := stream.Send(makePingResponse(req)); err != nil {
@@ -160,7 +160,7 @@ func (s *agentTunnelServer) AgentEventTunnel(stream tunnel.AgentTunnelService_Ev
 				agents.RemoveAgent(state)
 				return err
 			}
-		case *tunnel.ASEventWrapper_AgentHello:
+		case *tunnel.AgentToControllerWrapper_AgentHello:
 			req := in.GetAgentHello()
 			if req.ProtocolVersion != tunnel.CurrentProtocolVersion {
 				return fmt.Errorf("Agent protocol version %d is older than %d", req.ProtocolVersion, tunnel.CurrentProtocolVersion)
@@ -168,7 +168,7 @@ func (s *agentTunnelServer) AgentEventTunnel(stream tunnel.AgentTunnelService_Ev
 			state.ep.protocol = req.Protocols[0] // TODO: handle multiple protocols
 			agents.AddAgent(state)
 			sendWebhook(state, req.KubernetesNamespaces, req.CommandNames)
-		case *tunnel.ASEventWrapper_HttpResponse:
+		case *tunnel.AgentToControllerWrapper_HttpResponse:
 			resp := in.GetHttpResponse()
 			atomic.StoreUint64(&state.lastUse, tunnel.Now())
 			httpids.Lock()
@@ -182,7 +182,7 @@ func (s *agentTunnelServer) AgentEventTunnel(stream tunnel.AgentTunnelService_Ev
 				log.Printf("Got response to unknown HTTP request id %s from %s", resp.Id, agentIdentity)
 			}
 			httpids.Unlock()
-		case *tunnel.ASEventWrapper_HttpChunkedResponse:
+		case *tunnel.AgentToControllerWrapper_HttpChunkedResponse:
 			resp := in.GetHttpChunkedResponse()
 			atomic.StoreUint64(&state.lastUse, tunnel.Now())
 			httpids.Lock()

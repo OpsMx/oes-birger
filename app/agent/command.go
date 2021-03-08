@@ -38,15 +38,15 @@ type outputMessage struct {
 	closed  bool
 }
 
-func makeCommandFailed(req *tunnel.CommandRequest, err error, message string) *tunnel.ASEventWrapper {
+func makeCommandFailed(req *tunnel.CommandRequest, err error, message string) *tunnel.AgentToControllerWrapper {
 	var msg string
 	if err != nil {
 		msg = fmt.Sprintf("%s: %v", message, err)
 	} else {
 		msg = message
 	}
-	return &tunnel.ASEventWrapper{
-		Event: &tunnel.ASEventWrapper_CommandTermination{
+	return &tunnel.AgentToControllerWrapper{
+		Event: &tunnel.AgentToControllerWrapper_CommandTermination{
 			CommandTermination: &tunnel.CommandTermination{
 				Id:       req.Id,
 				Target:   req.Target,
@@ -57,9 +57,9 @@ func makeCommandFailed(req *tunnel.CommandRequest, err error, message string) *t
 	}
 }
 
-func makeCommandTermination(req *tunnel.CommandRequest, exitstatus int) *tunnel.ASEventWrapper {
-	return &tunnel.ASEventWrapper{
-		Event: &tunnel.ASEventWrapper_CommandTermination{
+func makeCommandTermination(req *tunnel.CommandRequest, exitstatus int) *tunnel.AgentToControllerWrapper {
+	return &tunnel.AgentToControllerWrapper{
+		Event: &tunnel.AgentToControllerWrapper_CommandTermination{
 			CommandTermination: &tunnel.CommandTermination{
 				Id:       req.Id,
 				Target:   req.Target,
@@ -69,9 +69,9 @@ func makeCommandTermination(req *tunnel.CommandRequest, exitstatus int) *tunnel.
 	}
 }
 
-func makeCommandData(req *tunnel.CommandRequest, channel tunnel.ChannelDirection, data []byte) *tunnel.ASEventWrapper {
-	return &tunnel.ASEventWrapper{
-		Event: &tunnel.ASEventWrapper_CommandData{
+func makeCommandData(req *tunnel.CommandRequest, channel tunnel.ChannelDirection, data []byte) *tunnel.AgentToControllerWrapper {
+	return &tunnel.AgentToControllerWrapper{
+		Event: &tunnel.AgentToControllerWrapper_CommandData{
 			CommandData: &tunnel.CommandData{
 				Id:      req.Id,
 				Target:  req.Target,
@@ -82,9 +82,9 @@ func makeCommandData(req *tunnel.CommandRequest, channel tunnel.ChannelDirection
 	}
 }
 
-func makeCommandDataClosed(req *tunnel.CommandRequest, channel tunnel.ChannelDirection) *tunnel.ASEventWrapper {
-	return &tunnel.ASEventWrapper{
-		Event: &tunnel.ASEventWrapper_CommandData{
+func makeCommandDataClosed(req *tunnel.CommandRequest, channel tunnel.ChannelDirection) *tunnel.AgentToControllerWrapper {
+	return &tunnel.AgentToControllerWrapper{
+		Event: &tunnel.AgentToControllerWrapper_CommandData{
 			CommandData: &tunnel.CommandData{
 				Id:      req.Id,
 				Target:  req.Target,
@@ -95,7 +95,7 @@ func makeCommandDataClosed(req *tunnel.CommandRequest, channel tunnel.ChannelDir
 	}
 }
 
-func runCommand(dataflow chan *tunnel.ASEventWrapper, req *tunnel.CommandRequest) {
+func runCommand(dataflow chan *tunnel.AgentToControllerWrapper, req *tunnel.CommandRequest) {
 	ctx, cancel := context.WithCancel(context.Background())
 	registerCancelFunction(req.Id, cancel)
 	defer unregisterCancelFunction(req.Id)

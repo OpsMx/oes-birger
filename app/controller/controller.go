@@ -123,7 +123,7 @@ func kubernetesAPIHandler(w http.ResponseWriter, r *http.Request) {
 		Headers:  makeHeaders(r.Header),
 		Body:     body,
 	}
-	message := &httpMessage{out: make(chan *tunnel.ASEventWrapper), cmd: req}
+	message := &httpMessage{out: make(chan *tunnel.AgentToControllerWrapper), cmd: req}
 	found := agents.SendToAgent(ep, message)
 	if !found {
 		w.WriteHeader(http.StatusBadGateway)
@@ -154,7 +154,7 @@ func kubernetesAPIHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		switch x := in.Event.(type) {
-		case *tunnel.ASEventWrapper_HttpResponse:
+		case *tunnel.AgentToControllerWrapper_HttpResponse:
 			resp := in.GetHttpResponse()
 			seenHeader = true
 			isChunked = resp.ContentLength < 0
@@ -171,7 +171,7 @@ func kubernetesAPIHandler(w http.ResponseWriter, r *http.Request) {
 				cleanClose = true
 				return
 			}
-		case *tunnel.ASEventWrapper_HttpChunkedResponse:
+		case *tunnel.AgentToControllerWrapper_HttpChunkedResponse:
 			resp := in.GetHttpChunkedResponse()
 			if !seenHeader {
 				log.Printf("Error: got ChunkedResponse before HttpResponse")

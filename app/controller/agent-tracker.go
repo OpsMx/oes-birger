@@ -42,7 +42,7 @@ type Agents struct {
 }
 
 type httpMessage struct {
-	out chan *tunnel.ASEventWrapper
+	out chan *tunnel.AgentToControllerWrapper
 	cmd *tunnel.HttpRequest
 }
 
