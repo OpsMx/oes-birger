@@ -29,7 +29,7 @@ import (
 var (
 	configFile = flag.String("configFile", "/app/config/config.yaml", "The file with the controller config")
 
-	agents *Agents = MakeAgents()
+	agents *AgentList = MakeAgents()
 
 	config *ControllerConfig
 

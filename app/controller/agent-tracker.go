@@ -34,9 +34,9 @@ type Agent interface {
 }
 
 //
-// Agents holds a list of all currently known agents
+// AgentList holds a list of all currently known agents
 //
-type Agents struct {
+type AgentList struct {
 	sync.RWMutex
 	m map[endpoint][]Agent
 }
@@ -78,7 +78,7 @@ type DirectlyConnectedAgentStatistics struct {
 // The statistics returned is an opaque object, intended to be rendered to JSON or some
 // other output format using a system that uses introspection.
 //
-func (s *Agents) GetStatistics() interface{} {
+func (s *AgentList) GetStatistics() interface{} {
 	ret := make([]interface{}, 0)
 	s.RLock()
 	defer s.RUnlock()
@@ -123,8 +123,8 @@ type endpoint struct {
 // MakeAgents returns a new agent object which will manage (safely) agents
 // connected directly or indirectly.
 //
-func MakeAgents() *Agents {
-	return &Agents{
+func MakeAgents() *AgentList {
+	return &AgentList{
 		m: make(map[endpoint][]Agent),
 	}
 }
@@ -141,7 +141,7 @@ func sliceIndex(limit int, predicate func(i int) bool) int {
 //
 // AddAgent will add a bew agent to our list.
 //
-func (s *Agents) AddAgent(state *agentState) {
+func (s *AgentList) AddAgent(state *agentState) {
 	s.Lock()
 	defer s.Unlock()
 	agentList, ok := s.m[state.ep]
@@ -157,7 +157,7 @@ func (s *Agents) AddAgent(state *agentState) {
 //
 // RemoveAgent will remove an agent and signal to it that closing down is started.
 //
-func (s *Agents) RemoveAgent(state *agentState) {
+func (s *AgentList) RemoveAgent(state *agentState) {
 	s.Lock()
 	defer s.Unlock()
 	agentList, ok := s.m[state.ep]
@@ -187,7 +187,7 @@ func (s *Agents) RemoveAgent(state *agentState) {
 // SendToAgent will send a new httpMessage to an agent, and return true if an agent
 // was found.
 //
-func (s *Agents) SendToAgent(ep endpoint, message *httpMessage) bool {
+func (s *AgentList) SendToAgent(ep endpoint, message *httpMessage) bool {
 	s.RLock()
 	defer s.RUnlock()
 	agentList, ok := s.m[ep]
@@ -203,7 +203,7 @@ func (s *Agents) SendToAgent(ep endpoint, message *httpMessage) bool {
 //
 // CancelRequest will cancel an ongoing request.
 //
-func (s *Agents) CancelRequest(ep endpoint, message *cancelRequest) bool {
+func (s *AgentList) CancelRequest(ep endpoint, message *cancelRequest) bool {
 	s.RLock()
 	defer s.RUnlock()
 	agentList, ok := s.m[ep]
