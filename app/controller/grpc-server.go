@@ -15,22 +15,6 @@ import (
 	"google.golang.org/grpc/credentials"
 )
 
-type agentTunnelServer struct {
-	tunnel.UnimplementedAgentTunnelServiceServer
-}
-
-func newAgentServer() *agentTunnelServer {
-	return &agentTunnelServer{}
-}
-
-type cmdToolTunnelServer struct {
-	tunnel.UnimplementedCmdToolTunnelServiceServer
-}
-
-func newCmdToolServer() *cmdToolTunnelServer {
-	return &cmdToolTunnelServer{}
-}
-
 func sendWebhook(state *agentState, namespaces []string, commandNames []string) {
 	if hook == nil {
 		return
@@ -204,6 +188,14 @@ func (s *agentTunnelServer) EventTunnel(stream tunnel.AgentTunnelService_EventTu
 	}
 }
 
+type agentTunnelServer struct {
+	tunnel.UnimplementedAgentTunnelServiceServer
+}
+
+func newAgentServer() *agentTunnelServer {
+	return &agentTunnelServer{}
+}
+
 func runAgentGRPCServer(serverCert tls.Certificate) {
 	//
 	// Set up GRPC server
@@ -229,6 +221,18 @@ func runAgentGRPCServer(serverCert tls.Certificate) {
 	if err := grpcServer.Serve(lis); err != nil {
 		log.Fatalf("Failed to start Agent GRPC server: %v", err)
 	}
+}
+
+type cmdToolTunnelServer struct {
+	tunnel.UnimplementedCmdToolTunnelServiceServer
+}
+
+func newCmdToolServer() *cmdToolTunnelServer {
+	return &cmdToolTunnelServer{}
+}
+
+func (s *cmdToolTunnelServer) EventTunnel(stream tunnel.CmdToolTunnelService_EventTunnelServer) error {
+	return fmt.Errorf("Unimplemented")
 }
 
 func runCmdToolGRPCServer(serverCert tls.Certificate) {

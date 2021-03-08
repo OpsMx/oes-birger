@@ -290,6 +290,9 @@ func main() {
 	//
 	go runCommandHTTPServer(*serverCert)
 
+	// Start up a command-tool GRPC server
+	go runCmdToolGRPCServer(*serverCert)
+
 	//
 	// Run the GRPC server itself
 	//
