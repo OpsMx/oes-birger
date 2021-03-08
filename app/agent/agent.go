@@ -38,7 +38,7 @@ var (
 	config *AgentConfig
 )
 
-func runTunnel(sa *serverContext, client tunnel.AgentTunnelServiceClient, ticker chan uint64, identity string) {
+func runTunnel(sa *serverContext, client tunnel.AgentTunnelServiceClient, ticker chan uint64) {
 	ctx := context.Background()
 	stream, err := client.EventTunnel(ctx)
 	if err != nil {
@@ -374,6 +374,6 @@ func main() {
 	runTicker(*tickTime, ticker)
 
 	log.Printf("Starting tunnel.")
-	runTunnel(sa, client, ticker, "skan")
+	runTunnel(sa, client, ticker)
 	log.Printf("Done.")
 }
