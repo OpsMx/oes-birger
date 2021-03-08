@@ -29,7 +29,7 @@ import (
 var (
 	configFile = flag.String("configFile", "/app/config/config.yaml", "The file with the controller config")
 
-	agents *AgentList = MakeAgents()
+	agents *AgentNameList = MakeAgents()
 
 	config *ControllerConfig
 
@@ -45,7 +45,7 @@ var (
 	apiRequestCounter = promauto.NewCounterVec(prometheus.CounterOpts{
 		Name: "controller_api_requests_total",
 		Help: "The total numbe of API requests",
-	}, []string{"agent", "protocol"})
+	}, []string{"agent"})
 )
 
 func firstLabel(name string) string {
@@ -110,20 +110,20 @@ func makeHeaders(headers map[string][]string) []*tunnel.HttpHeader {
 
 func kubernetesAPIHandler(w http.ResponseWriter, r *http.Request) {
 	agentname := firstLabel(r.TLS.PeerCertificates[0].Subject.CommonName)
-	ep := endpoint{protocol: "kubernetes", name: agentname}
-	apiRequestCounter.WithLabelValues(agentname, ep.protocol).Inc()
+	ep := endpoint{protocols: []string{"kubernetes"}, name: agentname}
+	apiRequestCounter.WithLabelValues(agentname).Inc()
 
 	body, _ := ioutil.ReadAll(r.Body)
 	req := &tunnel.HttpRequest{
 		Id:       ulidContext.Ulid(),
 		Target:   agentname,
-		Protocol: ep.protocol,
+		Protocol: "kubernetes",
 		Method:   r.Method,
 		URI:      r.RequestURI,
 		Headers:  makeHeaders(r.Header),
 		Body:     body,
 	}
-	message := &httpMessage{out: make(chan *tunnel.AgentToControllerWrapper), cmd: req}
+	message := &HTTPMessage{out: make(chan *tunnel.AgentToControllerWrapper), cmd: req}
 	found := agents.SendToAgent(ep, message)
 	if !found {
 		w.WriteHeader(http.StatusBadGateway)

@@ -38,8 +38,14 @@ var (
 	config *AgentConfig
 )
 
-func runTunnel(sa *serverContext, client tunnel.AgentTunnelServiceClient, ticker chan uint64) {
+func runKubernetesTunnel(wg *sync.WaitGroup, sa *serverContext, conn *grpc.ClientConn) {
+	defer wg.Done()
+
+	ticker := time.NewTicker(time.Duration(*tickTime) * time.Second)
+
+	client := tunnel.NewAgentTunnelServiceClient(conn)
 	ctx := context.Background()
+
 	stream, err := client.EventTunnel(ctx)
 	if err != nil {
 		log.Fatalf("%v.EventTunnel(_) = _, %v", client, err)
@@ -47,8 +53,8 @@ func runTunnel(sa *serverContext, client tunnel.AgentTunnelServiceClient, ticker
 	hello := &tunnel.AgentToControllerWrapper{
 		Event: &tunnel.AgentToControllerWrapper_AgentHello{
 			AgentHello: &tunnel.AgentHello{
-				Protocols:            []string{"kubernetes", "command"},
-				CommandNames:         []string{},
+				Protocols:            []string{"kubernetes", "remote-command"},
+				CommandNames:         []string{"bash"},
 				KubernetesNamespaces: config.Namespaces,
 				ProtocolVersion:      tunnel.CurrentProtocolVersion,
 			},
@@ -62,10 +68,10 @@ func runTunnel(sa *serverContext, client tunnel.AgentTunnelServiceClient, ticker
 
 	// Handle periodic pings from the ticker.
 	go func() {
-		for ts := range ticker {
+		for ts := range ticker.C {
 			req := &tunnel.AgentToControllerWrapper{
 				Event: &tunnel.AgentToControllerWrapper_PingRequest{
-					PingRequest: &tunnel.PingRequest{Ts: ts},
+					PingRequest: &tunnel.PingRequest{Ts: uint64(ts.UnixNano())},
 				},
 			}
 			if err = stream.Send(req); err != nil {
@@ -127,17 +133,6 @@ func runTunnel(sa *serverContext, client tunnel.AgentTunnelServiceClient, ticker
 	<-waitc
 	close(dataflow)
 	stream.CloseSend()
-}
-
-func runTicker(tickTime int, ticker chan uint64) {
-	log.Printf("Starting ticker to send pings every %d seconds.", tickTime)
-	go func() {
-		for {
-			time.Sleep(time.Duration(tickTime) * time.Second)
-			ticker <- tunnel.Now()
-		}
-	}()
-
 }
 
 type serverContextFields struct {
@@ -368,12 +363,12 @@ func main() {
 	}
 	defer conn.Close()
 
-	client := tunnel.NewAgentTunnelServiceClient(conn)
+	var wg sync.WaitGroup
 
-	ticker := make(chan uint64)
-	runTicker(*tickTime, ticker)
+	log.Printf("Starting Kubernetes tunnel.")
+	wg.Add(1)
+	go runKubernetesTunnel(&wg, sa, conn)
 
-	log.Printf("Starting tunnel.")
-	runTunnel(sa, client, ticker)
+	wg.Wait()
 	log.Printf("Done.")
 }

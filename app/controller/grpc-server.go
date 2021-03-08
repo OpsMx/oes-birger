@@ -8,6 +8,7 @@ import (
 	"net"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/opsmx/oes-birger/pkg/tunnel"
 	"google.golang.org/grpc"
@@ -28,7 +29,7 @@ func sendWebhook(state *agentState, namespaces []string, commandNames []string) 
 	}
 	req := &agentConnectionNotification{
 		Identity:             state.ep.name,
-		Protocols:            []string{state.ep.protocol},
+		Protocols:            state.ep.protocols,
 		Session:              state.session,
 		KubernetesNamespaces: namespaces,
 		CommandNames:         commandNames,
@@ -39,7 +40,7 @@ func sendWebhook(state *agentState, namespaces []string, commandNames []string) 
 func makePingResponse(req *tunnel.PingRequest) *tunnel.ControllerToAgentWrapper {
 	resp := &tunnel.ControllerToAgentWrapper{
 		Event: &tunnel.ControllerToAgentWrapper_PingResponse{
-			PingResponse: &tunnel.PingResponse{Ts: tunnel.Now(), EchoedTs: req.Ts},
+			PingResponse: &tunnel.PingResponse{Ts: uint64(time.Now().UnixNano()), EchoedTs: req.Ts},
 		},
 	}
 	return resp
@@ -64,9 +65,9 @@ func addHTTPId(httpids *sessionList, id string, c chan *tunnel.AgentToController
 
 func handleHTTPRequests(session string, requestChan chan interface{}, httpids *sessionList, stream tunnel.AgentTunnelService_EventTunnelServer) {
 	for interfacedRequest := range requestChan {
-		request, ok := interfacedRequest.(httpMessage)
+		request, ok := interfacedRequest.(*HTTPMessage)
 		if !ok {
-			log.Printf("Got type other than httpMessage: %T", request)
+			log.Printf("Got type other than HTTPMessage: %T", request)
 			continue
 		}
 		addHTTPId(httpids, request.cmd.Id, request.out)
@@ -119,7 +120,7 @@ func (s *agentTunnelServer) EventTunnel(stream tunnel.AgentTunnelService_EventTu
 	httpids := &sessionList{m: make(map[string]chan *tunnel.AgentToControllerWrapper)}
 
 	state := &agentState{
-		ep:              endpoint{name: agentIdentity, protocol: "UNKNOWN"},
+		ep:              endpoint{name: agentIdentity, protocols: []string{"UNKNOWN"}},
 		session:         sessionIdentity,
 		inRequest:       inRequest,
 		inCancelRequest: inCancelRequest,
@@ -161,7 +162,7 @@ func (s *agentTunnelServer) EventTunnel(stream tunnel.AgentTunnelService_EventTu
 			if req.ProtocolVersion != tunnel.CurrentProtocolVersion {
 				return fmt.Errorf("Agent protocol version %d is older than %d", req.ProtocolVersion, tunnel.CurrentProtocolVersion)
 			}
-			state.ep.protocol = req.Protocols[0] // TODO: handle multiple protocols
+			state.ep.protocols = req.Protocols
 			agents.AddAgent(state)
 			sendWebhook(state, req.KubernetesNamespaces, req.CommandNames)
 		case *tunnel.AgentToControllerWrapper_HttpResponse:
@@ -298,6 +299,6 @@ func runCmdToolGRPCServer(serverCert tls.Certificate) {
 	grpcServer := grpc.NewServer(grpc.Creds(creds))
 	tunnel.RegisterCmdToolTunnelServiceServer(grpcServer, newCmdToolServer())
 	if err := grpcServer.Serve(lis); err != nil {
-		log.Fatalf("Failed to start Agent GRPC server: %v", err)
+		log.Fatalf("Failed to start CmdTool GRPC server: %v", err)
 	}
 }

@@ -14,7 +14,7 @@ var (
 	connectedAgentsGauge = promauto.NewGaugeVec(prometheus.GaugeOpts{
 		Name: "agents_connected",
 		Help: "The currently connected agents",
-	}, []string{"agent", "protocol"})
+	}, []string{"agent"})
 )
 
 //
@@ -34,14 +34,14 @@ type Agent interface {
 }
 
 //
-// AgentList holds a list of all currently known agents
+// AgentNameList holds a list of all currently known agents
 //
-type AgentList struct {
+type AgentNameList struct {
 	sync.RWMutex
-	m map[endpoint][]Agent
+	m map[string][]Agent
 }
 
-type httpMessage struct {
+type HTTPMessage struct {
 	out chan *tunnel.AgentToControllerWrapper
 	cmd *tunnel.HttpRequest
 }
@@ -78,7 +78,7 @@ type DirectlyConnectedAgentStatistics struct {
 // The statistics returned is an opaque object, intended to be rendered to JSON or some
 // other output format using a system that uses introspection.
 //
-func (s *AgentList) GetStatistics() interface{} {
+func (s *AgentNameList) GetStatistics() interface{} {
 	ret := make([]interface{}, 0)
 	s.RLock()
 	defer s.RUnlock()
@@ -111,21 +111,21 @@ func (s *agentState) LastUse() uint64 {
 }
 
 func (s *agentState) String() string {
-	return fmt.Sprintf("(%s, %s, %s)", s.ep.name, s.ep.protocol, s.session)
+	return fmt.Sprintf("(%s, [%v], %s)", s.ep.name, s.ep.protocols, s.session)
 }
 
 type endpoint struct {
-	name     string // The agent name
-	protocol string // "kubernetes" or whatever API we are handling
+	name      string   // The agent name
+	protocols []string // "kubernetes", "remote-command", etc.
 }
 
 //
 // MakeAgents returns a new agent object which will manage (safely) agents
 // connected directly or indirectly.
 //
-func MakeAgents() *AgentList {
-	return &AgentList{
-		m: make(map[endpoint][]Agent),
+func MakeAgents() *AgentNameList {
+	return &AgentNameList{
+		m: make(map[string][]Agent),
 	}
 }
 
@@ -141,28 +141,28 @@ func sliceIndex(limit int, predicate func(i int) bool) int {
 //
 // AddAgent will add a bew agent to our list.
 //
-func (s *AgentList) AddAgent(state *agentState) {
+func (s *AgentNameList) AddAgent(state *agentState) {
 	s.Lock()
 	defer s.Unlock()
-	agentList, ok := s.m[state.ep]
+	agentList, ok := s.m[state.ep.name]
 	if !ok {
 		agentList = make([]Agent, 0)
 	}
 	agentList = append(agentList, state)
-	s.m[state.ep] = agentList
+	s.m[state.ep.name] = agentList
 	log.Printf("Agent %s added, now at %d endpoints", state, len(agentList))
-	connectedAgentsGauge.WithLabelValues(state.ep.name, state.ep.protocol).Inc()
+	connectedAgentsGauge.WithLabelValues(state.ep.name).Inc()
 }
 
 //
 // RemoveAgent will remove an agent and signal to it that closing down is started.
 //
-func (s *AgentList) RemoveAgent(state *agentState) {
+func (s *AgentNameList) RemoveAgent(state *agentState) {
 	s.Lock()
 	defer s.Unlock()
-	agentList, ok := s.m[state.ep]
+	agentList, ok := s.m[state.ep.name]
 	if !ok {
-		log.Printf("Attempt to remove unknown agent %s", state)
+		log.Printf("RemoveAgent: No agents known by the name of %s", state)
 		return
 	}
 
@@ -175,8 +175,8 @@ func (s *AgentList) RemoveAgent(state *agentState) {
 		agentList[i] = agentList[len(agentList)-1]
 		agentList[len(agentList)-1] = nil
 		agentList = agentList[:len(agentList)-1]
-		s.m[state.ep] = agentList
-		connectedAgentsGauge.WithLabelValues(state.ep.name, state.ep.protocol).Dec()
+		s.m[state.ep.name] = agentList
+		connectedAgentsGauge.WithLabelValues(state.ep.name).Dec()
 	} else {
 		log.Printf("Attempt to remove unknown agent %s", state)
 	}
@@ -187,10 +187,10 @@ func (s *AgentList) RemoveAgent(state *agentState) {
 // SendToAgent will send a new httpMessage to an agent, and return true if an agent
 // was found.
 //
-func (s *AgentList) SendToAgent(ep endpoint, message *httpMessage) bool {
+func (s *AgentNameList) SendToAgent(ep endpoint, message *HTTPMessage) bool {
 	s.RLock()
 	defer s.RUnlock()
-	agentList, ok := s.m[ep]
+	agentList, ok := s.m[ep.name]
 	if !ok || len(agentList) == 0 {
 		log.Printf("No agents connected for: %s", ep)
 		return false
@@ -203,10 +203,10 @@ func (s *AgentList) SendToAgent(ep endpoint, message *httpMessage) bool {
 //
 // CancelRequest will cancel an ongoing request.
 //
-func (s *AgentList) CancelRequest(ep endpoint, message *cancelRequest) bool {
+func (s *AgentNameList) CancelRequest(ep endpoint, message *cancelRequest) bool {
 	s.RLock()
 	defer s.RUnlock()
-	agentList, ok := s.m[ep]
+	agentList, ok := s.m[ep.name]
 	if !ok || len(agentList) == 0 {
 		log.Printf("No agents connected for: %s", ep)
 		return false
@@ -236,7 +236,7 @@ func (s *agentState) CancelRequest(message *cancelRequest) {
 func (s *agentState) GetStatistics() interface{} {
 	return &DirectlyConnectedAgentStatistics{
 		Identity:       s.ep.name,
-		Protocols:      []string{s.ep.protocol},
+		Protocols:      s.ep.protocols,
 		Session:        s.session,
 		ConnectedAt:    s.connectedAt,
 		LastPing:       s.lastPing,
