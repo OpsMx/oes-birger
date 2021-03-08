@@ -40,7 +40,7 @@ var (
 
 func runTunnel(sa *serverContext, client tunnel.TunnelServiceClient, ticker chan uint64, identity string) {
 	ctx := context.Background()
-	stream, err := client.EventTunnel(ctx)
+	stream, err := client.AgentEventTunnel(ctx)
 	if err != nil {
 		log.Fatalf("%v.EventTunnel(_) = _, %v", client, err)
 	}

@@ -51,21 +51,21 @@ type sessionList struct {
 	m map[string]chan *tunnel.ASEventWrapper
 }
 
-func removeHttpId(httpids *sessionList, id string) {
+func removeHTTPId(httpids *sessionList, id string) {
 	httpids.Lock()
 	defer httpids.Unlock()
 	delete(httpids.m, id)
 }
 
-func addHttpId(httpids *sessionList, id string, c chan *tunnel.ASEventWrapper) {
+func addHTTPId(httpids *sessionList, id string, c chan *tunnel.ASEventWrapper) {
 	httpids.Lock()
 	defer httpids.Unlock()
 	httpids.m[id] = c
 }
 
-func handleHttpRequests(session string, httpRequestChan chan *httpMessage, httpids *sessionList, stream tunnel.TunnelService_EventTunnelServer) {
+func handleHTTPRequests(session string, httpRequestChan chan *httpMessage, httpids *sessionList, stream tunnel.TunnelService_AgentEventTunnelServer) {
 	for request := range httpRequestChan {
-		addHttpId(httpids, request.cmd.Id, request.out)
+		addHTTPId(httpids, request.cmd.Id, request.out)
 		resp := &tunnel.SAEventWrapper{
 			Event: &tunnel.SAEventWrapper_HttpRequest{
 				HttpRequest: request.cmd,
@@ -78,9 +78,9 @@ func handleHttpRequests(session string, httpRequestChan chan *httpMessage, httpi
 	log.Printf("Request channel closed for %s", session)
 }
 
-func handleHttpAgentResponse(session string, identity string, cancelChan chan *cancelRequest, httpids *sessionList, stream tunnel.TunnelService_EventTunnelServer) {
+func handleHTTPAgentResponse(session string, identity string, cancelChan chan *cancelRequest, httpids *sessionList, stream tunnel.TunnelService_AgentEventTunnelServer) {
 	for request := range cancelChan {
-		removeHttpId(httpids, request.id)
+		removeHTTPId(httpids, request.id)
 		resp := &tunnel.SAEventWrapper{
 			Event: &tunnel.SAEventWrapper_CancelRequest{
 				CancelRequest: &tunnel.CancelRequest{Id: request.id, Target: identity},
@@ -93,7 +93,7 @@ func handleHttpAgentResponse(session string, identity string, cancelChan chan *c
 	log.Printf("cancel channel closed for agent %s", session)
 }
 
-func closeAllHttp(httpids *sessionList) {
+func closeAllHTTP(httpids *sessionList) {
 	httpids.Lock()
 	defer httpids.Unlock()
 	for _, v := range httpids.m {
@@ -102,7 +102,7 @@ func closeAllHttp(httpids *sessionList) {
 }
 
 // This runs in its own goroutine, one per GRPC connection from an agent.
-func (s *tunnelServer) EventTunnel(stream tunnel.TunnelService_EventTunnelServer) error {
+func (s *tunnelServer) EventTunnel(stream tunnel.TunnelService_AgentEventTunnelServer) error {
 	agentIdentity, err := getAgentNameFromContext(stream.Context())
 	if err != nil {
 		return err
@@ -124,21 +124,21 @@ func (s *tunnelServer) EventTunnel(stream tunnel.TunnelService_EventTunnelServer
 
 	log.Printf("Agent %s connected, awaiting hello message", state)
 
-	go handleHttpRequests(sessionIdentity, inHTTPRequest, httpids, stream)
+	go handleHTTPRequests(sessionIdentity, inHTTPRequest, httpids, stream)
 
-	go handleHttpAgentResponse(sessionIdentity, agentIdentity, inCancelRequest, httpids, stream)
+	go handleHTTPAgentResponse(sessionIdentity, agentIdentity, inCancelRequest, httpids, stream)
 
 	for {
 		in, err := stream.Recv()
 		if err == io.EOF {
 			log.Printf("Closing %s", state)
-			closeAllHttp(httpids)
+			closeAllHTTP(httpids)
 			agents.RemoveAgent(state)
 			return nil
 		}
 		if err != nil {
 			log.Printf("Agent closed connection: %s", state)
-			closeAllHttp(httpids)
+			closeAllHTTP(httpids)
 			agents.RemoveAgent(state)
 			return err
 		}
