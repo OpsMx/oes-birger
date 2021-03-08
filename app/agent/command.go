@@ -8,7 +8,7 @@ import (
 	"os/exec"
 	"syscall"
 
-	"github.com/opsmx/grpc-bidir/pkg/tunnel"
+	"github.com/opsmx/oes-birger/pkg/tunnel"
 	"golang.org/x/net/context"
 )
 

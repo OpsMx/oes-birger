@@ -1,4 +1,4 @@
-module github.com/opsmx/grpc-bidir
+module github.com/opsmx/oes-birger
 
 go 1.16
 

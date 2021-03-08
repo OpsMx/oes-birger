@@ -21,8 +21,8 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 
-	"github.com/opsmx/grpc-bidir/pkg/kubeconfig"
-	"github.com/opsmx/grpc-bidir/pkg/tunnel"
+	"github.com/opsmx/oes-birger/pkg/kubeconfig"
+	"github.com/opsmx/oes-birger/pkg/tunnel"
 )
 
 var (

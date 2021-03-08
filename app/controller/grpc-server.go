@@ -9,7 +9,7 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/opsmx/grpc-bidir/pkg/tunnel"
+	"github.com/opsmx/oes-birger/pkg/tunnel"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 )

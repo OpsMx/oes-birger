@@ -7,7 +7,7 @@ import (
 
 	"gopkg.in/yaml.v2"
 
-	"github.com/opsmx/grpc-bidir/pkg/ca"
+	"github.com/opsmx/oes-birger/pkg/ca"
 )
 
 // ControllerConfig holds all the configuration for the controller.  The
