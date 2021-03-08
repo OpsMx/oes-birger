@@ -34,6 +34,9 @@ make_ca_deps = \
 	app/make-ca/make-ca.go \
 	pkg/ca/ca.go
 
+remote_command_deps = ${pb_deps} \
+	app/remote-command/main.go
+
 now = `date -u +%Y%m%dT%H%M%S`
 
 #
@@ -60,7 +63,7 @@ pkg/tunnel/tunnel.pb.go: go.mod pkg/tunnel/tunnel.proto
 #
 
 .PHONY: local
-local: bin/agent bin/controller bin/make-ca
+local: bin/agent bin/controller bin/make-ca bin/remote-command
 
 bin/agent: ${agent_deps}
 	@[ -d bin ] || mkdir bin
@@ -73,6 +76,10 @@ bin/controller: ${controller_deps}
 bin/make-ca: ${make_ca_deps}
 	@[ -d bin ] || mkdir bin
 	go build -o bin/make-ca app/make-ca/*.go
+
+bin/remote-command: ${remote_command_deps}
+	@[ -d bin ] || mkdir bin
+	go build -o bin/remote-command app/remote-command/*.go
 
 #
 # Multi-architecture image builds
