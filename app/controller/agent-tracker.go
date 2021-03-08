@@ -41,7 +41,7 @@ type AgentNameList struct {
 	m map[string][]Agent
 }
 
-type HTTPMessage struct {
+type httpMessage struct {
 	out chan *tunnel.AgentToControllerWrapper
 	cmd *tunnel.HttpRequest
 }
@@ -187,7 +187,7 @@ func (s *AgentNameList) RemoveAgent(state *agentState) {
 // SendToAgent will send a new httpMessage to an agent, and return true if an agent
 // was found.
 //
-func (s *AgentNameList) SendToAgent(ep endpoint, message *HTTPMessage) bool {
+func (s *AgentNameList) SendToAgent(ep endpoint, message *httpMessage) bool {
 	s.RLock()
 	defer s.RUnlock()
 	agentList, ok := s.m[ep.name]

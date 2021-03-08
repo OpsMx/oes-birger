@@ -65,7 +65,7 @@ func addHTTPId(httpids *sessionList, id string, c chan *tunnel.AgentToController
 
 func handleHTTPRequests(session string, requestChan chan interface{}, httpids *sessionList, stream tunnel.AgentTunnelService_EventTunnelServer) {
 	for interfacedRequest := range requestChan {
-		request, ok := interfacedRequest.(*HTTPMessage)
+		request, ok := interfacedRequest.(*httpMessage)
 		if !ok {
 			log.Printf("Got type other than HTTPMessage: %T", request)
 			continue

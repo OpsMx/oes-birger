@@ -123,7 +123,7 @@ func kubernetesAPIHandler(w http.ResponseWriter, r *http.Request) {
 		Headers:  makeHeaders(r.Header),
 		Body:     body,
 	}
-	message := &HTTPMessage{out: make(chan *tunnel.AgentToControllerWrapper), cmd: req}
+	message := &httpMessage{out: make(chan *tunnel.AgentToControllerWrapper), cmd: req}
 	found := agents.SendToAgent(ep, message)
 	if !found {
 		w.WriteHeader(http.StatusBadGateway)
