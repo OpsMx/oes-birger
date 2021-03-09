@@ -106,8 +106,11 @@ func runCommand(dataflow chan *tunnel.AgentToControllerWrapper, req *tunnel.Comm
 
 	// aggregation channel, for stdout and stderr to be send through.
 	agg := make(chan *outputMessage)
+	args := make([]string, 1)
+	args[0] = req.Name
+	args = append(args, req.Arguments...)
 
-	cmd := exec.CommandContext(ctx, req.Name, req.Arguments...)
+	cmd := exec.CommandContext(ctx, req.Name, args...)
 	cmd.Env = req.Environment
 
 	stdout, err := cmd.StdoutPipe()
