@@ -312,8 +312,10 @@ func (s *cmdToolTunnelServer) EventTunnel(stream tunnel.CmdToolTunnelService_Eve
 			switch x := in.Event.(type) {
 			case *tunnel.AgentToControllerWrapper_CommandTermination:
 				resp := in.GetCommandTermination()
-				stream.Send(makeCommandTermination(int(resp.ExitCode)))
-
+				log.Printf("Got command exit code %d", resp.ExitCode)
+				if err := stream.Send(makeCommandTermination(int(resp.ExitCode))); err != nil {
+					log.Printf("While sending: %v", err)
+				}
 			case *tunnel.AgentToControllerWrapper_CommandData:
 				resp := in.GetCommandData()
 				msg := &tunnel.ControllerToCmdToolWrapper{
@@ -325,7 +327,9 @@ func (s *cmdToolTunnelServer) EventTunnel(stream tunnel.CmdToolTunnelService_Eve
 						},
 					},
 				}
-				stream.Send(msg)
+				if err := stream.Send(msg); err != nil {
+					log.Printf("Sending CommandData to tool: %v", err)
+				}
 			case nil:
 				// ignore for now
 			default:
