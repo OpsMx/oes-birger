@@ -16,7 +16,6 @@
 bin
 minica
 .DS_Store
-pkg/tunnel/tunnel.pb.go
 buildtime
 *.buildtime
 deploy-sample
