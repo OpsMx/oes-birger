@@ -90,7 +90,6 @@ func runCommand(client tunnel.CmdToolTunnelServiceClient, cmd string, env []stri
 			switch x := in.Event.(type) {
 			case *tunnel.ControllerToCmdToolWrapper_CommandData:
 				req := in.GetCommandData()
-				log.Printf("CommandData: %v", req)
 				if req.Channel == tunnel.ChannelDirection_STDOUT {
 					fmt.Fprintf(os.Stdout, "%s", string(req.Body))
 				} else {
@@ -124,7 +123,6 @@ func main() {
 	}
 
 	args := flag.Args()
-	fmt.Printf("Command: %s, env: [%s], args: [%s]\n", *cmd, strings.Join(env, ","), strings.Join(args, ","))
 
 	// load client cert/key, cacert
 	clcert, err := tls.LoadX509KeyPair(*certFile, *keyFile)

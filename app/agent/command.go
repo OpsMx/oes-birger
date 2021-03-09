@@ -19,7 +19,6 @@ func outputSender(channel tunnel.ChannelDirection, c chan *outputMessage, in io.
 			// we need to copy the underlying data, since we will re-use it.
 			tmp := make([]byte, n)
 			copy(tmp, buffer[:n])
-			log.Printf("Sending %s", string(tmp))
 			c <- &outputMessage{channel: channel, value: tmp, closed: false}
 		}
 		if err == io.EOF {
