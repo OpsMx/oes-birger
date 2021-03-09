@@ -108,6 +108,8 @@ func runCommand(dataflow chan *tunnel.AgentToControllerWrapper, req *tunnel.Comm
 
 	cmd := exec.CommandContext(ctx, req.Name, req.Arguments...)
 	cmd.Env = req.Environment
+	cmd.SysProcAttr = &syscall.SysProcAttr{}
+	cmd.SysProcAttr.Credential = &syscall.Credential{Uid: 65534, Gid: 65534}
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
