@@ -23,9 +23,12 @@ func outputSender(channel tunnel.ChannelDirection, c chan *outputMessage, in io.
 		}
 		if err == io.EOF {
 			c <- &outputMessage{channel: channel, value: emptyBytes, closed: true}
-		} else if err != nil {
+			return
+		}
+		if err != nil {
 			log.Printf("Got %v in read", err)
 			c <- &outputMessage{channel: channel, value: emptyBytes, closed: true}
+			return
 		}
 	}
 }
