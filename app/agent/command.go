@@ -146,18 +146,24 @@ func runCommand(dataflow chan *tunnel.AgentToControllerWrapper, req *tunnel.Comm
 		}
 	}
 
+	log.Printf("Command closed both stdin and stdout.")
+
 	if err := cmd.Wait(); err != nil {
 		if exiterr, ok := err.(*exec.ExitError); ok {
+			log.Printf("exited with code != 0")
 			// The program has exited with an exit code != 0
 			if status, ok := exiterr.Sys().(syscall.WaitStatus); ok {
+				log.Printf("Captured exit code %d", status.ExitStatus())
 				dataflow <- makeCommandTermination(req, status.ExitStatus())
 				return
 			}
+			log.Printf("Could not retrieve exit code.")
 		} else {
 			dataflow <- makeCommandFailed(req, err, "Wait()")
 			return
 		}
 	}
 
+	log.Printf("Exit code 0")
 	dataflow <- makeCommandTermination(req, 0)
 }
