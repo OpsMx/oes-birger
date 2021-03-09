@@ -80,6 +80,7 @@ func handleHTTPRequests(session string, requestChan chan interface{}, httpids *s
 		}
 		cmdRequest, ok := interfacedRequest.(*runCmdMessage)
 		if ok {
+			log.Printf("cmd %v running, setting up tracking", cmdRequest)
 			addHTTPId(httpids, cmdRequest.cmd.Id, cmdRequest.out)
 			resp := &tunnel.ControllerToAgentWrapper{
 				Event: &tunnel.ControllerToAgentWrapper_CommandRequest{
@@ -93,7 +94,6 @@ func handleHTTPRequests(session string, requestChan chan interface{}, httpids *s
 		}
 		log.Printf("Got unexpected message type: %T", interfacedRequest)
 	}
-	log.Printf("Request channel closed for %s", session)
 }
 
 func handleHTTPCancelRequest(session string, identity string, cancelChan chan *cancelRequest, httpids *sessionList, stream tunnel.AgentTunnelService_EventTunnelServer) {

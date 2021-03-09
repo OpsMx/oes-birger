@@ -117,8 +117,10 @@ func runKubernetesTunnel(wg *sync.WaitGroup, sa *serverContext, conn *grpc.Clien
 				}
 			case *tunnel.ControllerToAgentWrapper_CommandRequest:
 				req := in.GetCommandRequest()
+				log.Printf("Got cmd request: %v", req)
 				switch req.Name {
-				case "bash":
+				case "sh":
+					log.Printf("Running 'sh'")
 					go runCommand(dataflow, req)
 				default:
 					dataflow <- makeCommandFailed(req, nil, "Agent: Unknown command")
