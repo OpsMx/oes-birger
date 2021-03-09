@@ -65,20 +65,33 @@ func addHTTPId(httpids *sessionList, id string, c chan *tunnel.AgentToController
 
 func handleHTTPRequests(session string, requestChan chan interface{}, httpids *sessionList, stream tunnel.AgentTunnelService_EventTunnelServer) {
 	for interfacedRequest := range requestChan {
-		request, ok := interfacedRequest.(*httpMessage)
-		if !ok {
-			log.Printf("Got type other than HTTPMessage: %T", request)
+		httpRequest, ok := interfacedRequest.(*httpMessage)
+		if ok {
+			addHTTPId(httpids, httpRequest.cmd.Id, httpRequest.out)
+			resp := &tunnel.ControllerToAgentWrapper{
+				Event: &tunnel.ControllerToAgentWrapper_HttpRequest{
+					HttpRequest: httpRequest.cmd,
+				},
+			}
+			if err := stream.Send(resp); err != nil {
+				log.Printf("Unable to send to agent %s for HTTP request %s", session, httpRequest.cmd.Id)
+			}
 			continue
 		}
-		addHTTPId(httpids, request.cmd.Id, request.out)
-		resp := &tunnel.ControllerToAgentWrapper{
-			Event: &tunnel.ControllerToAgentWrapper_HttpRequest{
-				HttpRequest: request.cmd,
-			},
+		cmdRequest, ok := interfacedRequest.(*runCmdMessage)
+		if ok {
+			addHTTPId(httpids, cmdRequest.cmd.Id, cmdRequest.out)
+			resp := &tunnel.ControllerToAgentWrapper{
+				Event: &tunnel.ControllerToAgentWrapper_CommandRequest{
+					CommandRequest: cmdRequest.cmd,
+				},
+			}
+			if err := stream.Send(resp); err != nil {
+				log.Printf("Unable to send to agent %s for CMD request %s", session, cmdRequest.cmd.Id)
+			}
+			continue
 		}
-		if err := stream.Send(resp); err != nil {
-			log.Printf("Unable to send to agent %s for HTTP request %s", session, request.cmd.Id)
-		}
+		log.Printf("Got unexpected message type: %T", interfacedRequest)
 	}
 	log.Printf("Request channel closed for %s", session)
 }
@@ -193,6 +206,31 @@ func (s *agentTunnelServer) EventTunnel(stream tunnel.AgentTunnelService_EventTu
 				log.Printf("Got response to unknown HTTP request id %s from %s", resp.Id, state)
 			}
 			httpids.Unlock()
+		case *tunnel.AgentToControllerWrapper_CommandTermination:
+			resp := in.GetCommandTermination()
+			atomic.StoreUint64(&state.lastUse, tunnel.Now())
+			httpids.Lock()
+			dest := httpids.m[resp.Id]
+			if dest != nil {
+				dest <- in
+				close(dest)
+				delete(httpids.m, resp.Id)
+			} else {
+				log.Printf("Got response to unknown CMD request id %s from %s", resp.Id, state)
+			}
+			httpids.Unlock()
+		case *tunnel.AgentToControllerWrapper_CommandData:
+			resp := in.GetCommandData()
+			atomic.StoreUint64(&state.lastUse, tunnel.Now())
+			httpids.Lock()
+			dest := httpids.m[resp.Id]
+			if dest != nil {
+				dest <- in
+				delete(httpids.m, resp.Id)
+			} else {
+				log.Printf("Got response to unknown CMD request id %s from %s", resp.Id, state)
+			}
+			httpids.Unlock()
 		case nil:
 			// ignore for now
 		default:
@@ -244,14 +282,58 @@ func newCmdToolServer() *cmdToolTunnelServer {
 	return &cmdToolTunnelServer{}
 }
 
+func makeCommandTermination(exitstatus int) *tunnel.ControllerToCmdToolWrapper {
+	return &tunnel.ControllerToCmdToolWrapper{
+		Event: &tunnel.ControllerToCmdToolWrapper_CommandTermination{
+			CommandTermination: &tunnel.CmdToolCommandTermination{
+				ExitCode: int32(exitstatus),
+			},
+		},
+	}
+}
+
+type runCmdMessage struct {
+	out chan *tunnel.AgentToControllerWrapper
+	cmd *tunnel.CommandRequest
+}
+
 func (s *cmdToolTunnelServer) EventTunnel(stream tunnel.CmdToolTunnelService_EventTunnelServer) error {
 	identity, err := getAgentNameFromContext(stream.Context())
 	if err != nil {
 		return err
 	}
 	log.Printf("CmdTool %s connected", identity)
+	ep := endpoint{protocols: []string{"remote-command"}, name: identity}
 
 	sessionIdentity := ulidContext.Ulid()
+	agentResponseChan := make(chan *tunnel.AgentToControllerWrapper)
+
+	go func() {
+		for in := range agentResponseChan {
+			switch x := in.Event.(type) {
+			case *tunnel.AgentToControllerWrapper_CommandTermination:
+				resp := in.GetCommandTermination()
+				stream.Send(makeCommandTermination(int(resp.ExitCode)))
+
+			case *tunnel.AgentToControllerWrapper_CommandData:
+				resp := in.GetCommandData()
+				msg := &tunnel.ControllerToCmdToolWrapper{
+					Event: &tunnel.ControllerToCmdToolWrapper_CommandData{
+						CommandData: &tunnel.CmdToolCommandData{
+							Body:    resp.Body,
+							Channel: resp.Channel,
+							Closed:  resp.Closed,
+						},
+					},
+				}
+				stream.Send(msg)
+			case nil:
+				// ignore for now
+			default:
+				log.Printf("CmdTool %s unknown message from agent: %s: %T", identity, sessionIdentity, x)
+			}
+		}
+	}()
 
 	for {
 		in, err := stream.Recv()
@@ -268,6 +350,18 @@ func (s *cmdToolTunnelServer) EventTunnel(stream tunnel.CmdToolTunnelService_Eve
 		case *tunnel.CmdToolToControllerWrapper_CommandRequest:
 			req := in.GetCommandRequest()
 			log.Printf("CmdTool %s request: %v", identity, req)
+			cmd := &tunnel.CommandRequest{
+				Id:          ulidContext.Ulid(),
+				Target:      identity,
+				Arguments:   req.Arguments,
+				Environment: req.Environment,
+			}
+			message := &runCmdMessage{out: agentResponseChan, cmd: cmd}
+			found := agents.SendToAgent(ep, message)
+			if !found {
+				close(agentResponseChan)
+				return fmt.Errorf("Unknown agent: %s", identity)
+			}
 		case nil:
 			// ignore for now
 		default:

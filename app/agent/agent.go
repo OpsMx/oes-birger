@@ -54,7 +54,7 @@ func runKubernetesTunnel(wg *sync.WaitGroup, sa *serverContext, conn *grpc.Clien
 		Event: &tunnel.AgentToControllerWrapper_AgentHello{
 			AgentHello: &tunnel.AgentHello{
 				Protocols:            []string{"kubernetes", "remote-command"},
-				CommandNames:         []string{"bash"},
+				CommandNames:         []string{"sh"},
 				KubernetesNamespaces: config.Namespaces,
 				ProtocolVersion:      tunnel.CurrentProtocolVersion,
 			},

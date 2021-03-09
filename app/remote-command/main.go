@@ -57,7 +57,7 @@ func loadCert() []byte {
 	return cert
 }
 
-func runCommand(client tunnel.CmdToolTunnelServiceClient) {
+func runCommand(client tunnel.CmdToolTunnelServiceClient, cmd string, env []string, args []string) {
 	ctx := context.Background()
 	stream, err := client.EventTunnel(ctx)
 	if err != nil {
@@ -65,6 +65,17 @@ func runCommand(client tunnel.CmdToolTunnelServiceClient) {
 	}
 
 	waitc := make(chan struct{})
+
+	run := tunnel.CmdToolToControllerWrapper{
+		Event: &tunnel.CmdToolToControllerWrapper_CommandRequest{
+			CommandRequest: &tunnel.CmdToolCommandRequest{
+				Name:        cmd,
+				Arguments:   args,
+				Environment: env,
+			},
+		},
+	}
+	stream.Send(&run)
 	go func() {
 		for {
 			in, err := stream.Recv()
@@ -144,8 +155,5 @@ func main() {
 
 	client := tunnel.NewCmdToolTunnelServiceClient(conn)
 
-	log.Printf("Starting tunnel.")
-	runCommand(client)
-	log.Printf("Done.")
-
+	runCommand(client, *cmd, env, args)
 }

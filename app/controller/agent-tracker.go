@@ -187,7 +187,7 @@ func (s *AgentNameList) RemoveAgent(state *agentState) {
 // SendToAgent will send a new httpMessage to an agent, and return true if an agent
 // was found.
 //
-func (s *AgentNameList) SendToAgent(ep endpoint, message *httpMessage) bool {
+func (s *AgentNameList) SendToAgent(ep endpoint, message interface{}) bool {
 	s.RLock()
 	defer s.RUnlock()
 	agentList, ok := s.m[ep.name]

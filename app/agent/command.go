@@ -100,6 +100,8 @@ func runCommand(dataflow chan *tunnel.AgentToControllerWrapper, req *tunnel.Comm
 	registerCancelFunction(req.Id, cancel)
 	defer unregisterCancelFunction(req.Id)
 
+	log.Printf("Got command request: %v", req)
+
 	// aggregation channel, for stdout and stderr to be send through.
 	agg := make(chan *outputMessage)
 
