@@ -337,14 +337,18 @@ func (s *cmdToolTunnelServer) EventTunnel(stream tunnel.CmdToolTunnelService_Eve
 		}
 	}()
 
+	operationID := ulidContext.Ulid()
+
 	for {
 		in, err := stream.Recv()
 		if err == io.EOF {
 			log.Printf("CmdTool %s closed connection %s", identity, sessionIdentity)
+			agents.CancelRequest(ep, &cancelRequest{id: operationID})
 			return nil
 		}
 		if err != nil {
 			log.Printf("CmdTool %s closed connection: %s", identity, sessionIdentity)
+			agents.CancelRequest(ep, &cancelRequest{id: operationID})
 			return err
 		}
 
@@ -353,7 +357,7 @@ func (s *cmdToolTunnelServer) EventTunnel(stream tunnel.CmdToolTunnelService_Eve
 			req := in.GetCommandRequest()
 			log.Printf("CmdTool %s request: %v", identity, req)
 			cmd := &tunnel.CommandRequest{
-				Id:          ulidContext.Ulid(),
+				Id:          operationID,
 				Target:      identity,
 				Name:        req.Name,
 				Arguments:   req.Arguments,
