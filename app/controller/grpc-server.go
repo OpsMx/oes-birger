@@ -352,6 +352,7 @@ func (s *cmdToolTunnelServer) EventTunnel(stream tunnel.CmdToolTunnelService_Eve
 			cmd := &tunnel.CommandRequest{
 				Id:          ulidContext.Ulid(),
 				Target:      identity,
+				Name:        req.Name,
 				Arguments:   req.Arguments,
 				Environment: req.Environment,
 			}
