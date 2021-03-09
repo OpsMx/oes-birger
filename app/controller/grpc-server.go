@@ -65,8 +65,9 @@ func addHTTPId(httpids *sessionList, id string, c chan *tunnel.AgentToController
 
 func handleHTTPRequests(session string, requestChan chan interface{}, httpids *sessionList, stream tunnel.AgentTunnelService_EventTunnelServer) {
 	for interfacedRequest := range requestChan {
-		httpRequest, ok := interfacedRequest.(*httpMessage)
-		if ok {
+		switch interfacedRequest.(type) {
+		case *httpMessage:
+			httpRequest := interfacedRequest.(*httpMessage)
 			addHTTPId(httpids, httpRequest.cmd.Id, httpRequest.out)
 			resp := &tunnel.ControllerToAgentWrapper{
 				Event: &tunnel.ControllerToAgentWrapper_HttpRequest{
@@ -76,11 +77,9 @@ func handleHTTPRequests(session string, requestChan chan interface{}, httpids *s
 			if err := stream.Send(resp); err != nil {
 				log.Printf("Unable to send to agent %s for HTTP request %s", session, httpRequest.cmd.Id)
 			}
-			continue
-		}
-		cmdRequest, ok := interfacedRequest.(*runCmdMessage)
-		if ok {
-			log.Printf("cmd %v running, setting up tracking", cmdRequest)
+		case *runCmdMessage:
+			cmdRequest := interfacedRequest.(*runCmdMessage)
+			log.Printf("cmd %s %s %v %v running", cmdRequest.cmd.Id, cmdRequest.cmd.Name, cmdRequest.cmd.Arguments, cmdRequest.cmd.Environment)
 			addHTTPId(httpids, cmdRequest.cmd.Id, cmdRequest.out)
 			resp := &tunnel.ControllerToAgentWrapper{
 				Event: &tunnel.ControllerToAgentWrapper_CommandRequest{
@@ -90,9 +89,9 @@ func handleHTTPRequests(session string, requestChan chan interface{}, httpids *s
 			if err := stream.Send(resp); err != nil {
 				log.Printf("Unable to send to agent %s for CMD request %s", session, cmdRequest.cmd.Id)
 			}
-			continue
+		default:
+			log.Printf("Got unexpected message type: %T", interfacedRequest)
 		}
-		log.Printf("Got unexpected message type: %T", interfacedRequest)
 	}
 }
 
@@ -226,7 +225,6 @@ func (s *agentTunnelServer) EventTunnel(stream tunnel.AgentTunnelService_EventTu
 			dest := httpids.m[resp.Id]
 			if dest != nil {
 				dest <- in
-				delete(httpids.m, resp.Id)
 			} else {
 				log.Printf("Got response to unknown CMD request id %s from %s", resp.Id, state)
 			}
@@ -313,8 +311,10 @@ func (s *cmdToolTunnelServer) EventTunnel(stream tunnel.CmdToolTunnelService_Eve
 			switch x := in.Event.(type) {
 			case *tunnel.AgentToControllerWrapper_CommandTermination:
 				resp := in.GetCommandTermination()
-				stream.Send(makeCommandTermination(int(resp.ExitCode)))
-
+				log.Printf("Got command exit code %d", resp.ExitCode)
+				if err := stream.Send(makeCommandTermination(int(resp.ExitCode))); err != nil {
+					log.Printf("While sending: %v", err)
+				}
 			case *tunnel.AgentToControllerWrapper_CommandData:
 				resp := in.GetCommandData()
 				msg := &tunnel.ControllerToCmdToolWrapper{
@@ -326,7 +326,9 @@ func (s *cmdToolTunnelServer) EventTunnel(stream tunnel.CmdToolTunnelService_Eve
 						},
 					},
 				}
-				stream.Send(msg)
+				if err := stream.Send(msg); err != nil {
+					log.Printf("Sending CommandData to tool: %v", err)
+				}
 			case nil:
 				// ignore for now
 			default:
@@ -335,14 +337,18 @@ func (s *cmdToolTunnelServer) EventTunnel(stream tunnel.CmdToolTunnelService_Eve
 		}
 	}()
 
+	operationID := ulidContext.Ulid()
+
 	for {
 		in, err := stream.Recv()
 		if err == io.EOF {
 			log.Printf("CmdTool %s closed connection %s", identity, sessionIdentity)
+			agents.CancelRequest(ep, &cancelRequest{id: operationID})
 			return nil
 		}
 		if err != nil {
 			log.Printf("CmdTool %s closed connection: %s", identity, sessionIdentity)
+			agents.CancelRequest(ep, &cancelRequest{id: operationID})
 			return err
 		}
 
@@ -351,8 +357,9 @@ func (s *cmdToolTunnelServer) EventTunnel(stream tunnel.CmdToolTunnelService_Eve
 			req := in.GetCommandRequest()
 			log.Printf("CmdTool %s request: %v", identity, req)
 			cmd := &tunnel.CommandRequest{
-				Id:          ulidContext.Ulid(),
+				Id:          operationID,
 				Target:      identity,
+				Name:        req.Name,
 				Arguments:   req.Arguments,
 				Environment: req.Environment,
 			}

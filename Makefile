@@ -61,7 +61,7 @@ bin/%:: ${all_deps}
 # Multi-architecture image builds
 #
 .PHONY: images-ma
-images-ma: $(addsuffix -ma.ts, $(addprefix buildtime/,$(IMAGE_TARGETS)))
+images-ma: buildtime $(addsuffix -ma.ts, $(addprefix buildtime/,$(IMAGE_TARGETS)))
 
 buildtime/%-ma.ts:: ${all_deps} Dockerfile.multi
 	${BUILDX} \
@@ -78,7 +78,7 @@ buildtime/%-ma.ts:: ${all_deps} Dockerfile.multi
 .PHONY: images
 images: $(addsuffix .ts, $(addprefix buildtime/,$(IMAGE_TARGETS)))
 
-buildtime/%.ts:: ${all_deps} Dockerfile
+buildtime/%.ts:: buildtime ${all_deps} Dockerfile
 	docker build \
 		--tag ${IMAGE_PREFIX}forwarder-$(patsubst %.ts,%,$(@F)):latest \
 		--tag ${IMAGE_PREFIX}forwarder-$(patsubst %.ts,%,$(@F)):v${now} \

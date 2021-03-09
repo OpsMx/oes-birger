@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"os"
 	"os/exec"
 	"syscall"
 
@@ -24,10 +23,12 @@ func outputSender(channel tunnel.ChannelDirection, c chan *outputMessage, in io.
 		}
 		if err == io.EOF {
 			c <- &outputMessage{channel: channel, value: emptyBytes, closed: true}
+			return
 		}
 		if err != nil {
 			log.Printf("Got %v in read", err)
 			c <- &outputMessage{channel: channel, value: emptyBytes, closed: true}
+			return
 		}
 	}
 }
@@ -105,8 +106,7 @@ func runCommand(dataflow chan *tunnel.AgentToControllerWrapper, req *tunnel.Comm
 	// aggregation channel, for stdout and stderr to be send through.
 	agg := make(chan *outputMessage)
 
-	cmd := exec.CommandContext(ctx, os.Args[1], os.Args[2:]...)
-
+	cmd := exec.CommandContext(ctx, req.Name, req.Arguments...)
 	cmd.Env = req.Environment
 
 	stdout, err := cmd.StdoutPipe()
@@ -146,18 +146,24 @@ func runCommand(dataflow chan *tunnel.AgentToControllerWrapper, req *tunnel.Comm
 		}
 	}
 
+	log.Printf("Command closed both stdin and stdout.")
+
 	if err := cmd.Wait(); err != nil {
 		if exiterr, ok := err.(*exec.ExitError); ok {
+			log.Printf("exited with code != 0")
 			// The program has exited with an exit code != 0
 			if status, ok := exiterr.Sys().(syscall.WaitStatus); ok {
+				log.Printf("Captured exit code %d", status.ExitStatus())
 				dataflow <- makeCommandTermination(req, status.ExitStatus())
 				return
 			}
+			log.Printf("Could not retrieve exit code.")
 		} else {
 			dataflow <- makeCommandFailed(req, err, "Wait()")
 			return
 		}
 	}
 
+	log.Printf("Exit code 0")
 	dataflow <- makeCommandTermination(req, 0)
 }
