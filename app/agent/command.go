@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"os"
 	"os/exec"
 	"syscall"
 
@@ -105,8 +104,7 @@ func runCommand(dataflow chan *tunnel.AgentToControllerWrapper, req *tunnel.Comm
 	// aggregation channel, for stdout and stderr to be send through.
 	agg := make(chan *outputMessage)
 
-	cmd := exec.CommandContext(ctx, os.Args[1], os.Args[2:]...)
-
+	cmd := exec.CommandContext(ctx, req.Name, req.Arguments...)
 	cmd.Env = req.Environment
 
 	stdout, err := cmd.StdoutPipe()
