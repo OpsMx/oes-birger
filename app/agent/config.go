@@ -4,7 +4,7 @@ import (
 	"io/ioutil"
 	"log"
 
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 )
 
 // AgentConfig holds all the configuration for the agent.  The
