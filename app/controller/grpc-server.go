@@ -79,7 +79,7 @@ func handleHTTPRequests(session string, requestChan chan interface{}, httpids *s
 			}
 		case *runCmdMessage:
 			cmdRequest := interfacedRequest.(*runCmdMessage)
-			log.Printf("cmd %s %v %v running", cmdRequest.cmd.Name, cmdRequest.cmd.Arguments, cmdRequest.cmd.Environment)
+			log.Printf("cmd %s %s %v %v running", cmdRequest.cmd.Id, cmdRequest.cmd.Name, cmdRequest.cmd.Arguments, cmdRequest.cmd.Environment)
 			addHTTPId(httpids, cmdRequest.cmd.Id, cmdRequest.out)
 			resp := &tunnel.ControllerToAgentWrapper{
 				Event: &tunnel.ControllerToAgentWrapper_CommandRequest{
