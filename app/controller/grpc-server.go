@@ -225,7 +225,6 @@ func (s *agentTunnelServer) EventTunnel(stream tunnel.AgentTunnelService_EventTu
 			dest := httpids.m[resp.Id]
 			if dest != nil {
 				dest <- in
-				delete(httpids.m, resp.Id)
 			} else {
 				log.Printf("Got response to unknown CMD request id %s from %s", resp.Id, state)
 			}
