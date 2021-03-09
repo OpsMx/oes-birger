@@ -65,8 +65,9 @@ func addHTTPId(httpids *sessionList, id string, c chan *tunnel.AgentToController
 
 func handleHTTPRequests(session string, requestChan chan interface{}, httpids *sessionList, stream tunnel.AgentTunnelService_EventTunnelServer) {
 	for interfacedRequest := range requestChan {
-		httpRequest, ok := interfacedRequest.(*httpMessage)
-		if ok {
+		switch interfacedRequest.(type) {
+		case *httpMessage:
+			httpRequest := interfacedRequest.(*httpMessage)
 			addHTTPId(httpids, httpRequest.cmd.Id, httpRequest.out)
 			resp := &tunnel.ControllerToAgentWrapper{
 				Event: &tunnel.ControllerToAgentWrapper_HttpRequest{
@@ -76,10 +77,8 @@ func handleHTTPRequests(session string, requestChan chan interface{}, httpids *s
 			if err := stream.Send(resp); err != nil {
 				log.Printf("Unable to send to agent %s for HTTP request %s", session, httpRequest.cmd.Id)
 			}
-			continue
-		}
-		cmdRequest, ok := interfacedRequest.(*runCmdMessage)
-		if ok {
+		case *runCmdMessage:
+			cmdRequest := interfacedRequest.(*runCmdMessage)
 			log.Printf("cmd %v running, setting up tracking", cmdRequest)
 			addHTTPId(httpids, cmdRequest.cmd.Id, cmdRequest.out)
 			resp := &tunnel.ControllerToAgentWrapper{
@@ -90,9 +89,9 @@ func handleHTTPRequests(session string, requestChan chan interface{}, httpids *s
 			if err := stream.Send(resp); err != nil {
 				log.Printf("Unable to send to agent %s for CMD request %s", session, cmdRequest.cmd.Id)
 			}
-			continue
+		default:
+			log.Printf("Got unexpected message type: %T", interfacedRequest)
 		}
-		log.Printf("Got unexpected message type: %T", interfacedRequest)
 	}
 }
 
