@@ -101,5 +101,8 @@ test: ${pb_deps}
 .PHONY: clean
 clean:
 	rm -f buildtime/*.ts
-	rm -f ${pb_deps}
 	rm -f bin/*
+
+.PHONY: really-clean
+really-clean: clean
+	rm -f ${pb_deps}
