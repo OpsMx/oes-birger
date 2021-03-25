@@ -2,7 +2,7 @@
 # Install the latest versions of our mods.  This is done as a separate step
 # so it will pull from an image cache if possible, unless there are changes.
 #
-FROM --platform=${BUILDPLATFORM} golang:1.16.0-alpine AS buildmod
+FROM --platform=${BUILDPLATFORM} golang:1.16.2-alpine AS buildmod
 ENV CGO_ENABLED=0
 RUN mkdir /build
 WORKDIR /build
@@ -13,50 +13,24 @@ RUN go mod download
 #
 # Compile the agent.
 #
-FROM buildmod AS build-agent
+FROM buildmod AS build-binaries
 COPY . .
 ARG TARGETOS
 ARG TARGETARCH
 RUN mkdir /out /out/agent-binaries
 RUN GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o /out/agent app/agent/*.go
+RUN GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o /out/controller app/controller/*.go
+RUN GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o /out/make-ca app/make-ca/*.go
+# Also build the different OS versions here, so we can publish them.
 RUN GOOS=linux GOARCH=amd64 go build -o /out/agent-binaries/agent.amd64.latest app/agent/*.go
 RUN GOOS=linux GOARCH=arm64 go build -o /out/agent-binaries/agent.arm64.latest app/agent/*.go
-
-#
-# Compile the controller.
-#
-FROM buildmod AS build-controller
-COPY . .
-ARG TARGETOS
-ARG TARGETARCH
-RUN mkdir /out
-RUN GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o /out/controller app/controller/*.go
-
-#
-# Compile make-ca.
-#
-FROM buildmod AS build-make-ca
-COPY . .
-ARG TARGETOS
-ARG TARGETARCH
-RUN mkdir /out
-RUN GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o /out/make-ca app/make-ca/*.go
 
 #
 # Build the agent image.  This should be a --target on docker build.
 #
 FROM scratch AS agent-image
 WORKDIR /app
-COPY --from=build-agent /out/agent /app
-EXPOSE 9102
-CMD ["/app/agent"]
-
-#
-# Build the agent-alpine image.  This should be a --target on docker build.
-#
-FROM alpine:3.12 AS agent-alpine-image
-WORKDIR /app
-COPY --from=build-agent /out/agent /app
+COPY --from=build-binaries /out/agent /app
 EXPOSE 9102
 CMD ["/app/agent"]
 
@@ -67,8 +41,8 @@ CMD ["/app/agent"]
 #
 FROM scratch AS controller-image
 WORKDIR /app
-COPY --from=build-controller /out/controller /app
-COPY --from=build-agent /out/agent-binaries /app/agent-binaries
+COPY --from=build-binaries /out/controller /app
+COPY --from=build-binaries /out/agent-binaries /app/agent-binaries
 EXPOSE 9001-9002 9102
 CMD ["/app/controller"]
 
@@ -77,5 +51,5 @@ CMD ["/app/controller"]
 #
 FROM scratch AS make-ca-image
 WORKDIR /app
-COPY --from=build-make-ca /out/make-ca /app
+COPY --from=build-binaries /out/make-ca /app
 CMD ["/app/make-ca"]

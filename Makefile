@@ -13,8 +13,7 @@ BINARIES = agent controller make-ca remote-command
 # These are the targets for Docker images, used both for the multi-arch and
 # single (local) Docker builds.
 # Dockerfiles should have a target that ends in -image, e.g. agent-image.
-IMAGE_TARGETS = controller agent make-ca agent-alpine
-
+IMAGE_TARGETS = controller agent make-ca
 #
 # Below here lies magic...
 #
