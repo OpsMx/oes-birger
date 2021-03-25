@@ -29,7 +29,7 @@ type CommandConfig struct {
 	// One of the paths must exist unless `InsecureIgnoreHostKey` is true.
 	KnownHosts string `yaml:"knownHostsPath"`
 
-	// InsecureIgnoreHostKey will disable host key checking.  Not recommended.
+	// InsecureIgnoreHostKey will disable host key checking.  76Not recommended.
 	InsecureIgnoreHostKey bool `yaml:"insecureIgnoreHostKey"`
 
 	// UserKeyPath is where the Kubernetes secret of type `ssh-key-secret` is mounted.

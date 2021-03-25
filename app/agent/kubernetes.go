@@ -24,7 +24,7 @@ func executeKubernetesRequest(dataflow chan *tunnel.AgentToControllerWrapper, c 
 		caCertPool := x509.NewCertPool()
 		caCertPool.AddCert(c.serverCA)
 		tlsConfig.RootCAs = caCertPool
-		tlsConfig.BuildNameToCertificate()
+		//tlsConfig.BuildNameToCertificate()
 	}
 	if c.clientCert != nil {
 		tlsConfig.Certificates = []tls.Certificate{*c.clientCert}

@@ -6,11 +6,6 @@ import (
 	"sync"
 )
 
-type cancelState struct {
-	id     string
-	cancel context.CancelFunc
-}
-
 var cancelRegistry = struct {
 	sync.Mutex
 	m map[string]context.CancelFunc

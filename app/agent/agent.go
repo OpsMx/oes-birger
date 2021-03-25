@@ -5,7 +5,6 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/base64"
-	b64 "encoding/base64"
 	"encoding/pem"
 	"flag"
 	"fmt"
@@ -165,7 +164,7 @@ func (scf *serverContextFields) isSameAs(scf2 *serverContextFields) bool {
 		return false
 	}
 	if scf.clientCert != nil && scf2.clientCert != nil {
-		if bytes.Compare(scf.clientCert.Certificate[0], scf2.clientCert.Certificate[0]) != 0 {
+		if !bytes.Equal(scf.clientCert.Certificate[0], scf2.clientCert.Certificate[0]) {
 			return false
 		}
 	}
@@ -202,11 +201,11 @@ func serverContextFromKubeconfig(kconfig *kubeconfig.KubeConfig) *serverContextF
 			log.Fatalf("Unable to retrieve cluster and user info for context %s: %v", name, err)
 		}
 
-		certData, err := b64.StdEncoding.DecodeString(user.User.ClientCertificateData)
+		certData, err := base64.StdEncoding.DecodeString(user.User.ClientCertificateData)
 		if err != nil {
 			log.Fatalf("Error decoding user cert from base64 (%s): %v", user.Name, err)
 		}
-		keyData, err := b64.StdEncoding.DecodeString(user.User.ClientKeyData)
+		keyData, err := base64.StdEncoding.DecodeString(user.User.ClientKeyData)
 		if err != nil {
 			log.Fatalf("Error decoding user key from base64 (%s): %v", user.Name, err)
 		}
@@ -224,7 +223,7 @@ func serverContextFromKubeconfig(kconfig *kubeconfig.KubeConfig) *serverContextF
 		}
 
 		if len(cluster.Cluster.CertificateAuthorityData) > 0 {
-			serverCA, err := b64.StdEncoding.DecodeString(cluster.Cluster.CertificateAuthorityData)
+			serverCA, err := base64.StdEncoding.DecodeString(cluster.Cluster.CertificateAuthorityData)
 			if err != nil {
 				log.Fatalf("Error decoding server CA cert from base64 (%s): %v", cluster.Name, err)
 			}
@@ -262,11 +261,11 @@ func loadServiceAccount() (*serverContextFields, error) {
 
 	servicePort := os.Getenv("KUBERNETES_SERVICE_PORT")
 	if len(servicePort) == 0 {
-		return nil, fmt.Errorf("Unable to locate API server from KUBERNETES_SERVICE_PORT environment variable")
+		return nil, fmt.Errorf("unable to locate API server from KUBERNETES_SERVICE_PORT environment variable")
 	}
 	serviceHost := os.Getenv("KUBERNETES_SERVICE_HOST")
 	if len(serviceHost) == 0 {
-		return nil, fmt.Errorf("Unable to locate API server from KUBERNETES_SERVICE_HOST environment variable")
+		return nil, fmt.Errorf("unable to locate API server from KUBERNETES_SERVICE_HOST environment variable")
 	}
 
 	return &serverContextFields{
@@ -357,10 +356,12 @@ func main() {
 	opts := []grpc.DialOption{
 		grpc.WithTransportCredentials(ta),
 		grpc.WithBlock(),
-		grpc.WithTimeout(10 * time.Second),
 	}
 
-	conn, err := grpc.Dial(config.ControllerHostname, opts...)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	conn, err := grpc.DialContext(ctx, config.ControllerHostname, opts...)
 	if err != nil {
 		log.Fatalf("Could not connect: %v", err)
 	}
