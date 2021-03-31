@@ -5,12 +5,12 @@ package tunnel;
 option go_package = "./;tunnel";
 
 message PingRequest {
-    uint64 ts = 2;
+    uint64 ts = 1;
 }
 
 message PingResponse {
-    uint64 ts = 2;
-    uint64 echoedTs = 3;
+    uint64 ts = 1;
+    uint64 echoedTs = 2;
 }
 
 message HttpHeader {
@@ -20,8 +20,8 @@ message HttpHeader {
 
 message HttpRequest {
     string id = 1;
-    string target = 2;
-    string protocol = 3;
+    string name = 2;
+    string type = 3;
     string method = 4;
     string URI = 5;
     repeated HttpHeader headers = 6;
@@ -30,7 +30,6 @@ message HttpRequest {
 
 message CancelRequest {
     string id = 1;
-    string target = 2;
 }
 
 // This is the initial response sent to the controller from the agent.
@@ -38,33 +37,30 @@ message CancelRequest {
 // with a zero length meaning EOF.
 message HttpResponse {
     string id = 1;
-    string target = 2;
-    int32 status = 3;
-    repeated HttpHeader headers = 4;
-    int64 contentLength = 6;
+    int32 status = 2;
+    repeated HttpHeader headers = 3;
+    int64 contentLength = 4;
 }
 
 message HttpChunkedResponse {
     string id = 1;
-    string target = 2;
-    bytes body = 3;
+    bytes body = 2;
 }
 
 message CommandRequest {
     string id = 1;
-    string target = 2;
-    string name = 3;
-    repeated string arguments = 4;
-    repeated string environment = 5;
+    string name = 2;
+    repeated string arguments = 3;
+    repeated string environment = 4;
 }
 
 // A simplified message, used for command-tool <-> controller communication.
 // This does not have the "id" or "target" field, as these are set by
 // the controller based on authentication used.
 message CmdToolCommandRequest {
-    string name = 3;
-    repeated string arguments = 4;
-    repeated string environment = 5;
+    string name = 1;
+    repeated string arguments = 2;
+    repeated string environment = 3;
 }
 
 enum ChannelDirection {
@@ -75,41 +71,43 @@ enum ChannelDirection {
 
 message CommandData {
     string id = 1;
-    string target = 2;
-    bytes body = 3;
-    ChannelDirection channel = 4;
-    bool Closed = 5;
+    bytes body = 2;
+    ChannelDirection channel = 3;
+    bool Closed = 4;
 }
 
 // A simplified message, used for command-tool <-> controller communication.
 // This does not have the "id" or "target" field, as these are set by
 // the controller based on authentication used.
 message CmdToolCommandData {
-    bytes body = 3;
-    ChannelDirection channel = 4;
-    bool Closed = 5;
+    bytes body = 1;
+    ChannelDirection channel = 2;
+    bool Closed = 3;
 }
 
 message CommandTermination {
     string id = 1;
-    string target = 2;
-    int32 exitCode = 3;
-    string message = 4;
+    int32 exitCode = 2;
+    string message = 3;
 }
 
 // A simplified message, used for command-tool <-> controller communication.
 // This does not have the "id" or "target" field, as these are set by
 // the controller based on authentication used.
 message CmdToolCommandTermination {
-    int32 exitCode = 3;
-    string message = 4;
+    int32 exitCode = 1;
+    string message = 2;
+}
+
+message EndpointHealth {
+    string name = 1;
+    string type = 2;
+    bool configured = 3;
 }
 
 message AgentHello {
-    repeated string protocols = 1;
-    repeated string kubernetesNamespaces = 2;
-    repeated string commandNames = 3;
-    int32 protocolVersion = 4;
+    int32 protocolVersion = 1;
+    repeated EndpointHealth endpoints = 2;
 }
 
 // Messages sent from server to agent

@@ -15,24 +15,34 @@ import (
 	"google.golang.org/grpc/credentials"
 )
 
-type agentConnectionNotification struct {
-	Identity             string   `json:"identity,omitempty"`
-	Protocols            []string `json:"protocols,omitempty"`
-	Session              string   `json:"session,omitempty"`
-	KubernetesNamespaces []string `json:"namespaces,omitempty"`
-	CommandNames         []string `json:"commandNames,omitEmpty"`
+type endpointHealth struct {
+	Name       string `json:"name,omitempty"`
+	Type       string `json:"type,omitempty"`
+	Configured bool   `json:"configured,omitempty"`
 }
 
-func sendWebhook(state *agentState, namespaces []string, commandNames []string) {
+type agentConnectionNotification struct {
+	Identity  string           `json:"identity,omitempty"`
+	Session   string           `json:"session,omitempty"`
+	Endpoints []endpointHealth `json:"endpoints,omitempty"`
+}
+
+func sendWebhook(state *agentState, endpoints []*tunnel.EndpointHealth) {
 	if hook == nil {
 		return
 	}
+	eh := make([]endpointHealth, len(endpoints))
+	for i, ep := range endpoints {
+		eh[i] = endpointHealth{
+			Name:       ep.Name,
+			Type:       ep.Type,
+			Configured: ep.Configured,
+		}
+	}
 	req := &agentConnectionNotification{
-		Identity:             state.ep.name,
-		Protocols:            state.ep.protocols,
-		Session:              state.session,
-		KubernetesNamespaces: namespaces,
-		CommandNames:         commandNames,
+		Identity:  state.ep.name,
+		Session:   state.session,
+		Endpoints: eh,
 	}
 	hook.Send(req)
 }
@@ -100,7 +110,7 @@ func handleHTTPCancelRequest(session string, identity string, cancelChan chan *c
 		removeHTTPId(httpids, request.id)
 		resp := &tunnel.ControllerToAgentWrapper{
 			Event: &tunnel.ControllerToAgentWrapper_CancelRequest{
-				CancelRequest: &tunnel.CancelRequest{Id: request.id, Target: identity},
+				CancelRequest: &tunnel.CancelRequest{Id: request.id},
 			},
 		}
 		if err := stream.Send(resp); err != nil {
@@ -174,9 +184,9 @@ func (s *agentTunnelServer) EventTunnel(stream tunnel.AgentTunnelService_EventTu
 			if req.ProtocolVersion != tunnel.CurrentProtocolVersion {
 				return fmt.Errorf("Agent protocol version %d is older than %d", req.ProtocolVersion, tunnel.CurrentProtocolVersion)
 			}
-			state.ep.protocols = req.Protocols
+			// TODO: state.ep.endpoints = req.Endpoints
 			agents.AddAgent(state)
-			sendWebhook(state, req.KubernetesNamespaces, req.CommandNames)
+			sendWebhook(state, req.Endpoints)
 		case *tunnel.AgentToControllerWrapper_HttpResponse:
 			resp := in.GetHttpResponse()
 			atomic.StoreUint64(&state.lastUse, tunnel.Now())
@@ -358,7 +368,6 @@ func (s *cmdToolTunnelServer) EventTunnel(stream tunnel.CmdToolTunnelService_Eve
 			log.Printf("CmdTool %s request: %v", identity, req)
 			cmd := &tunnel.CommandRequest{
 				Id:          operationID,
-				Target:      identity,
 				Name:        req.Name,
 				Arguments:   req.Arguments,
 				Environment: req.Environment,

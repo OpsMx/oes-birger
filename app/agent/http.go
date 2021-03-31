@@ -14,24 +14,22 @@ func makeHeaders(headers map[string][]string) []*tunnel.HttpHeader {
 	return ret
 }
 
-func makeChunkedResponse(id string, target string, data []byte) *tunnel.AgentToControllerWrapper {
+func makeChunkedResponse(id string, data []byte) *tunnel.AgentToControllerWrapper {
 	return &tunnel.AgentToControllerWrapper{
 		Event: &tunnel.AgentToControllerWrapper_HttpChunkedResponse{
 			HttpChunkedResponse: &tunnel.HttpChunkedResponse{
-				Id:     id,
-				Target: target,
-				Body:   data,
+				Id:   id,
+				Body: data,
 			},
 		},
 	}
 }
 
-func makeBadGatewayResponse(id string, target string) *tunnel.AgentToControllerWrapper {
+func makeBadGatewayResponse(id string) *tunnel.AgentToControllerWrapper {
 	return &tunnel.AgentToControllerWrapper{
 		Event: &tunnel.AgentToControllerWrapper_HttpResponse{
 			HttpResponse: &tunnel.HttpResponse{
 				Id:            id,
-				Target:        target,
 				Status:        http.StatusBadGateway,
 				ContentLength: 0,
 			},
@@ -39,12 +37,11 @@ func makeBadGatewayResponse(id string, target string) *tunnel.AgentToControllerW
 	}
 }
 
-func makeResponse(id string, target string, response *http.Response) *tunnel.AgentToControllerWrapper {
+func makeResponse(id string, response *http.Response) *tunnel.AgentToControllerWrapper {
 	return &tunnel.AgentToControllerWrapper{
 		Event: &tunnel.AgentToControllerWrapper_HttpResponse{
 			HttpResponse: &tunnel.HttpResponse{
 				Id:            id,
-				Target:        target,
 				Status:        int32(response.StatusCode),
 				ContentLength: response.ContentLength,
 				Headers:       makeHeaders(response.Header),

@@ -46,7 +46,7 @@ func executeKubernetesRequest(dataflow chan *tunnel.AgentToControllerWrapper, c 
 	httpRequest, err := http.NewRequestWithContext(ctx, req.Method, c.serverURL+req.URI, bytes.NewBuffer(req.Body))
 	if err != nil {
 		log.Printf("Failed to build request for %s to %s: %v", req.Method, c.serverURL+req.URI, err)
-		dataflow <- makeBadGatewayResponse(req.Id, req.Target)
+		dataflow <- makeBadGatewayResponse(req.Id)
 		return
 	}
 	for _, header := range req.Headers {
@@ -61,12 +61,12 @@ func executeKubernetesRequest(dataflow chan *tunnel.AgentToControllerWrapper, c 
 	get, err := client.Do(httpRequest)
 	if err != nil {
 		log.Printf("Failed to execute request for %s to %s: %v", req.Method, c.serverURL+req.URI, err)
-		dataflow <- makeBadGatewayResponse(req.Id, req.Target)
+		dataflow <- makeBadGatewayResponse(req.Id)
 		return
 	}
 
 	// First, send the headers.
-	resp := makeResponse(req.Id, req.Target, get)
+	resp := makeResponse(req.Id, get)
 	dataflow <- resp
 
 	// Now, send one or more data packet.
@@ -74,11 +74,11 @@ func executeKubernetesRequest(dataflow chan *tunnel.AgentToControllerWrapper, c 
 		buf := make([]byte, 10240)
 		n, err := get.Body.Read(buf)
 		if n > 0 {
-			resp := makeChunkedResponse(req.Id, req.Target, buf[:n])
+			resp := makeChunkedResponse(req.Id, buf[:n])
 			dataflow <- resp
 		}
 		if err == io.EOF {
-			resp := makeChunkedResponse(req.Id, req.Target, emptyBytes)
+			resp := makeChunkedResponse(req.Id, emptyBytes)
 			dataflow <- resp
 			return
 		}
@@ -89,7 +89,7 @@ func executeKubernetesRequest(dataflow chan *tunnel.AgentToControllerWrapper, c 
 		if err != nil {
 			log.Printf("Got error on HTTP read: %v", err)
 			// todo: send an error message somehow.  For now, just send EOF
-			resp := makeChunkedResponse(req.Id, req.Target, emptyBytes)
+			resp := makeChunkedResponse(req.Id, emptyBytes)
 			dataflow <- resp
 			return
 		}

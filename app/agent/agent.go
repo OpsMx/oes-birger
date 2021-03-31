@@ -20,6 +20,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 
+	"github.com/opsmx/oes-birger/app/agent/cfg"
 	"github.com/opsmx/oes-birger/pkg/kubeconfig"
 	"github.com/opsmx/oes-birger/pkg/tunnel"
 )
@@ -34,10 +35,10 @@ var (
 
 	emptyBytes = []byte("")
 
-	config *AgentConfig
+	config *cfg.AgentConfig
 )
 
-func runKubernetesTunnel(wg *sync.WaitGroup, sa *serverContext, conn *grpc.ClientConn) {
+func runTunnel(wg *sync.WaitGroup, sa *serverContext, conn *grpc.ClientConn) {
 	defer wg.Done()
 
 	ticker := time.NewTicker(time.Duration(*tickTime) * time.Second)
@@ -49,14 +50,12 @@ func runKubernetesTunnel(wg *sync.WaitGroup, sa *serverContext, conn *grpc.Clien
 	if err != nil {
 		log.Fatalf("%v.EventTunnel(_) = _, %v", client, err)
 	}
+	helloMsg := &tunnel.AgentHello{
+		ProtocolVersion: tunnel.CurrentProtocolVersion,
+	}
 	hello := &tunnel.AgentToControllerWrapper{
 		Event: &tunnel.AgentToControllerWrapper_AgentHello{
-			AgentHello: &tunnel.AgentHello{
-				Protocols:            []string{"kubernetes", "remote-command"},
-				CommandNames:         []string{"sh"},
-				KubernetesNamespaces: config.Namespaces,
-				ProtocolVersion:      tunnel.CurrentProtocolVersion,
-			},
+			AgentHello: helloMsg,
 		},
 	}
 	if err = stream.Send(hello); err != nil {
@@ -108,11 +107,11 @@ func runKubernetesTunnel(wg *sync.WaitGroup, sa *serverContext, conn *grpc.Clien
 				callCancelFunction(req.Id)
 			case *tunnel.ControllerToAgentWrapper_HttpRequest:
 				req := in.GetHttpRequest()
-				if req.Protocol == "kubernetes" {
+				if req.Type == "kubernetes" {
 					go executeKubernetesRequest(dataflow, makeServerContextFields(sa), req)
 				} else {
-					log.Printf("Request for unsupported HTTP tunnel: %s", req.Protocol)
-					dataflow <- makeBadGatewayResponse(req.Id, req.Target)
+					log.Printf("Request for unsupported HTTP tunnel type: %s", req.Type)
+					dataflow <- makeBadGatewayResponse(req.Id)
 				}
 			case *tunnel.ControllerToAgentWrapper_CommandRequest:
 				req := in.GetCommandRequest()
@@ -324,12 +323,12 @@ func updateServerContextTicker(sa *serverContext) {
 func main() {
 	flag.Parse()
 
-	c, err := LoadConfig(*configFile)
+	c, err := cfg.Load(*configFile)
 	if err != nil {
 		log.Fatalf("Error loading config: %v", err)
 	}
 	config = c
-	config.DumpConfig()
+	log.Printf("controller hostname: %s", config.ControllerHostname)
 
 	// load client cert/key, cacert
 	clcert, err := tls.LoadX509KeyPair(*agentCertFile, *agentKeyFile)
@@ -369,9 +368,11 @@ func main() {
 
 	var wg sync.WaitGroup
 
-	log.Printf("Starting Kubernetes tunnel.")
-	wg.Add(1)
-	go runKubernetesTunnel(&wg, sa, conn)
+	if config.Kubernetes != nil && config.Kubernetes.Enabled {
+		log.Printf("Starting Kubernetes tunnel.")
+		wg.Add(1)
+		go runTunnel(&wg, sa, conn)
+	}
 
 	wg.Wait()
 	log.Printf("Done.")

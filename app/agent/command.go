@@ -50,7 +50,6 @@ func makeCommandFailed(req *tunnel.CommandRequest, err error, message string) *t
 		Event: &tunnel.AgentToControllerWrapper_CommandTermination{
 			CommandTermination: &tunnel.CommandTermination{
 				Id:       req.Id,
-				Target:   req.Target,
 				ExitCode: 127,
 				Message:  msg,
 			},
@@ -63,7 +62,6 @@ func makeCommandTermination(req *tunnel.CommandRequest, exitstatus int) *tunnel.
 		Event: &tunnel.AgentToControllerWrapper_CommandTermination{
 			CommandTermination: &tunnel.CommandTermination{
 				Id:       req.Id,
-				Target:   req.Target,
 				ExitCode: int32(exitstatus),
 			},
 		},
@@ -75,7 +73,6 @@ func makeCommandData(req *tunnel.CommandRequest, channel tunnel.ChannelDirection
 		Event: &tunnel.AgentToControllerWrapper_CommandData{
 			CommandData: &tunnel.CommandData{
 				Id:      req.Id,
-				Target:  req.Target,
 				Body:    data,
 				Channel: channel,
 			},
@@ -88,7 +85,6 @@ func makeCommandDataClosed(req *tunnel.CommandRequest, channel tunnel.ChannelDir
 		Event: &tunnel.AgentToControllerWrapper_CommandData{
 			CommandData: &tunnel.CommandData{
 				Id:      req.Id,
-				Target:  req.Target,
 				Channel: channel,
 				Closed:  true,
 			},

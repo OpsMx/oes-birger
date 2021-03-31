@@ -115,13 +115,12 @@ func kubernetesAPIHandler(w http.ResponseWriter, r *http.Request) {
 
 	body, _ := ioutil.ReadAll(r.Body)
 	req := &tunnel.HttpRequest{
-		Id:       ulidContext.Ulid(),
-		Target:   agentname,
-		Protocol: "kubernetes",
-		Method:   r.Method,
-		URI:      r.RequestURI,
-		Headers:  makeHeaders(r.Header),
-		Body:     body,
+		Id:      ulidContext.Ulid(),
+		Type:    "kubernetes",
+		Method:  r.Method,
+		URI:     r.RequestURI,
+		Headers: makeHeaders(r.Header),
+		Body:    body,
 	}
 	message := &httpMessage{out: make(chan *tunnel.AgentToControllerWrapper), cmd: req}
 	found := agents.SendToAgent(ep, message)
