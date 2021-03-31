@@ -368,11 +368,9 @@ func main() {
 
 	var wg sync.WaitGroup
 
-	if config.Kubernetes != nil && config.Kubernetes.Enabled {
-		log.Printf("Starting Kubernetes tunnel.")
-		wg.Add(1)
-		go runTunnel(&wg, sa, conn)
-	}
+	log.Printf("Starting GRPC tunnel.")
+	wg.Add(1)
+	go runTunnel(&wg, sa, conn)
 
 	wg.Wait()
 	log.Printf("Done.")
