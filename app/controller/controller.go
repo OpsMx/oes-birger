@@ -207,7 +207,7 @@ func runAgentHTTPServer(serverCert tls.Certificate) {
 		Certificates: []tls.Certificate{serverCert},
 		MinVersion:   tls.VersionTLS12,
 	}
-	tlsConfig.BuildNameToCertificate()
+	//tlsConfig.BuildNameToCertificate()
 
 	mux := http.NewServeMux()
 

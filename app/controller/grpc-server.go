@@ -75,29 +75,27 @@ func addHTTPId(httpids *sessionList, id string, c chan *tunnel.AgentToController
 
 func handleHTTPRequests(session string, requestChan chan interface{}, httpids *sessionList, stream tunnel.AgentTunnelService_EventTunnelServer) {
 	for interfacedRequest := range requestChan {
-		switch interfacedRequest.(type) {
+		switch value := interfacedRequest.(type) {
 		case *httpMessage:
-			httpRequest := interfacedRequest.(*httpMessage)
-			addHTTPId(httpids, httpRequest.cmd.Id, httpRequest.out)
+			addHTTPId(httpids, value.cmd.Id, value.out)
 			resp := &tunnel.ControllerToAgentWrapper{
 				Event: &tunnel.ControllerToAgentWrapper_HttpRequest{
-					HttpRequest: httpRequest.cmd,
+					HttpRequest: value.cmd,
 				},
 			}
 			if err := stream.Send(resp); err != nil {
-				log.Printf("Unable to send to agent %s for HTTP request %s", session, httpRequest.cmd.Id)
+				log.Printf("Unable to send to agent %s for HTTP request %s", session, value.cmd.Id)
 			}
 		case *runCmdMessage:
-			cmdRequest := interfacedRequest.(*runCmdMessage)
-			log.Printf("cmd %s %s %v %v running", cmdRequest.cmd.Id, cmdRequest.cmd.Name, cmdRequest.cmd.Arguments, cmdRequest.cmd.Environment)
-			addHTTPId(httpids, cmdRequest.cmd.Id, cmdRequest.out)
+			log.Printf("cmd %s %s %v %v running", value.cmd.Id, value.cmd.Name, value.cmd.Arguments, value.cmd.Environment)
+			addHTTPId(httpids, value.cmd.Id, value.out)
 			resp := &tunnel.ControllerToAgentWrapper{
 				Event: &tunnel.ControllerToAgentWrapper_CommandRequest{
-					CommandRequest: cmdRequest.cmd,
+					CommandRequest: value.cmd,
 				},
 			}
 			if err := stream.Send(resp); err != nil {
-				log.Printf("Unable to send to agent %s for CMD request %s", session, cmdRequest.cmd.Id)
+				log.Printf("Unable to send to agent %s for CMD request %s", session, value.cmd.Id)
 			}
 		default:
 			log.Printf("Got unexpected message type: %T", interfacedRequest)
@@ -376,7 +374,7 @@ func (s *cmdToolTunnelServer) EventTunnel(stream tunnel.CmdToolTunnelService_Eve
 			found := agents.SendToAgent(ep, message)
 			if !found {
 				close(agentResponseChan)
-				return fmt.Errorf("Unknown agent: %s", identity)
+				return fmt.Errorf("unknown agent: %s", identity)
 			}
 		case nil:
 			// ignore for now
