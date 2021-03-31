@@ -110,7 +110,7 @@ func makeHeaders(headers map[string][]string) []*tunnel.HttpHeader {
 
 func kubernetesAPIHandler(w http.ResponseWriter, r *http.Request) {
 	agentname := firstLabel(r.TLS.PeerCertificates[0].Subject.CommonName)
-	ep := endpoint{protocols: []string{"kubernetes"}, name: agentname}
+	ep := endpoint{name: agentname}
 	apiRequestCounter.WithLabelValues(agentname).Inc()
 
 	body, _ := ioutil.ReadAll(r.Body)
@@ -193,7 +193,7 @@ func kubernetesAPIHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func runAgentHTTPServer(serverCert tls.Certificate) {
+func runAgentKubernetesAPIServer(serverCert tls.Certificate) {
 	log.Printf("Running Kubernetes API HTTPS listener on port %d", config.KubernetesAPIPort)
 
 	certPool, err := authority.MakeCertPool()
@@ -279,26 +279,9 @@ func main() {
 		log.Fatalf("Cannot make server certificate: %v", err)
 	}
 
-	//
-	// Set up k8s API server
-	//
-	go runAgentHTTPServer(*serverCert)
-
-	//
-	// Start up command and control API server
-	//
+	go runAgentKubernetesAPIServer(*serverCert)
 	go runCommandHTTPServer(*serverCert)
-
-	// Start up a command-tool GRPC server
 	go runCmdToolGRPCServer(*serverCert)
-
-	//
-	// Run the GRPC server itself
-	//
 	go runAgentGRPCServer(*serverCert)
-
-	//
-	// Run Prometheus HTTP server (never returns)
-	//
 	runPrometheusHTTPServer(config.PrometheusPort)
 }

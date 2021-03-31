@@ -64,13 +64,12 @@ type agentState struct {
 // DirectlyConnectedAgentStatistics describes statistics for a directly connected agent.
 //
 type DirectlyConnectedAgentStatistics struct {
-	Identity       string   `json:"identity"`
-	Protocols      []string `json:"protocols"`
-	Session        string   `json:"session"`
-	ConnectedAt    uint64   `json:"connectedAt"`
-	LastPing       uint64   `json:"lastPing"`
-	LastUse        uint64   `json:"lastUse"`
-	ConnectionType string   `json:"connectionType"`
+	Identity       string `json:"identity"`
+	Session        string `json:"session"`
+	ConnectedAt    uint64 `json:"connectedAt"`
+	LastPing       uint64 `json:"lastPing"`
+	LastUse        uint64 `json:"lastUse"`
+	ConnectionType string `json:"connectionType"`
 }
 
 //
@@ -111,12 +110,12 @@ func (s *agentState) LastUse() uint64 {
 }
 
 func (s *agentState) String() string {
-	return fmt.Sprintf("(%s, [%v], %s)", s.ep.name, s.ep.protocols, s.session)
+	return fmt.Sprintf("(%s, %s)", s.ep.name, s.session)
 }
 
 type endpoint struct {
-	name      string   // The agent name
-	protocols []string // "kubernetes", "remote-command", etc.
+	name      string // The agent name
+	endpoints []endpointHealth
 }
 
 //
@@ -236,7 +235,6 @@ func (s *agentState) CancelRequest(message *cancelRequest) {
 func (s *agentState) GetStatistics() interface{} {
 	return &DirectlyConnectedAgentStatistics{
 		Identity:       s.ep.name,
-		Protocols:      s.ep.protocols,
 		Session:        s.session,
 		ConnectedAt:    s.connectedAt,
 		LastPing:       s.lastPing,

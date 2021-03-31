@@ -27,8 +27,6 @@ import (
 
 var (
 	tickTime           = flag.Int("tickTime", 30, "Time between sending Ping messages")
-	agentCertFile      = flag.String("certFile", "/app/secrets/agent/tls.crt", "The file containing the certificate used to connect to the controller")
-	agentKeyFile       = flag.String("keyFile", "/app/secrets/agent/tls.key", "The file containing the certificate used to connect to the controller")
 	caCertFile         = flag.String("caCertFile", "/app/config/ca.pem", "The file containing the CA certificate we will use to verify the controller's cert")
 	kubeConfigFilename = flag.String("kubeconfig", "/app/config/kubeconfig.yaml", "The location of a kubeconfig file to define endpoints and kube API auth")
 	configFile         = flag.String("configFile", "/app/config/config.yaml", "The file with the controller config")
@@ -107,7 +105,7 @@ func runTunnel(wg *sync.WaitGroup, sa *serverContext, conn *grpc.ClientConn) {
 				callCancelFunction(req.Id)
 			case *tunnel.ControllerToAgentWrapper_HttpRequest:
 				req := in.GetHttpRequest()
-				if req.Type == "kubernetes" {
+				if req.Type == "kubernetes" && config.Kubernetes.Enabled {
 					go executeKubernetesRequest(dataflow, makeServerContextFields(sa), req)
 				} else {
 					log.Printf("Request for unsupported HTTP tunnel type: %s", req.Type)
@@ -291,7 +289,7 @@ func loadCert() []byte {
 	return cert
 }
 
-func loadSecurity() *serverContextFields {
+func loadKubernetesSecurity() *serverContextFields {
 	yamlString, err := os.Open(*kubeConfigFilename)
 	if err == nil {
 		kconfig, err := kubeconfig.ReadKubeConfig(yamlString)
@@ -309,7 +307,7 @@ func loadSecurity() *serverContextFields {
 
 func updateServerContextTicker(sa *serverContext) {
 	for {
-		saf := loadSecurity()
+		saf := loadKubernetesSecurity()
 		sa.Lock()
 		if !sa.f.isSameAs(saf) {
 			log.Printf("Updating security context for API calls to Kubernetes")
@@ -331,7 +329,7 @@ func main() {
 	log.Printf("controller hostname: %s", config.ControllerHostname)
 
 	// load client cert/key, cacert
-	clcert, err := tls.LoadX509KeyPair(*agentCertFile, *agentKeyFile)
+	clcert, err := tls.LoadX509KeyPair(config.CertFile, config.KeyFile)
 	if err != nil {
 		log.Fatalf("Unable to load agent certificate or key: %v", err)
 	}
@@ -346,11 +344,14 @@ func main() {
 		RootCAs:      caCertPool,
 	})
 
-	// First, try to see if we have a kubeconfig.yaml
-	saf := loadSecurity()
-	sa := &serverContext{f: *saf}
+	sa := &serverContext{}
+	if config.Kubernetes.Enabled {
+		// First, try to see if we have a kubeconfig.yaml
+		saf := loadKubernetesSecurity()
+		sa.f = *saf
 
-	go updateServerContextTicker(sa)
+		go updateServerContextTicker(sa)
+	}
 
 	opts := []grpc.DialOption{
 		grpc.WithTransportCredentials(ta),

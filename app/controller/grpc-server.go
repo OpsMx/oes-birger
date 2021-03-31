@@ -140,7 +140,7 @@ func (s *agentTunnelServer) EventTunnel(stream tunnel.AgentTunnelService_EventTu
 	httpids := &sessionList{m: make(map[string]chan *tunnel.AgentToControllerWrapper)}
 
 	state := &agentState{
-		ep:              endpoint{name: agentIdentity, protocols: []string{"UNKNOWN"}},
+		ep:              endpoint{name: agentIdentity},
 		session:         sessionIdentity,
 		inRequest:       inRequest,
 		inCancelRequest: inCancelRequest,
@@ -182,7 +182,15 @@ func (s *agentTunnelServer) EventTunnel(stream tunnel.AgentTunnelService_EventTu
 			if req.ProtocolVersion != tunnel.CurrentProtocolVersion {
 				return fmt.Errorf("Agent protocol version %d is older than %d", req.ProtocolVersion, tunnel.CurrentProtocolVersion)
 			}
-			// TODO: state.ep.endpoints = req.Endpoints
+			endpoints := make([]endpointHealth, len(req.Endpoints))
+			for i, ep := range req.Endpoints {
+				endpoints[i] = endpointHealth{
+					Name:       ep.Name,
+					Type:       ep.Type,
+					Configured: ep.Configured,
+				}
+			}
+			state.ep.endpoints = endpoints
 			agents.AddAgent(state)
 			sendWebhook(state, req.Endpoints)
 		case *tunnel.AgentToControllerWrapper_HttpResponse:
@@ -309,7 +317,6 @@ func (s *cmdToolTunnelServer) EventTunnel(stream tunnel.CmdToolTunnelService_Eve
 		return err
 	}
 	log.Printf("CmdTool %s connected", identity)
-	ep := endpoint{protocols: []string{"remote-command"}, name: identity}
 
 	sessionIdentity := ulidContext.Ulid()
 	agentResponseChan := make(chan *tunnel.AgentToControllerWrapper)
@@ -346,6 +353,7 @@ func (s *cmdToolTunnelServer) EventTunnel(stream tunnel.CmdToolTunnelService_Eve
 	}()
 
 	operationID := ulidContext.Ulid()
+	ep := endpoint{name: identity}
 
 	for {
 		in, err := stream.Recv()

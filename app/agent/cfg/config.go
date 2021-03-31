@@ -6,6 +6,11 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+const (
+	DEFAULT_CERT_PATH = "/app/secrets/agent/tls.crt"
+	DEFAULT_KEY_PATH  = "/app/secrets/agent/tls.key"
+)
+
 // CommandConfig defines a remote host we can run commands on.
 // Each host has a `Name`, which can be targeted from Spinnaker.
 // There are no environment overrides for these.
@@ -58,6 +63,28 @@ type AgentConfig struct {
 	Commands           []CommandConfig   `yaml:"commands,omitempty"`
 	Kubernetes         *KubernetesConfig `yaml:"kubernetes,omitempty"`
 	Services           *ServiceConfig    `yaml:"services,omitempty"`
+	CertFile           string            `yaml:"certFile,omitempty"`
+	KeyFile            string            `yaml:"keyFile,omitempty"`
+}
+
+func (c *AgentConfig) applyDefaults() {
+	if len(c.ControllerHostname) == 0 {
+		c.ControllerHostname = "forwarder-controller:9001"
+	}
+
+	if len(c.CertFile) == 0 {
+		c.CertFile = DEFAULT_CERT_PATH
+	}
+
+	if len(c.KeyFile) == 0 {
+		c.KeyFile = DEFAULT_KEY_PATH
+	}
+
+	if c.Kubernetes == nil {
+		c.Kubernetes = &KubernetesConfig{
+			Enabled: false,
+		}
+	}
 }
 
 // Load will load YAML configuration from the provided filename, and then apply
@@ -74,9 +101,7 @@ func Load(filename string) (*AgentConfig, error) {
 		return nil, err
 	}
 
-	if len(config.ControllerHostname) == 0 {
-		config.ControllerHostname = "forwarder-controller:9001"
-	}
+	config.applyDefaults()
 
 	return config, nil
 }
