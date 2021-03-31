@@ -8,11 +8,15 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/base64"
-	"encoding/json"
 	"encoding/pem"
 	"fmt"
 	"math/big"
 	"time"
+)
+
+const (
+	DEFAULT_TLS_CERTIFICATE_PATH = "/app/secrets/ca/tls.crt" // use as const
+	DEFAULT_TLS_KEY_PATH         = "/app/secrets/ca/tls.key" // use as const
 )
 
 //
@@ -32,32 +36,19 @@ type Config struct {
 	CAKeyFile  string `yaml:"caKeyFile,omitempty" json:"caKeyFile,omitempty"`
 }
 
-// TODO: this may not be needed...
-func deepcopy(dst interface{}, src interface{}) error {
-	j, err := json.Marshal(src)
-	if err != nil {
-		return err
-	}
-	err = json.Unmarshal(j, &dst)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
 func (c *Config) applyDefaults() {
 	if len(c.CACertFile) == 0 {
-		c.CACertFile = "/app/secrets/ca/tls.crt"
+		c.CACertFile = DEFAULT_TLS_CERTIFICATE_PATH
 	}
 	if len(c.CAKeyFile) == 0 {
-		c.CAKeyFile = "/app/secrets/ca/tls.key"
+		c.CAKeyFile = DEFAULT_TLS_KEY_PATH
 	}
 }
 
 func (c *CA) loadCertificate() error {
 	caCert, err := tls.LoadX509KeyPair(c.config.CACertFile, c.config.CAKeyFile)
 	if err != nil {
-		return fmt.Errorf("Unable to load CA cetificate or key: %v", err)
+		return fmt.Errorf("unable to load CA cetificate or key: %v", err)
 	}
 	c.caCert = caCert
 	return nil
@@ -70,18 +61,13 @@ func (c *CA) loadCertificate() error {
 // in the configuration.
 //
 func MakeCA(c *Config) (*CA, error) {
-	var config Config
-	err := deepcopy(config, *c)
-	if err != nil {
-		return nil, err
-	}
-	config.applyDefaults()
+	c.applyDefaults()
 
 	ca := &CA{
-		config: &config,
+		config: c,
 	}
 
-	err = ca.loadCertificate()
+	err := ca.loadCertificate()
 	if err != nil {
 		return nil, err
 	}
@@ -183,6 +169,9 @@ func (c *CA) MakeServerCert(names []string) (*tls.Certificate, error) {
 	// we now have a certificate and private key.  Now, sign the cert with the CA.
 
 	caCert, err := x509.ParseCertificate(c.caCert.Certificate[0])
+	if err != nil {
+		return nil, err
+	}
 
 	certBytes, err := x509.CreateCertificate(crand.Reader, cert, caCert, &certPrivKey.PublicKey, c.caCert.PrivateKey)
 	if err != nil {
@@ -255,7 +244,7 @@ func (c *CA) MakeCertPool() (*x509.CertPool, error) {
 	for _, cert := range c.caCert.Certificate {
 		x, err := x509.ParseCertificate(cert)
 		if err != nil {
-			return nil, fmt.Errorf("Unable to parse certificate ASN.1: %v", err)
+			return nil, fmt.Errorf("unable to parse certificate ASN.1: %v", err)
 		}
 		caCertPool.AddCert(x)
 		caCertPool.AppendCertsFromPEM(cert)
