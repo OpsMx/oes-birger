@@ -60,11 +60,11 @@ func (c *CA) loadCertificate() error {
 // actually create a new CA.  This loads the certificate from the filenames
 // in the configuration.
 //
-func MakeCA(c *Config) (*CA, error) {
+func MakeCA(c Config) (*CA, error) {
 	c.applyDefaults()
 
 	ca := &CA{
-		config: c,
+		config: &c,
 	}
 
 	err := ca.loadCertificate()
