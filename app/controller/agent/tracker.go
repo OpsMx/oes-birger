@@ -5,8 +5,6 @@ import (
 	"math/rand"
 	"sync"
 	"time"
-
-	"github.com/opsmx/oes-birger/pkg/tunnel"
 )
 
 var (
@@ -36,11 +34,6 @@ type Endpoint struct {
 type ConnectedAgents struct {
 	sync.RWMutex
 	m map[string][]Agent
-}
-
-type HTTPMessage struct {
-	Out chan *tunnel.AgentToControllerWrapper
-	Cmd *tunnel.HttpRequest
 }
 
 //
@@ -139,7 +132,7 @@ func (s *ConnectedAgents) RemoveAgent(state *AgentState) {
 }
 
 //
-// SendToAgent will send a new httpMessage to an agent, and return true if an agent
+// Send will search for the specific agent and endpoint. send a message to an agent, and return true if an agent
 // was found.
 //
 func (s *ConnectedAgents) Send(ep AgentSearch, message interface{}) (string, bool) {

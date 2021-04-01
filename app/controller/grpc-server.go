@@ -71,7 +71,7 @@ func addHTTPId(httpids *sessionList, id string, c chan *tunnel.AgentToController
 func handleHTTPRequests(session string, requestChan chan interface{}, httpids *sessionList, stream tunnel.AgentTunnelService_EventTunnelServer) {
 	for interfacedRequest := range requestChan {
 		switch value := interfacedRequest.(type) {
-		case *agent.HTTPMessage:
+		case *HTTPMessage:
 			addHTTPId(httpids, value.Cmd.Id, value.Out)
 			resp := &tunnel.ControllerToAgentWrapper{
 				Event: &tunnel.ControllerToAgentWrapper_HttpRequest{

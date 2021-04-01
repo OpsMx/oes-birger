@@ -105,6 +105,11 @@ func makeHeaders(headers map[string][]string) []*tunnel.HttpHeader {
 // tunnel are closed.
 //
 
+type HTTPMessage struct {
+	Out chan *tunnel.AgentToControllerWrapper
+	Cmd *tunnel.HttpRequest
+}
+
 func kubernetesAPIHandler(w http.ResponseWriter, r *http.Request) {
 	agentIdentity := firstLabel(r.TLS.PeerCertificates[0].Subject.CommonName)
 	ep := agent.AgentSearch{
@@ -125,7 +130,7 @@ func kubernetesAPIHandler(w http.ResponseWriter, r *http.Request) {
 		Headers: makeHeaders(r.Header),
 		Body:    body,
 	}
-	message := &agent.HTTPMessage{Out: make(chan *tunnel.AgentToControllerWrapper), Cmd: req}
+	message := &HTTPMessage{Out: make(chan *tunnel.AgentToControllerWrapper), Cmd: req}
 	sessionID, found := agents.Send(ep, message)
 	if !found {
 		w.WriteHeader(http.StatusBadGateway)
