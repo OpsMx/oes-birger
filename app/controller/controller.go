@@ -17,6 +17,7 @@ import (
 	"google.golang.org/grpc/peer"
 	"google.golang.org/grpc/status"
 
+	"github.com/opsmx/oes-birger/app/controller/agent"
 	"github.com/opsmx/oes-birger/pkg/ca"
 	"github.com/opsmx/oes-birger/pkg/tunnel"
 	"github.com/opsmx/oes-birger/pkg/ulid"
@@ -28,8 +29,6 @@ import (
 
 var (
 	configFile = flag.String("configFile", "/app/config/config.yaml", "The file with the controller config")
-
-	agents *AgentNameList = MakeAgents()
 
 	config *ControllerConfig
 
@@ -109,32 +108,39 @@ func makeHeaders(headers map[string][]string) []*tunnel.HttpHeader {
 //
 
 func kubernetesAPIHandler(w http.ResponseWriter, r *http.Request) {
-	agentname := firstLabel(r.TLS.PeerCertificates[0].Subject.CommonName)
-	ep := endpoint{name: agentname}
-	apiRequestCounter.WithLabelValues(agentname).Inc()
+	agentIdentity := firstLabel(r.TLS.PeerCertificates[0].Subject.CommonName)
+	ep := agent.AgentSearch{
+		Identity:     agentIdentity,
+		EndpointType: "kubernetes",
+		EndpointName: "kubernetes",
+	}
+	apiRequestCounter.WithLabelValues(agentIdentity).Inc()
+
+	transactionID := ulidContext.Ulid()
 
 	body, _ := ioutil.ReadAll(r.Body)
 	req := &tunnel.HttpRequest{
-		Id:      ulidContext.Ulid(),
+		Id:      transactionID,
 		Type:    "kubernetes",
 		Method:  r.Method,
 		URI:     r.RequestURI,
 		Headers: makeHeaders(r.Header),
 		Body:    body,
 	}
-	message := &httpMessage{out: make(chan *tunnel.AgentToControllerWrapper), cmd: req}
-	found := agents.SendToAgent(ep, message)
+	message := &agent.HTTPMessage{Out: make(chan *tunnel.AgentToControllerWrapper), Cmd: req}
+	sessionID, found := agent.Send(ep, message)
 	if !found {
 		w.WriteHeader(http.StatusBadGateway)
 		return
 	}
+	ep.Session = sessionID
 
 	cleanClose := false
 	notify := r.Context().Done()
 	go func() {
 		<-notify
 		if !cleanClose {
-			agents.CancelRequest(ep, &cancelRequest{id: req.Id})
+			agent.Cancel(ep, transactionID)
 		}
 	}()
 
@@ -142,7 +148,7 @@ func kubernetesAPIHandler(w http.ResponseWriter, r *http.Request) {
 	isChunked := false
 	flusher := w.(http.Flusher)
 	for {
-		in, more := <-message.out
+		in, more := <-message.Out
 		if !more {
 			if !seenHeader {
 				log.Printf("Request timed out sending to agent")
@@ -243,7 +249,7 @@ func runPrometheusHTTPServer(port uint16) {
 	server.ListenAndServe()
 
 	prometheus.MustRegister(apiRequestCounter)
-	prometheus.MustRegister(connectedAgentsGauge)
+	agent.PrometheusRegister()
 }
 
 func main() {
