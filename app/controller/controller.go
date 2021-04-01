@@ -110,13 +110,18 @@ type HTTPMessage struct {
 	Cmd *tunnel.HttpRequest
 }
 
+func getServerName(httpRequest *http.Request) string {
+	items := strings.Split(httpRequest.Host, ":")
+	return items[0]
+}
+
 func kubernetesAPIHandler(w http.ResponseWriter, r *http.Request) {
 	if len(r.TLS.PeerCertificates) == 0 {
 		log.Printf("Kubernetes:  client did not present a certificate, returning Unauthorized")
 		w.WriteHeader(http.StatusUnauthorized)
 	}
 
-	log.Printf("Client sent host %s", r.Host)
+	log.Printf("Client sent host %s", getServerName(r))
 
 	agentIdentity := firstLabel(r.TLS.PeerCertificates[0].Subject.CommonName)
 	ep := agent.AgentSearch{
