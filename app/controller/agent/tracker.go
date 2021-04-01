@@ -2,10 +2,15 @@ package agent
 
 import (
 	"log"
-	rnd "math/rand"
+	"math/rand"
 	"sync"
+	"time"
 
 	"github.com/opsmx/oes-birger/pkg/tunnel"
+)
+
+var (
+	rnd = rand.New(rand.NewSource(time.Now().UnixNano())) // not used for crypto
 )
 
 //

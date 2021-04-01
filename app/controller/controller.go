@@ -7,10 +7,8 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
-	"math/rand"
 	"net/http"
 	"strings"
-	"time"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
@@ -37,8 +35,6 @@ var (
 	ulidContext = ulid.NewContext()
 
 	hook *webhook.Runner
-
-	rnd = rand.New(rand.NewSource(time.Now().UnixNano()))
 
 	agents = agent.MakeAgents()
 
