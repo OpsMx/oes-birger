@@ -111,9 +111,21 @@ type HTTPMessage struct {
 	Cmd *tunnel.HttpRequest
 }
 
-func getServerName(httpRequest *http.Request) string {
+func getServiceTypeFromName(httpRequest *http.Request) string {
 	items := strings.Split(httpRequest.Host, ":")
-	return items[0]
+	items2 := strings.Split(items[0], ".")
+	return items2[0]
+}
+
+func serviceAPIHandler(w http.ResponseWriter, r *http.Request) {
+	serviceType := getServiceTypeFromName(r)
+	if serviceType == "kubernetes" {
+		kubernetesAPIHandler(w, r)
+	} else {
+		log.Printf("unknown service type: %s", serviceType)
+		w.WriteHeader(http.StatusBadGateway)
+		return
+	}
 }
 
 func kubernetesAPIHandler(w http.ResponseWriter, r *http.Request) {
@@ -122,8 +134,6 @@ func kubernetesAPIHandler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
-
-	log.Printf("Client sent host %s", getServerName(r))
 
 	endpointName, endpointType, agentIdentity := labels(r.TLS.PeerCertificates[0].Subject.CommonName)
 	if endpointType != "kubernetes" {
