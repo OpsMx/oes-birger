@@ -29,7 +29,8 @@ type CommandConfig struct {
 // KubernetesConfig holds the config for Kubernetes endpoints.
 //
 type KubernetesConfig struct {
-	Enabled bool `yaml:"enabled"`
+	Enabled    bool   `yaml:"enabled"`
+	KubeConfig string `yaml:"kubeConfig,omitempty"`
 }
 
 //
@@ -84,6 +85,10 @@ func (c *AgentConfig) applyDefaults() {
 		c.Kubernetes = &KubernetesConfig{
 			Enabled: false,
 		}
+	}
+
+	if c.Kubernetes.KubeConfig == "" {
+		c.Kubernetes.KubeConfig = "/app/config/kubeconfig.yaml"
 	}
 }
 
