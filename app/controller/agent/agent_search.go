@@ -1,6 +1,9 @@
 package agent
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 type AgentSearch struct {
 	Identity     string // The agent identity
@@ -10,5 +13,17 @@ type AgentSearch struct {
 }
 
 func (a *AgentSearch) String() string {
-	return fmt.Sprintf("(%s, %s, %s)", a.Identity, a.EndpointType, a.EndpointName)
+	l := []string{
+		fmt.Sprintf("identity=%s", a.Identity),
+	}
+	if len(a.Session) == 0 {
+		l = append(l, fmt.Sprintf("session=%s", a.Session))
+	}
+	if len(a.EndpointType) == 0 {
+		l = append(l, fmt.Sprintf("type=%s", a.EndpointType))
+	}
+	if len(a.EndpointName) == 0 {
+		l = append(l, fmt.Sprintf("name=%s", a.EndpointName))
+	}
+	return fmt.Sprintf("(%s)", strings.Join(l, ", "))
 }

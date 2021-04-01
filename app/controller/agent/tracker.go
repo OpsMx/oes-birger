@@ -18,14 +18,10 @@ var (
 type Agent interface {
 	Send(interface{}) string
 	Cancel(string)
+	HasEndpoint(string, string) bool
+	GetSession() string
 
 	GetStatistics() interface{}
-}
-
-type Endpoint struct {
-	Name       string `json:"name,omitempty"`
-	Type       string `json:"type,omitempty"`
-	Configured bool   `json:"configured,omitempty"`
 }
 
 //
@@ -143,6 +139,15 @@ func (s *ConnectedAgents) Send(ep AgentSearch, message interface{}) (string, boo
 		log.Printf("No agents connected for: %s", ep)
 		return "", false
 	}
+	possibleAgents := []int{}
+	for i, a := range agentList {
+		if a.HasEndpoint(ep.EndpointType, ep.EndpointName) {
+			possibleAgents = append(possibleAgents, i)
+		}
+	}
+	if len(possibleAgents) == 0 {
+		log.Printf("Request for %s, no such endpoint exists or all are unconfigured.", ep)
+	}
 	a := agentList[rnd.Intn(len(agentList))]
 	session := a.Send(message)
 	return session, true
@@ -154,14 +159,27 @@ func (s *ConnectedAgents) Send(ep AgentSearch, message interface{}) (string, boo
 // which owns this ID...  not one at random.
 //
 func (s *ConnectedAgents) Cancel(ep AgentSearch, id string) bool {
+	// The session must be set, if not this is an error.
+	if len(ep.Session) == 0 {
+		log.Printf("ERROR: session is not set.  Coding error.")
+		return false
+	}
+
 	s.RLock()
 	defer s.RUnlock()
 	agentList, ok := s.m[ep.Identity]
 	if !ok || len(agentList) == 0 {
-		log.Printf("No agents connected for: %s", ep)
+		log.Printf("ERROR: No agents connected for: %s.  Likely coding error.", ep)
 		return false
 	}
-	agent := agentList[rnd.Intn(len(agentList))]
-	agent.Cancel(id)
-	return true
+
+	for _, a := range agentList {
+		if a.GetSession() == ep.Session {
+			a.Cancel(id)
+			return true
+		}
+	}
+
+	log.Printf("ERROR: No agents with specific session exist for %s.  Likely coding error.", ep)
+	return false
 }

@@ -13,8 +13,12 @@ type AgentState struct {
 	LastUse         uint64
 }
 
+func (s *AgentState) GetSession() string {
+	return s.Session
+}
+
 func (s *AgentState) String() string {
-	return fmt.Sprintf("(%s, %s)", s.Identity, s.Session)
+	return fmt.Sprintf("(identity=%s, session=%s)", s.Identity, s.Session)
 }
 
 //
@@ -26,10 +30,22 @@ func (s *AgentState) Send(message interface{}) string {
 }
 
 //
-// SendCancel canceles a specific stream
+// Cancel cancels a specific stream
 //
 func (s *AgentState) Cancel(id string) {
 	s.InCancelRequest <- id
+}
+
+//
+// HasEndpoint returns true if the endpoint is presend and configured.
+//
+func (s *AgentState) HasEndpoint(endpointType string, endpointName string) bool {
+	for _, ep := range s.Endpoints {
+		if ep.Type == endpointType && ep.Name == endpointName {
+			return ep.Configured
+		}
+	}
+	return false
 }
 
 //
