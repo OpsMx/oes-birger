@@ -250,7 +250,7 @@ func runHTTPSServer(serverCert tls.Certificate) {
 
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("/", kubernetesAPIHandler)
+	mux.HandleFunc("/", serviceAPIHandler)
 
 	server := &http.Server{
 		Addr:      fmt.Sprintf(":%d", config.ServicePort),
