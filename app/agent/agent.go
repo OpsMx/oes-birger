@@ -183,13 +183,37 @@ func loadCert() []byte {
 }
 
 func configureEndpoints() {
-	log.Printf("%#v", config)
-	for _, c := range config.Services {
-		endpoints = append(endpoints, Endpoint{
-			Type:       c.Type,
-			Name:       c.Name,
-			Configured: c.Enabled,
-		})
+	// For each service, if it is enabled, find and create an instance.
+	for _, service := range config.Services {
+		var instance HTTPRequestProcessor
+		var configured bool
+
+		if service.Enabled {
+			config, err := yaml.Marshal(service.Config)
+			if err != nil {
+				log.Fatal(err)
+			}
+			switch service.Type {
+			case "kubernetes":
+				instance, configured, err = MakeKubernetesEndpoint(config)
+			default:
+				log.Fatalf("Unknown service type %s, name %s", service.Type, service.Name)
+			}
+
+			// If the instance-specific make method returns an error, catch it here.
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			// If it did not return an error, a nil instance means it is not fully configured.
+			log.Printf("Adding endpoint type %s, name %s, configured %v", service.Type, service.Name, configured)
+			endpoints = append(endpoints, Endpoint{
+				Type:       service.Type,
+				Name:       service.Name,
+				Configured: configured,
+				instance:   instance,
+			})
+		}
 	}
 }
 
@@ -224,37 +248,6 @@ func main() {
 	})
 
 	sa := &serverContext{}
-
-	// For each service, if it is enabled, find and create an instance.
-	for _, service := range config.Services {
-		var instance HTTPRequestProcessor
-		var configured bool
-		if service.Enabled {
-			config, err := yaml.Marshal(service.Config)
-			if err != nil {
-				log.Fatal(err)
-			}
-			switch service.Type {
-			case "kubernetes":
-				instance, configured, err = MakeKubernetesEndpoint(config)
-			default:
-				log.Fatalf("Unknown service type %s, name %s", service.Type, service.Name)
-			}
-
-			// If the instance-specific make method returns an error, catch it here.
-			if err != nil {
-				log.Fatal(err)
-			}
-
-			// If it did not return an error, a nil instance means it is not fully configured.
-			endpoints = append(endpoints, Endpoint{
-				Type:       service.Type,
-				Name:       service.Name,
-				Configured: configured,
-				instance:   instance,
-			})
-		}
-	}
 
 	opts := []grpc.DialOption{
 		grpc.WithTransportCredentials(ta),
