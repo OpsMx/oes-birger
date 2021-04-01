@@ -22,7 +22,7 @@ type agentConnectionNotification struct {
 	Endpoints []agent.Endpoint `json:"endpoints,omitempty"`
 }
 
-func sendWebhook(state *agent.AgentState, endpoints []*tunnel.EndpointHealth) {
+func (s *agentTunnelServer) sendWebhook(state *agent.AgentState, endpoints []*tunnel.EndpointHealth) {
 	if hook == nil {
 		return
 	}
@@ -42,7 +42,7 @@ func sendWebhook(state *agent.AgentState, endpoints []*tunnel.EndpointHealth) {
 	hook.Send(req)
 }
 
-func makePingResponse(req *tunnel.PingRequest) *tunnel.ControllerToAgentWrapper {
+func (s *agentTunnelServer) makePingResponse(req *tunnel.PingRequest) *tunnel.ControllerToAgentWrapper {
 	resp := &tunnel.ControllerToAgentWrapper{
 		Event: &tunnel.ControllerToAgentWrapper_PingResponse{
 			PingResponse: &tunnel.PingResponse{Ts: uint64(time.Now().UnixNano()), EchoedTs: req.Ts},
@@ -56,23 +56,23 @@ type sessionList struct {
 	m map[string]chan *tunnel.AgentToControllerWrapper
 }
 
-func removeHTTPId(httpids *sessionList, id string) {
+func (s *agentTunnelServer) removeHTTPId(httpids *sessionList, id string) {
 	httpids.Lock()
 	defer httpids.Unlock()
 	delete(httpids.m, id)
 }
 
-func addHTTPId(httpids *sessionList, id string, c chan *tunnel.AgentToControllerWrapper) {
+func (s *agentTunnelServer) addHTTPId(httpids *sessionList, id string, c chan *tunnel.AgentToControllerWrapper) {
 	httpids.Lock()
 	defer httpids.Unlock()
 	httpids.m[id] = c
 }
 
-func handleHTTPRequests(session string, requestChan chan interface{}, httpids *sessionList, stream tunnel.AgentTunnelService_EventTunnelServer) {
+func (s *agentTunnelServer) handleHTTPRequests(session string, requestChan chan interface{}, httpids *sessionList, stream tunnel.AgentTunnelService_EventTunnelServer) {
 	for interfacedRequest := range requestChan {
 		switch value := interfacedRequest.(type) {
 		case *HTTPMessage:
-			addHTTPId(httpids, value.Cmd.Id, value.Out)
+			s.addHTTPId(httpids, value.Cmd.Id, value.Out)
 			resp := &tunnel.ControllerToAgentWrapper{
 				Event: &tunnel.ControllerToAgentWrapper_HttpRequest{
 					HttpRequest: value.Cmd,
@@ -83,7 +83,7 @@ func handleHTTPRequests(session string, requestChan chan interface{}, httpids *s
 			}
 		case *runCmdMessage:
 			log.Printf("cmd %s %s %v %v running", value.cmd.Id, value.cmd.Name, value.cmd.Arguments, value.cmd.Environment)
-			addHTTPId(httpids, value.cmd.Id, value.out)
+			s.addHTTPId(httpids, value.cmd.Id, value.out)
 			resp := &tunnel.ControllerToAgentWrapper{
 				Event: &tunnel.ControllerToAgentWrapper_CommandRequest{
 					CommandRequest: value.cmd,
@@ -98,9 +98,9 @@ func handleHTTPRequests(session string, requestChan chan interface{}, httpids *s
 	}
 }
 
-func handleHTTPCancelRequest(session string, identity string, cancelChan chan string, httpids *sessionList, stream tunnel.AgentTunnelService_EventTunnelServer) {
+func (s *agentTunnelServer) handleHTTPCancelRequest(session string, identity string, cancelChan chan string, httpids *sessionList, stream tunnel.AgentTunnelService_EventTunnelServer) {
 	for id := range cancelChan {
-		removeHTTPId(httpids, id)
+		s.removeHTTPId(httpids, id)
 		resp := &tunnel.ControllerToAgentWrapper{
 			Event: &tunnel.ControllerToAgentWrapper_CancelRequest{
 				CancelRequest: &tunnel.CancelRequest{Id: id},
@@ -113,7 +113,7 @@ func handleHTTPCancelRequest(session string, identity string, cancelChan chan st
 	log.Printf("cancel channel closed for agent %s", session)
 }
 
-func closeAllHTTP(httpids *sessionList) {
+func (s *agentTunnelServer) closeAllHTTP(httpids *sessionList) {
 	httpids.Lock()
 	defer httpids.Unlock()
 	for _, v := range httpids.m {
@@ -144,21 +144,21 @@ func (s *agentTunnelServer) EventTunnel(stream tunnel.AgentTunnelService_EventTu
 
 	log.Printf("Agent %s connected, awaiting hello message", state)
 
-	go handleHTTPRequests(sessionIdentity, inRequest, httpids, stream)
+	go s.handleHTTPRequests(sessionIdentity, inRequest, httpids, stream)
 
-	go handleHTTPCancelRequest(sessionIdentity, agentIdentity, inCancelRequest, httpids, stream)
+	go s.handleHTTPCancelRequest(sessionIdentity, agentIdentity, inCancelRequest, httpids, stream)
 
 	for {
 		in, err := stream.Recv()
 		if err == io.EOF {
 			log.Printf("Closing %s", state)
-			closeAllHTTP(httpids)
+			s.closeAllHTTP(httpids)
 			agents.RemoveAgent(state)
 			return nil
 		}
 		if err != nil {
 			log.Printf("Agent closed connection: %s", state)
-			closeAllHTTP(httpids)
+			s.closeAllHTTP(httpids)
 			agents.RemoveAgent(state)
 			return err
 		}
@@ -167,7 +167,7 @@ func (s *agentTunnelServer) EventTunnel(stream tunnel.AgentTunnelService_EventTu
 		case *tunnel.AgentToControllerWrapper_PingRequest:
 			req := in.GetPingRequest()
 			atomic.StoreUint64(&state.LastPing, tunnel.Now())
-			if err := stream.Send(makePingResponse(req)); err != nil {
+			if err := stream.Send(s.makePingResponse(req)); err != nil {
 				log.Printf("Unable to respond to %s with ping response: %v", state, err)
 				agents.RemoveAgent(state)
 				return err
@@ -187,7 +187,7 @@ func (s *agentTunnelServer) EventTunnel(stream tunnel.AgentTunnelService_EventTu
 			}
 			state.Endpoints = endpoints
 			agents.AddAgent(state)
-			sendWebhook(state, req.Endpoints)
+			s.sendWebhook(state, req.Endpoints)
 		case *tunnel.AgentToControllerWrapper_HttpResponse:
 			resp := in.GetHttpResponse()
 			atomic.StoreUint64(&state.LastUse, tunnel.Now())
@@ -291,7 +291,7 @@ func newCmdToolServer() *cmdToolTunnelServer {
 	return &cmdToolTunnelServer{}
 }
 
-func makeCommandTermination(exitstatus int) *tunnel.ControllerToCmdToolWrapper {
+func (s *cmdToolTunnelServer) makeCommandTermination(exitstatus int) *tunnel.ControllerToCmdToolWrapper {
 	return &tunnel.ControllerToCmdToolWrapper{
 		Event: &tunnel.ControllerToCmdToolWrapper_CommandTermination{
 			CommandTermination: &tunnel.CmdToolCommandTermination{
@@ -322,7 +322,7 @@ func (s *cmdToolTunnelServer) EventTunnel(stream tunnel.CmdToolTunnelService_Eve
 			case *tunnel.AgentToControllerWrapper_CommandTermination:
 				resp := in.GetCommandTermination()
 				log.Printf("Got command exit code %d", resp.ExitCode)
-				if err := stream.Send(makeCommandTermination(int(resp.ExitCode))); err != nil {
+				if err := stream.Send(s.makeCommandTermination(int(resp.ExitCode))); err != nil {
 					log.Printf("While sending: %v", err)
 				}
 			case *tunnel.AgentToControllerWrapper_CommandData:

@@ -92,7 +92,10 @@ func (s *ConnectedAgents) AddAgent(state *AgentState) {
 	}
 	agentList = append(agentList, state)
 	s.m[state.Identity] = agentList
-	log.Printf("Agent %s added, now at %d endpoints", state, len(agentList))
+	log.Printf("Agent %s added, now at %d paths, %d endpoints", state, len(agentList), len(state.Endpoints))
+	for _, endpoint := range state.Endpoints {
+		log.Printf("  agent %s, endpoint: %s", state, &endpoint)
+	}
 	connectedAgentsGauge.WithLabelValues(state.Identity).Inc()
 }
 
@@ -124,7 +127,7 @@ func (s *ConnectedAgents) RemoveAgent(state *AgentState) {
 	agentList = agentList[:len(agentList)-1]
 	s.m[state.Identity] = agentList
 	connectedAgentsGauge.WithLabelValues(state.Identity).Dec()
-	log.Printf("Agent %s removed, now at %d endpoints", state, len(agentList))
+	log.Printf("Agent %s removed, now at %d paths", state, len(agentList))
 }
 
 //
@@ -146,7 +149,7 @@ func (s *ConnectedAgents) Send(ep AgentSearch, message interface{}) (string, boo
 		}
 	}
 	if len(possibleAgents) == 0 {
-		log.Printf("Request for %s, no such endpoint exists or all are unconfigured.", ep)
+		log.Printf("Request for %s, no such path exists or all are unconfigured.", ep)
 	}
 	a := agentList[rnd.Intn(len(agentList))]
 	session := a.Send(message)

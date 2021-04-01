@@ -62,7 +62,7 @@ type AgentConfig struct {
 	CACert64           *string           `yaml:"caCert64,omitempty"`
 	Commands           []CommandConfig   `yaml:"commands,omitempty"`
 	Kubernetes         *KubernetesConfig `yaml:"kubernetes,omitempty"`
-	Services           *ServiceConfig    `yaml:"services,omitempty"`
+	Services           []*ServiceConfig  `yaml:"services,omitempty"`
 	CertFile           string            `yaml:"certFile,omitempty"`
 	KeyFile            string            `yaml:"keyFile,omitempty"`
 }

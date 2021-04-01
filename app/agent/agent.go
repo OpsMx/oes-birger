@@ -33,10 +33,23 @@ var (
 
 	emptyBytes = []byte("")
 
-	config *cfg.AgentConfig
+	config    *cfg.AgentConfig
+	endpoints = []Endpoint{}
 )
 
-func runTunnel(wg *sync.WaitGroup, sa *serverContext, conn *grpc.ClientConn) {
+// TODO: this is currently copied from the controller.  Should be shared.
+type Endpoint struct {
+	Name       string `json:"name,omitempty"`
+	Type       string `json:"type,omitempty"`
+	Configured bool   `json:"configured,omitempty"`
+}
+
+// TODO: this is currently copied from the controller.  Should be shared.
+func (e *Endpoint) String() string {
+	return fmt.Sprintf("(%s, %s, %v)", e.Type, e.Name, e.Configured)
+}
+
+func runTunnel(wg *sync.WaitGroup, sa *serverContext, conn *grpc.ClientConn, endpoints []Endpoint) {
 	defer wg.Done()
 
 	ticker := time.NewTicker(time.Duration(*tickTime) * time.Second)
@@ -48,8 +61,17 @@ func runTunnel(wg *sync.WaitGroup, sa *serverContext, conn *grpc.ClientConn) {
 	if err != nil {
 		log.Fatalf("%v.EventTunnel(_) = _, %v", client, err)
 	}
+	pbEndpoints := make([]*tunnel.EndpointHealth, len(endpoints))
+	for i, ep := range endpoints {
+		pbEndpoints[i] = &tunnel.EndpointHealth{
+			Name:       ep.Name,
+			Type:       ep.Type,
+			Configured: ep.Configured,
+		}
+	}
 	helloMsg := &tunnel.AgentHello{
 		ProtocolVersion: tunnel.CurrentProtocolVersion,
+		Endpoints:       pbEndpoints,
 	}
 	hello := &tunnel.AgentToControllerWrapper{
 		Event: &tunnel.AgentToControllerWrapper_AgentHello{
@@ -318,6 +340,17 @@ func updateServerContextTicker(sa *serverContext) {
 	}
 }
 
+func configureEndpoints() {
+	log.Printf("%#v", config)
+	for _, c := range config.Services {
+		endpoints = append(endpoints, Endpoint{
+			Type:       c.Type,
+			Name:       c.Name,
+			Configured: c.Enabled,
+		})
+	}
+}
+
 func main() {
 	flag.Parse()
 
@@ -327,6 +360,8 @@ func main() {
 	}
 	config = c
 	log.Printf("controller hostname: %s", config.ControllerHostname)
+
+	configureEndpoints()
 
 	// load client cert/key, cacert
 	clcert, err := tls.LoadX509KeyPair(config.CertFile, config.KeyFile)
@@ -351,6 +386,11 @@ func main() {
 		sa.f = *saf
 
 		go updateServerContextTicker(sa)
+		endpoints = append(endpoints, Endpoint{
+			Type:       "kubernetes",
+			Name:       "kubernetes1",
+			Configured: true,
+		})
 	}
 
 	opts := []grpc.DialOption{
@@ -371,7 +411,7 @@ func main() {
 
 	log.Printf("Starting GRPC tunnel.")
 	wg.Add(1)
-	go runTunnel(&wg, sa, conn)
+	go runTunnel(&wg, sa, conn, endpoints)
 
 	wg.Wait()
 	log.Printf("Done.")
