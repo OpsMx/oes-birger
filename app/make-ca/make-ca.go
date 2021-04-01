@@ -37,7 +37,7 @@ func main() {
 		log.Fatalf("%v", err)
 	}
 
-	ca64too, cert64, certPrivKey64, err := authority.GenerateCertificate("oes", "command")
+	ca64too, cert64, certPrivKey64, err := authority.GenerateCertificate("oes.command")
 	if err != nil {
 		log.Fatalf("%v", err)
 	}

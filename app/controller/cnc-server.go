@@ -78,7 +78,7 @@ func cncGenerateKubectlComponents(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ca64, user64, key64, err := authority.GenerateCertificate(req.Identity, "client")
+	ca64, user64, key64, err := authority.GenerateCertificate("kubernetes1.kubernetes." + req.Identity)
 	if err != nil {
 		w.Write(httpError(err))
 		w.WriteHeader(http.StatusBadRequest)
@@ -127,7 +127,7 @@ func cncGenerateAgentManifestComponents(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	ca64, user64, key64, err := authority.GenerateCertificate(req.Identity, "agent")
+	ca64, user64, key64, err := authority.GenerateCertificate(req.Identity + ".agent")
 	if err != nil {
 		w.Write(httpError(err))
 		w.WriteHeader(http.StatusBadRequest)

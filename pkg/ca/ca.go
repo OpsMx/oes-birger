@@ -191,12 +191,12 @@ func (c *CA) MakeServerCert(names []string) (*tls.Certificate, error) {
 // GenerateCertificate will make a new certificate, and return a base64 encoded
 // string for the certificate, key, and authority certificate.
 //
-func (c *CA) GenerateCertificate(name string, suffix string) (string, string, string, error) {
+func (c *CA) GenerateCertificate(name string) (string, string, string, error) {
 	now := time.Now().UTC()
 	cert := &x509.Certificate{
 		SerialNumber: big.NewInt(now.UnixNano()),
 		Subject: pkix.Name{
-			CommonName:   name + "." + suffix,
+			CommonName:   name,
 			Organization: []string{"OpsMX API Forwarder Client"},
 			Country:      []string{"US"},
 			Province:     []string{},
