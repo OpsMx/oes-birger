@@ -111,6 +111,13 @@ type HTTPMessage struct {
 }
 
 func kubernetesAPIHandler(w http.ResponseWriter, r *http.Request) {
+	if len(r.TLS.PeerCertificates) == 0 {
+		log.Printf("Kubernetes:  client did not present a certificate, returning Unauthorized")
+		w.WriteHeader(http.StatusUnauthorized)
+	}
+
+	log.Printf("Client sent host %s", r.Host)
+
 	agentIdentity := firstLabel(r.TLS.PeerCertificates[0].Subject.CommonName)
 	ep := agent.AgentSearch{
 		Identity:     agentIdentity,
@@ -213,7 +220,7 @@ func runAgentKubernetesAPIServer(serverCert tls.Certificate) {
 
 	tlsConfig := &tls.Config{
 		ClientCAs:    certPool,
-		ClientAuth:   tls.RequireAndVerifyClientCert,
+		ClientAuth:   tls.VerifyClientCertIfGiven,
 		Certificates: []tls.Certificate{serverCert},
 		MinVersion:   tls.VersionTLS12,
 	}

@@ -7,7 +7,6 @@ import (
 	"encoding/base64"
 	"encoding/pem"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -225,51 +224,13 @@ func (ke *KubernetesEndpoint) executeHTTPRequest(dataflow chan *tunnel.AgentToCo
 		dataflow <- makeBadGatewayResponse(req.Id)
 		return
 	}
-	for _, header := range req.Headers {
-		for _, value := range header.Values {
-			httpRequest.Header.Add(header.Name, value)
-		}
-	}
+
+	copyHeaders(req, httpRequest)
 	if len(c.token) > 0 {
 		httpRequest.Header.Set("Authorization", "Bearer "+c.token)
 	}
-	log.Printf("Sending HTTP request: %s to %v", req.Method, c.serverURL+req.URI)
-	get, err := client.Do(httpRequest)
-	if err != nil {
-		log.Printf("Failed to execute request for %s to %s: %v", req.Method, c.serverURL+req.URI, err)
-		dataflow <- makeBadGatewayResponse(req.Id)
-		return
-	}
 
-	// First, send the headers.
-	resp := makeResponse(req.Id, get)
-	dataflow <- resp
-
-	// Now, send one or more data packet.
-	for {
-		buf := make([]byte, 10240)
-		n, err := get.Body.Read(buf)
-		if n > 0 {
-			resp := makeChunkedResponse(req.Id, buf[:n])
-			dataflow <- resp
-		}
-		if err == io.EOF {
-			resp := makeChunkedResponse(req.Id, emptyBytes)
-			dataflow <- resp
-			return
-		}
-		if err == context.Canceled {
-			log.Printf("Context cancelled, request ID %s", req.Id)
-			return
-		}
-		if err != nil {
-			log.Printf("Got error on HTTP read: %v", err)
-			// todo: send an error message somehow.  For now, just send EOF
-			resp := makeChunkedResponse(req.Id, emptyBytes)
-			dataflow <- resp
-			return
-		}
-	}
+	runHTTPRequest(client, req, httpRequest, dataflow, c.serverURL)
 }
 
 func (ke *KubernetesEndpoint) loadKubernetesSecurity() *kubeContext {
