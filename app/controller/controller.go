@@ -115,7 +115,7 @@ func kubernetesAPIHandler(w http.ResponseWriter, r *http.Request) {
 	ep := agent.AgentSearch{
 		Identity:     agentIdentity,
 		EndpointType: "kubernetes",
-		EndpointName: "kubernetes",
+		EndpointName: "kubernetes1",
 	}
 	apiRequestCounter.WithLabelValues(agentIdentity).Inc()
 

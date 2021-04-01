@@ -106,8 +106,7 @@ message EndpointHealth {
 }
 
 message AgentHello {
-    int32 protocolVersion = 1;
-    repeated EndpointHealth endpoints = 2;
+    repeated EndpointHealth endpoints = 1;
 }
 
 // Messages sent from server to agent

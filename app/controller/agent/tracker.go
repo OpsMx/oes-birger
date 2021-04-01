@@ -20,6 +20,7 @@ type Agent interface {
 	Cancel(string)
 	HasEndpoint(string, string) bool
 	GetSession() string
+	GetIdentity() string
 
 	GetStatistics() interface{}
 }
@@ -177,7 +178,7 @@ func (s *ConnectedAgents) Cancel(ep AgentSearch, id string) bool {
 	}
 
 	for _, a := range agentList {
-		if a.GetSession() == ep.Session {
+		if ep.MatchesAgent(a) {
 			a.Cancel(id)
 			return true
 		}

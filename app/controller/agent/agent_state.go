@@ -17,7 +17,11 @@ func (s *AgentState) GetSession() string {
 	return s.Session
 }
 
-func (s *AgentState) String() string {
+func (s *AgentState) GetIdentity() string {
+	return s.Identity
+}
+
+func (s AgentState) String() string {
 	return fmt.Sprintf("(identity=%s, session=%s)", s.Identity, s.Session)
 }
 
