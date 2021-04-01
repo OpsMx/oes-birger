@@ -130,15 +130,15 @@ func serviceAPIHandler(w http.ResponseWriter, r *http.Request) {
 
 func kubernetesAPIHandler(w http.ResponseWriter, r *http.Request) {
 	if len(r.TLS.PeerCertificates) == 0 {
-		log.Printf("Kubernetes:  client did not present a certificate, returning Unauthorized")
-		w.WriteHeader(http.StatusUnauthorized)
+		log.Printf("Kubernetes:  client did not present a certificate, returning Forbidden")
+		w.WriteHeader(http.StatusForbidden)
 		return
 	}
 
 	endpointName, endpointType, agentIdentity := labels(r.TLS.PeerCertificates[0].Subject.CommonName)
 	if endpointType != "kubernetes" {
 		log.Printf("Kubernetes: client cert type is %s, expected 'client", endpointType)
-		w.WriteHeader(http.StatusUnauthorized)
+		w.WriteHeader(http.StatusForbidden)
 		return
 	}
 	ep := agent.AgentSearch{
