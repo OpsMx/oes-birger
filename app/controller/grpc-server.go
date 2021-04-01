@@ -175,7 +175,7 @@ func (s *agentTunnelServer) EventTunnel(stream tunnel.AgentTunnelService_EventTu
 		case *tunnel.AgentToControllerWrapper_AgentHello:
 			req := in.GetAgentHello()
 			if req.ProtocolVersion != tunnel.CurrentProtocolVersion {
-				return fmt.Errorf("Agent protocol version %d is older than %d", req.ProtocolVersion, tunnel.CurrentProtocolVersion)
+				return fmt.Errorf("agent protocol version %d is older than %d", req.ProtocolVersion, tunnel.CurrentProtocolVersion)
 			}
 			endpoints := make([]agent.Endpoint, len(req.Endpoints))
 			for i, ep := range req.Endpoints {
