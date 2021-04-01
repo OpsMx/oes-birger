@@ -222,8 +222,8 @@ func kubernetesAPIHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func runAgentKubernetesAPIServer(serverCert tls.Certificate) {
-	log.Printf("Running Kubernetes API HTTPS listener on port %d", config.KubernetesAPIPort)
+func runHTTPSServer(serverCert tls.Certificate) {
+	log.Printf("Running generic API HTTPS listener on port %d", config.ServicePort)
 
 	certPool, err := authority.MakeCertPool()
 	if err != nil {
@@ -243,7 +243,7 @@ func runAgentKubernetesAPIServer(serverCert tls.Certificate) {
 	mux.HandleFunc("/", kubernetesAPIHandler)
 
 	server := &http.Server{
-		Addr:      fmt.Sprintf(":%d", config.KubernetesAPIPort),
+		Addr:      fmt.Sprintf(":%d", config.ServicePort),
 		TLSConfig: tlsConfig,
 		Handler:   mux,
 	}
@@ -308,7 +308,7 @@ func main() {
 		log.Fatalf("Cannot make server certificate: %v", err)
 	}
 
-	go runAgentKubernetesAPIServer(*serverCert)
+	go runHTTPSServer(*serverCert)
 	go runCommandHTTPServer(*serverCert)
 	go runCmdToolGRPCServer(*serverCert)
 	go runAgentGRPCServer(*serverCert)

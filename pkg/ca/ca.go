@@ -147,6 +147,17 @@ func MakeCertificateAuthority() ([]byte, []byte, error) {
 //
 func (c *CA) MakeServerCert(names []string) (*tls.Certificate, error) {
 	now := time.Now().UTC()
+
+	caCert, err := x509.ParseCertificate(c.caCert.Certificate[0])
+	if err != nil {
+		return nil, err
+	}
+
+	certPrivKey, err := rsa.GenerateKey(crand.Reader, 2048)
+	if err != nil {
+		return nil, err
+	}
+
 	cert := &x509.Certificate{
 		SerialNumber: big.NewInt(now.UnixNano()),
 		Subject: pkix.Name{
@@ -160,17 +171,6 @@ func (c *CA) MakeServerCert(names []string) (*tls.Certificate, error) {
 		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
 		KeyUsage:    x509.KeyUsageDigitalSignature,
 		DNSNames:    names,
-	}
-	certPrivKey, err := rsa.GenerateKey(crand.Reader, 2048)
-	if err != nil {
-		return nil, err
-	}
-
-	// we now have a certificate and private key.  Now, sign the cert with the CA.
-
-	caCert, err := x509.ParseCertificate(c.caCert.Certificate[0])
-	if err != nil {
-		return nil, err
 	}
 
 	certBytes, err := x509.CreateCertificate(crand.Reader, cert, caCert, &certPrivKey.PublicKey, c.caCert.PrivateKey)

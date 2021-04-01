@@ -14,19 +14,19 @@ import (
 // configuration file is loaded from disk first, and then any
 // environment variables are applied.
 type ControllerConfig struct {
-	Agents                map[string]*agentConfig `yaml:"agents,omitempty"`
-	Webhook               string                  `yaml:"webhook,omitempty"`
-	ServerNames           []string                `yaml:"serverNames,omitempty"`
-	CAConfig              ca.Config               `yaml:"caConfig,omitempty"`
-	PrometheusPort        uint16                  `yaml:"prometheusPort"`
-	KubernetesAPIPort     uint16                  `yaml:"kubernetesAPIPort"`
-	KubernetesAPIHostname *string                 `yaml:"kubernetesAPIHostname"`
-	CommandHostname       *string                 `yaml:"commandHostname"`
-	CmdToolHostname       *string                 `yaml:"cmdToolHostname"`
-	CommandPort           uint16                  `yaml:"commandPort"`
-	AgentHostname         *string                 `yaml:"agentHostname"`
-	AgentPort             uint16                  `yaml:"agentPort"`
-	CmdToolPort           uint16                  `yaml:"cmdToolPort"`
+	Agents              map[string]*agentConfig `yaml:"agents,omitempty"`
+	Webhook             string                  `yaml:"webhook,omitempty"`
+	ServerNames         []string                `yaml:"serverNames,omitempty"`
+	CAConfig            ca.Config               `yaml:"caConfig,omitempty"`
+	PrometheusPort      uint16                  `yaml:"prometheusPort"`
+	ServiceBaseHostname *string                 `yaml:"serviceBaseHostname"`
+	ServicePort         uint16                  `yaml:"servicePort"`
+	CommandHostname     *string                 `yaml:"commandHostname"`
+	CommandPort         uint16                  `yaml:"commandPort"`
+	AgentHostname       *string                 `yaml:"agentHostname"`
+	AgentPort           uint16                  `yaml:"agentPort"`
+	CmdToolHostname     *string                 `yaml:"cmdToolHostname"`
+	CmdToolPort         uint16                  `yaml:"cmdToolPort"`
 }
 
 type agentConfig struct {
@@ -48,12 +48,16 @@ func LoadConfig(filename string) (*ControllerConfig, error) {
 		return nil, err
 	}
 
+	if config.ServiceBaseHostname == nil {
+		log.Fatalf("serviceBaseHostname is not set.")
+	}
+
 	if config.AgentPort == 0 {
 		config.AgentPort = 9001
 	}
 
-	if config.KubernetesAPIPort == 0 {
-		config.KubernetesAPIPort = 9002
+	if config.ServicePort == 0 {
+		config.ServicePort = 9002
 	}
 
 	if config.CommandPort == 0 {
@@ -92,7 +96,9 @@ func (c *ControllerConfig) addIfMissing(target *string, reason string) {
 func (c *ControllerConfig) addAllHostnames() {
 	c.addIfMissing(c.AgentHostname, "agentHostname")
 	c.addIfMissing(c.CommandHostname, "commandHostname")
-	c.addIfMissing(c.KubernetesAPIHostname, "kubernetesAPIHostname")
+	c.addIfMissing(c.ServiceBaseHostname, "ServiceBaseHostname")
+	baseWildcard := "*." + *c.ServiceBaseHostname
+	c.addIfMissing(&baseWildcard, "Service wildcard")
 	c.addIfMissing(c.CmdToolHostname, "cmdToolHostname")
 }
 
@@ -108,10 +114,7 @@ func (c *ControllerConfig) getAgentPort() uint16 {
 }
 
 func (c *ControllerConfig) getKubernetesURL() string {
-	if c.KubernetesAPIHostname != nil {
-		return fmt.Sprintf("https://%s:%d", *c.KubernetesAPIHostname, c.KubernetesAPIPort)
-	}
-	return fmt.Sprintf("https://%s:%d", c.ServerNames[0], c.KubernetesAPIPort)
+	return fmt.Sprintf("https://kubernetes.%s:%d", *c.ServiceBaseHostname, c.ServicePort)
 }
 
 func (c *ControllerConfig) getCommandHostname() string {
