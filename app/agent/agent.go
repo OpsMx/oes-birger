@@ -140,7 +140,7 @@ func runTunnel(wg *sync.WaitGroup, sa *serverContext, conn *grpc.ClientConn, end
 					}
 				}
 				if !found {
-					log.Printf("Request for unsupported HTTP tunnel type: %s", req.Type)
+					log.Printf("Request for unsupported HTTP tunnel type=%s name=%s", req.Type, req.Name)
 					dataflow <- makeBadGatewayResponse(req.Id)
 				}
 			case *tunnel.ControllerToAgentWrapper_CommandRequest:
