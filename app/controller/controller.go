@@ -45,8 +45,9 @@ var (
 	}, []string{"agent"})
 )
 
-func firstLabel(name string) string {
-	return strings.Split(name, ".")[0]
+func labels(name string) (serviceName string, agentName string, certType string) {
+	items := strings.Split(name, ".")
+	return items[0], items[1], items[2]
 }
 
 func getNamesFromContext(ctx context.Context) ([]string, error) {
@@ -119,15 +120,21 @@ func kubernetesAPIHandler(w http.ResponseWriter, r *http.Request) {
 	if len(r.TLS.PeerCertificates) == 0 {
 		log.Printf("Kubernetes:  client did not present a certificate, returning Unauthorized")
 		w.WriteHeader(http.StatusUnauthorized)
+		return
 	}
 
 	log.Printf("Client sent host %s", getServerName(r))
 
-	agentIdentity := firstLabel(r.TLS.PeerCertificates[0].Subject.CommonName)
+	endpointName, endpointType, agentIdentity := labels(r.TLS.PeerCertificates[0].Subject.CommonName)
+	if endpointType != "kubernetes" {
+		log.Printf("Kubernetes: client cert type is %s, expected 'client", endpointType)
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
 	ep := agent.AgentSearch{
 		Identity:     agentIdentity,
-		EndpointType: "kubernetes",
-		EndpointName: "kubernetes1",
+		EndpointType: endpointType,
+		EndpointName: endpointName,
 	}
 	apiRequestCounter.WithLabelValues(agentIdentity).Inc()
 
@@ -136,8 +143,8 @@ func kubernetesAPIHandler(w http.ResponseWriter, r *http.Request) {
 	body, _ := ioutil.ReadAll(r.Body)
 	req := &tunnel.HttpRequest{
 		Id:      transactionID,
-		Type:    "kubernetes",
-		Name:    "kubernetes1",
+		Type:    endpointType,
+		Name:    endpointName,
 		Method:  r.Method,
 		URI:     r.RequestURI,
 		Headers: makeHeaders(r.Header),
