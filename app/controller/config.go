@@ -137,7 +137,8 @@ func (c *ControllerConfig) getCmdToolHostname() string {
 func (c *ControllerConfig) Dump() {
 	log.Println("ControllerConfig:")
 	log.Printf("ServerNames: %v", config.ServerNames)
-	log.Printf("Kubernetes API URL returned for kubectl components: %s", c.getKubernetesURL())
+	log.Printf("Base service hostname: %s, port: %d", *c.ServiceBaseHostname, c.ServicePort)
+	log.Printf("URL returned for kubectl components: %s", c.getKubernetesURL())
 	log.Printf("Agent hostname: %s, port %d", c.getAgentHostname(), c.getAgentPort())
 	log.Printf("Command Hostname: %s, port %d", c.getCommandHostname(), c.CommandPort)
 	log.Printf("CmdTool Hostname: %s, port %d", c.getCmdToolHostname(), c.CmdToolPort)
