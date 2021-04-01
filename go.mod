@@ -3,7 +3,6 @@ module github.com/opsmx/oes-birger
 go 1.16
 
 require (
-	github.com/cweill/gotests v1.6.0 // indirect
 	github.com/golang/protobuf v1.4.3
 	github.com/kr/text v0.2.0 // indirect
 	github.com/oklog/ulid/v2 v2.0.2
