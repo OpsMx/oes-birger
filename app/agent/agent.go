@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"golang.org/x/net/context"
+	"gopkg.in/yaml.v3"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -224,15 +225,35 @@ func main() {
 
 	sa := &serverContext{}
 
-	if config.Kubernetes.Enabled {
-		k := MakeKubernetesEndpoint()
+	// For each service, if it is enabled, find and create an instance.
+	for _, service := range config.Services {
+		var instance HTTPRequestProcessor
+		var configured bool
+		if service.Enabled {
+			config, err := yaml.Marshal(service.Config)
+			if err != nil {
+				log.Fatal(err)
+			}
+			switch service.Type {
+			case "kubernetes":
+				instance, configured, err = MakeKubernetesEndpoint(config)
+			default:
+				log.Fatalf("Unknown service type %s, name %s", service.Type, service.Name)
+			}
 
-		endpoints = append(endpoints, Endpoint{
-			Type:       "kubernetes",
-			Name:       "kubernetes1",
-			Configured: true,
-			instance:   k,
-		})
+			// If the instance-specific make method returns an error, catch it here.
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			// If it did not return an error, a nil instance means it is not fully configured.
+			endpoints = append(endpoints, Endpoint{
+				Type:       service.Type,
+				Name:       service.Name,
+				Configured: configured,
+				instance:   instance,
+			})
+		}
 	}
 
 	opts := []grpc.DialOption{

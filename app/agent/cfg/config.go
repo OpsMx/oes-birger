@@ -26,46 +26,25 @@ type CommandConfig struct {
 }
 
 //
-// KubernetesConfig holds the config for Kubernetes endpoints.
-//
-type KubernetesConfig struct {
-	Enabled    bool   `yaml:"enabled"`
-	KubeConfig string `yaml:"kubeConfig,omitempty"`
-}
-
-//
-// ServiceCredentials holds what we use to authenticate the agent to the
-// service, in a somewhat generic way.
-//
-type ServiceCredentials struct {
-	Type     string  `yaml:"type,omitempty"`
-	Username *string `yaml:"username,omitempty"`
-	Password *string `yaml:"password,omitempty"`
-	Token    *string `yaml:"token,omitempty"`
-}
-
-//
 // ServiceConfig holds configuration for a service, like a Jenkins endpoint.
 //
 type ServiceConfig struct {
-	Enabled     bool               `yaml:"enabled"`
-	Name        string             `yaml:"name"`
-	Type        string             `yaml:"type"`
-	URL         string             `yaml:"url"`
-	Credentials ServiceCredentials `yaml:"credentials"`
+	Enabled bool                        `yaml:"enabled"`
+	Name    string                      `yaml:"name"`
+	Type    string                      `yaml:"type"`
+	Config  map[interface{}]interface{} `yaml:"config"`
 }
 
 // AgentConfig holds all the configuration for the agent.  The
 // configuration file is loaded from disk first, and then any
 // environment variables are applied.
 type AgentConfig struct {
-	ControllerHostname string            `yaml:"controllerHostname,omitempty"`
-	CACert64           *string           `yaml:"caCert64,omitempty"`
-	Commands           []CommandConfig   `yaml:"commands,omitempty"`
-	Kubernetes         *KubernetesConfig `yaml:"kubernetes,omitempty"`
-	Services           []*ServiceConfig  `yaml:"services,omitempty"`
-	CertFile           string            `yaml:"certFile,omitempty"`
-	KeyFile            string            `yaml:"keyFile,omitempty"`
+	ControllerHostname string          `yaml:"controllerHostname,omitempty"`
+	CACert64           *string         `yaml:"caCert64,omitempty"`
+	Commands           []CommandConfig `yaml:"commands,omitempty"`
+	Services           []ServiceConfig `yaml:"services,omitempty"`
+	CertFile           string          `yaml:"certFile,omitempty"`
+	KeyFile            string          `yaml:"keyFile,omitempty"`
 }
 
 func (c *AgentConfig) applyDefaults() {
@@ -79,16 +58,6 @@ func (c *AgentConfig) applyDefaults() {
 
 	if len(c.KeyFile) == 0 {
 		c.KeyFile = DEFAULT_KEY_PATH
-	}
-
-	if c.Kubernetes == nil {
-		c.Kubernetes = &KubernetesConfig{
-			Enabled: false,
-		}
-	}
-
-	if c.Kubernetes.KubeConfig == "" {
-		c.Kubernetes.KubeConfig = "/app/config/kubeconfig.yaml"
 	}
 }
 

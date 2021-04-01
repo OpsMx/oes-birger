@@ -18,11 +18,17 @@ import (
 	"github.com/opsmx/oes-birger/pkg/kubeconfig"
 	"github.com/opsmx/oes-birger/pkg/tunnel"
 	"golang.org/x/net/context"
+	"gopkg.in/yaml.v3"
 )
+
+type KubernetesConfig struct {
+	KubeConfig string `yaml:"kubeConfig,omitempty"`
+}
 
 type KubernetesEndpoint struct {
 	sync.RWMutex
-	f kubeContext
+	f      kubeContext
+	config KubernetesConfig
 }
 
 type kubeContext struct {
@@ -34,11 +40,25 @@ type kubeContext struct {
 	insecure   bool
 }
 
-func MakeKubernetesEndpoint() *KubernetesEndpoint {
+func MakeKubernetesEndpoint(configBytes []byte) (*KubernetesEndpoint, bool, error) {
 	k := &KubernetesEndpoint{}
+
+	var config KubernetesConfig
+	err := yaml.Unmarshal(configBytes, &config)
+	if err != nil {
+		return nil, false, err
+	}
+
+	if config.KubeConfig == "" {
+		config.KubeConfig = "/app/config/kubeconfig.yaml"
+	}
+
+	k.config = config
 	k.f = *k.loadKubernetesSecurity()
+
 	go k.updateServerContextTicker()
-	return k
+
+	return k, true, nil
 }
 
 func (ke *KubernetesEndpoint) makeServerContextFields() *kubeContext {
@@ -253,7 +273,7 @@ func (ke *KubernetesEndpoint) executeHTTPRequest(dataflow chan *tunnel.AgentToCo
 }
 
 func (ke *KubernetesEndpoint) loadKubernetesSecurity() *kubeContext {
-	yamlString, err := os.Open(config.Kubernetes.KubeConfig)
+	yamlString, err := os.Open(ke.config.KubeConfig)
 	if err == nil {
 		kconfig, err := kubeconfig.ReadKubeConfig(yamlString)
 		if err != nil {
