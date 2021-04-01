@@ -8,10 +8,6 @@ import (
 	"github.com/opsmx/oes-birger/pkg/tunnel"
 )
 
-var (
-	agents *ConnectedAgents = MakeAgents()
-)
-
 //
 // Agent is a thing that looks like a connected agent, either directly connected or
 // through another controller.
@@ -69,10 +65,6 @@ func (s *ConnectedAgents) GetStatistics() interface{} {
 		}
 	}
 	return ret
-}
-
-func GetStatistics() interface{} {
-	return agents.GetStatistics()
 }
 
 //

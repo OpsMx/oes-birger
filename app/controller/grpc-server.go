@@ -153,13 +153,13 @@ func (s *agentTunnelServer) EventTunnel(stream tunnel.AgentTunnelService_EventTu
 		if err == io.EOF {
 			log.Printf("Closing %s", state)
 			closeAllHTTP(httpids)
-			agent.RemoveAgent(state)
+			agents.RemoveAgent(state)
 			return nil
 		}
 		if err != nil {
 			log.Printf("Agent closed connection: %s", state)
 			closeAllHTTP(httpids)
-			agent.RemoveAgent(state)
+			agents.RemoveAgent(state)
 			return err
 		}
 
@@ -169,7 +169,7 @@ func (s *agentTunnelServer) EventTunnel(stream tunnel.AgentTunnelService_EventTu
 			atomic.StoreUint64(&state.LastPing, tunnel.Now())
 			if err := stream.Send(makePingResponse(req)); err != nil {
 				log.Printf("Unable to respond to %s with ping response: %v", state, err)
-				agent.RemoveAgent(state)
+				agents.RemoveAgent(state)
 				return err
 			}
 		case *tunnel.AgentToControllerWrapper_AgentHello:
@@ -186,7 +186,7 @@ func (s *agentTunnelServer) EventTunnel(stream tunnel.AgentTunnelService_EventTu
 				}
 			}
 			state.Endpoints = endpoints
-			agent.AddAgent(state)
+			agents.AddAgent(state)
 			sendWebhook(state, req.Endpoints)
 		case *tunnel.AgentToControllerWrapper_HttpResponse:
 			resp := in.GetHttpResponse()
@@ -357,12 +357,12 @@ func (s *cmdToolTunnelServer) EventTunnel(stream tunnel.CmdToolTunnelService_Eve
 		in, err := stream.Recv()
 		if err == io.EOF {
 			log.Printf("CmdTool %s closed connection %s", agentIdentity, sessionIdentity)
-			agent.Cancel(ep, operationID)
+			agents.Cancel(ep, operationID)
 			return nil
 		}
 		if err != nil {
 			log.Printf("CmdTool %s closed connection: %s", agentIdentity, sessionIdentity)
-			agent.Cancel(ep, operationID)
+			agents.Cancel(ep, operationID)
 			return err
 		}
 
@@ -378,7 +378,7 @@ func (s *cmdToolTunnelServer) EventTunnel(stream tunnel.CmdToolTunnelService_Eve
 				Environment: req.Environment,
 			}
 			message := &runCmdMessage{out: agentResponseChan, cmd: cmd}
-			sessionID, found := agent.Send(ep, message)
+			sessionID, found := agents.Send(ep, message)
 			ep.Session = sessionID
 			if !found {
 				close(agentResponseChan)

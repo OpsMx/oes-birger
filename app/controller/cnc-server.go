@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/oklog/ulid/v2"
-	"github.com/opsmx/oes-birger/app/controller/agent"
 )
 
 type kubeConfigRequest struct {
@@ -162,7 +161,7 @@ func cncGetStatistics(w http.ResponseWriter, r *http.Request) {
 
 	ret := statisticsResponse{
 		ServerTime:      ulid.Now(),
-		ConnectedAgents: agent.GetStatistics(),
+		ConnectedAgents: agents.GetStatistics(),
 	}
 	json, err := json.Marshal(ret)
 	if err != nil {

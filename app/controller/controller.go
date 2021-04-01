@@ -40,6 +40,8 @@ var (
 
 	rnd = rand.New(rand.NewSource(time.Now().UnixNano()))
 
+	agents = agent.MakeAgents()
+
 	// metrics
 	apiRequestCounter = promauto.NewCounterVec(prometheus.CounterOpts{
 		Name: "controller_api_requests_total",
@@ -128,7 +130,7 @@ func kubernetesAPIHandler(w http.ResponseWriter, r *http.Request) {
 		Body:    body,
 	}
 	message := &agent.HTTPMessage{Out: make(chan *tunnel.AgentToControllerWrapper), Cmd: req}
-	sessionID, found := agent.Send(ep, message)
+	sessionID, found := agents.Send(ep, message)
 	if !found {
 		w.WriteHeader(http.StatusBadGateway)
 		return
@@ -140,7 +142,7 @@ func kubernetesAPIHandler(w http.ResponseWriter, r *http.Request) {
 	go func() {
 		<-notify
 		if !cleanClose {
-			agent.Cancel(ep, transactionID)
+			agents.Cancel(ep, transactionID)
 		}
 	}()
 
