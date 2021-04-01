@@ -39,7 +39,7 @@ type kubeContext struct {
 	insecure   bool
 }
 
-func MakeKubernetesEndpoint(configBytes []byte) (*KubernetesEndpoint, bool, error) {
+func MakeKubernetesEndpoint(name string, configBytes []byte) (*KubernetesEndpoint, bool, error) {
 	k := &KubernetesEndpoint{}
 
 	var config KubernetesConfig
