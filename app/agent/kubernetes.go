@@ -12,6 +12,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/opsmx/oes-birger/pkg/kubeconfig"
@@ -19,20 +20,41 @@ import (
 	"golang.org/x/net/context"
 )
 
-func makeServerContextFields(src *serverContext) *serverContextFields {
-	src.RLock()
-	defer src.RUnlock()
-	return &serverContextFields{
-		username:   src.f.username,
-		serverURL:  src.f.serverURL,
-		serverCA:   src.f.serverCA,
-		clientCert: src.f.clientCert,
-		token:      src.f.token,
-		insecure:   src.f.insecure,
+type KubernetesEndpoint struct {
+	sync.RWMutex
+	f kubeContext
+}
+
+type kubeContext struct {
+	username   string
+	serverURL  string
+	serverCA   *x509.Certificate
+	clientCert *tls.Certificate
+	token      string
+	insecure   bool
+}
+
+func MakeKubernetesEndpoint() *KubernetesEndpoint {
+	k := &KubernetesEndpoint{}
+	k.f = *k.loadKubernetesSecurity()
+	go k.updateServerContextTicker()
+	return k
+}
+
+func (ke *KubernetesEndpoint) makeServerContextFields() *kubeContext {
+	ke.RLock()
+	defer ke.RUnlock()
+	return &kubeContext{
+		username:   ke.f.username,
+		serverURL:  ke.f.serverURL,
+		serverCA:   ke.f.serverCA,
+		clientCert: ke.f.clientCert,
+		token:      ke.f.token,
+		insecure:   ke.f.insecure,
 	}
 }
 
-func serverContextFromKubeconfig(kconfig *kubeconfig.KubeConfig) *serverContextFields {
+func (ke *KubernetesEndpoint) serverContextFromKubeconfig(kconfig *kubeconfig.KubeConfig) *kubeContext {
 	names := kconfig.GetContextNames()
 	for _, name := range names {
 		if name != kconfig.CurrentContext {
@@ -57,7 +79,7 @@ func serverContextFromKubeconfig(kconfig *kubeconfig.KubeConfig) *serverContextF
 			log.Fatalf("Error loading client cert/key: %v", err)
 		}
 
-		saf := &serverContextFields{
+		saf := &kubeContext{
 			username:   user.Name,
 			clientCert: &clientKeypair,
 			serverURL:  cluster.Cluster.Server,
@@ -85,16 +107,7 @@ func serverContextFromKubeconfig(kconfig *kubeconfig.KubeConfig) *serverContextF
 	return nil
 }
 
-type serverContextFields struct {
-	username   string
-	serverURL  string
-	serverCA   *x509.Certificate
-	clientCert *tls.Certificate
-	token      string
-	insecure   bool
-}
-
-func (scf *serverContextFields) isSameAs(scf2 *serverContextFields) bool {
+func (scf *kubeContext) isSameAs(scf2 *kubeContext) bool {
 	if scf.username != scf2.username || scf.serverURL != scf2.serverURL || scf.token != scf2.token || scf.insecure != scf2.insecure {
 		return false
 	}
@@ -120,7 +133,7 @@ func (scf *serverContextFields) isSameAs(scf2 *serverContextFields) bool {
 	return true
 }
 
-func loadServiceAccount() (*serverContextFields, error) {
+func (ke *KubernetesEndpoint) loadServiceAccount() (*kubeContext, error) {
 	token, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/token")
 	if err != nil {
 		return nil, err
@@ -145,7 +158,7 @@ func loadServiceAccount() (*serverContextFields, error) {
 		return nil, fmt.Errorf("unable to locate API server from KUBERNETES_SERVICE_HOST environment variable")
 	}
 
-	return &serverContextFields{
+	return &kubeContext{
 		username:  "ServiceAccount",
 		serverURL: "https://" + serviceHost + ":" + servicePort,
 		serverCA:  serverCert,
@@ -154,8 +167,8 @@ func loadServiceAccount() (*serverContextFields, error) {
 	}, nil
 }
 
-func executeKubernetesRequest(dataflow chan *tunnel.AgentToControllerWrapper, req *tunnel.HttpRequest, sa *serverContext) {
-	c := makeServerContextFields(sa)
+func (ke *KubernetesEndpoint) executeHTTPRequest(dataflow chan *tunnel.AgentToControllerWrapper, req *tunnel.HttpRequest) {
+	c := ke.makeServerContextFields()
 
 	// TODO: A ServerCA is technically optional, but we might want to fail if it's not present...
 	log.Printf("Running request %v", req)
@@ -239,31 +252,31 @@ func executeKubernetesRequest(dataflow chan *tunnel.AgentToControllerWrapper, re
 	}
 }
 
-func loadKubernetesSecurity() *serverContextFields {
+func (ke *KubernetesEndpoint) loadKubernetesSecurity() *kubeContext {
 	yamlString, err := os.Open(config.Kubernetes.KubeConfig)
 	if err == nil {
 		kconfig, err := kubeconfig.ReadKubeConfig(yamlString)
 		if err != nil {
 			log.Fatalf("Unable to read kubeconfig: %v", err)
 		}
-		return serverContextFromKubeconfig(kconfig)
+		return ke.serverContextFromKubeconfig(kconfig)
 	}
-	sa, err := loadServiceAccount()
+	sa, err := ke.loadServiceAccount()
 	if err != nil {
 		log.Fatalf("No kubeconfig and no Kubernetes account found: %v", err)
 	}
 	return sa
 }
 
-func updateServerContextTicker(sa *serverContext) {
+func (ke *KubernetesEndpoint) updateServerContextTicker() {
 	for {
-		saf := loadKubernetesSecurity()
-		sa.Lock()
-		if !sa.f.isSameAs(saf) {
+		saf := ke.loadKubernetesSecurity()
+		ke.Lock()
+		if !ke.f.isSameAs(saf) {
 			log.Printf("Updating security context for API calls to Kubernetes")
-			sa.f = *saf
+			ke.f = *saf
 		}
-		sa.Unlock()
+		ke.Unlock()
 		time.Sleep(time.Second * 600)
 	}
 }

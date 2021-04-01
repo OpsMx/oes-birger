@@ -34,8 +34,6 @@ var (
 )
 
 type serverContext struct {
-	sync.RWMutex
-	f serverContextFields
 }
 
 // TODO: this is currently copied from the controller.  Should be shared.
@@ -43,6 +41,12 @@ type Endpoint struct {
 	Name       string `json:"name,omitempty"`
 	Type       string `json:"type,omitempty"`
 	Configured bool   `json:"configured,omitempty"`
+
+	instance HTTPRequestProcessor
+}
+
+type HTTPRequestProcessor interface {
+	executeHTTPRequest(chan *tunnel.AgentToControllerWrapper, *tunnel.HttpRequest)
 }
 
 // TODO: this is currently copied from the controller.  Should be shared.
@@ -127,9 +131,15 @@ func runTunnel(wg *sync.WaitGroup, sa *serverContext, conn *grpc.ClientConn, end
 				callCancelFunction(req.Id)
 			case *tunnel.ControllerToAgentWrapper_HttpRequest:
 				req := in.GetHttpRequest()
-				if req.Type == "kubernetes" && config.Kubernetes.Enabled {
-					go executeKubernetesRequest(dataflow, req, sa)
-				} else {
+				found := false
+				for _, endpoint := range endpoints {
+					if endpoint.Configured && endpoint.Type == req.Type && endpoint.Name == req.Name {
+						go endpoint.instance.executeHTTPRequest(dataflow, req)
+						found = true
+						break
+					}
+				}
+				if !found {
 					log.Printf("Request for unsupported HTTP tunnel type: %s", req.Type)
 					dataflow <- makeBadGatewayResponse(req.Id)
 				}
@@ -213,14 +223,15 @@ func main() {
 	})
 
 	sa := &serverContext{}
+
 	if config.Kubernetes.Enabled {
-		sa.f = *loadKubernetesSecurity()
-		go updateServerContextTicker(sa)
+		k := MakeKubernetesEndpoint()
 
 		endpoints = append(endpoints, Endpoint{
 			Type:       "kubernetes",
 			Name:       "kubernetes1",
 			Configured: true,
+			instance:   k,
 		})
 	}
 
