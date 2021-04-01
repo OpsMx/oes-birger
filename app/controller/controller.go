@@ -125,6 +125,7 @@ func kubernetesAPIHandler(w http.ResponseWriter, r *http.Request) {
 	req := &tunnel.HttpRequest{
 		Id:      transactionID,
 		Type:    "kubernetes",
+		Name:    "kubernetes1",
 		Method:  r.Method,
 		URI:     r.RequestURI,
 		Headers: makeHeaders(r.Header),
