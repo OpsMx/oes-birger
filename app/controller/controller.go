@@ -5,7 +5,6 @@ import (
 	"crypto/tls"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"strings"
@@ -44,11 +43,6 @@ var (
 		Help: "The total numbe of API requests",
 	}, []string{"agent"})
 )
-
-func labels(name string) (serviceName string, agentName string, certType string) {
-	items := strings.Split(name, ".")
-	return items[0], items[1], items[2]
-}
 
 func getNamesFromContext(ctx context.Context) ([]string, error) {
 	p, ok := peer.FromContext(ctx)
@@ -128,110 +122,6 @@ func serviceAPIHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func kubernetesAPIHandler(w http.ResponseWriter, r *http.Request) {
-	if len(r.TLS.PeerCertificates) == 0 {
-		log.Printf("Kubernetes:  client did not present a certificate, returning Forbidden")
-		w.WriteHeader(http.StatusForbidden)
-		return
-	}
-
-	endpointName, endpointType, agentIdentity := labels(r.TLS.PeerCertificates[0].Subject.CommonName)
-	if endpointType != "kubernetes" {
-		log.Printf("Kubernetes: client cert type is %s, expected 'client", endpointType)
-		w.WriteHeader(http.StatusForbidden)
-		return
-	}
-	ep := agent.AgentSearch{
-		Identity:     agentIdentity,
-		EndpointType: endpointType,
-		EndpointName: endpointName,
-	}
-	apiRequestCounter.WithLabelValues(agentIdentity).Inc()
-
-	transactionID := ulidContext.Ulid()
-
-	body, _ := ioutil.ReadAll(r.Body)
-	req := &tunnel.HttpRequest{
-		Id:      transactionID,
-		Type:    endpointType,
-		Name:    endpointName,
-		Method:  r.Method,
-		URI:     r.RequestURI,
-		Headers: makeHeaders(r.Header),
-		Body:    body,
-	}
-	message := &HTTPMessage{Out: make(chan *tunnel.AgentToControllerWrapper), Cmd: req}
-	sessionID, found := agents.Send(ep, message)
-	if !found {
-		w.WriteHeader(http.StatusBadGateway)
-		return
-	}
-	ep.Session = sessionID
-
-	cleanClose := false
-	notify := r.Context().Done()
-	go func() {
-		<-notify
-		if !cleanClose {
-			agents.Cancel(ep, transactionID)
-		}
-	}()
-
-	seenHeader := false
-	isChunked := false
-	flusher := w.(http.Flusher)
-	for {
-		in, more := <-message.Out
-		if !more {
-			if !seenHeader {
-				log.Printf("Request timed out sending to agent")
-				w.WriteHeader(http.StatusBadGateway)
-			}
-			cleanClose = true
-			return
-		}
-
-		switch x := in.Event.(type) {
-		case *tunnel.AgentToControllerWrapper_HttpResponse:
-			resp := in.GetHttpResponse()
-			seenHeader = true
-			isChunked = resp.ContentLength < 0
-			for name := range w.Header() {
-				r.Header.Del(name)
-			}
-			for _, header := range resp.Headers {
-				for _, value := range header.Values {
-					w.Header().Add(header.Name, value)
-				}
-			}
-			w.WriteHeader(int(resp.Status))
-			if resp.ContentLength == 0 {
-				cleanClose = true
-				return
-			}
-		case *tunnel.AgentToControllerWrapper_HttpChunkedResponse:
-			resp := in.GetHttpChunkedResponse()
-			if !seenHeader {
-				log.Printf("Error: got ChunkedResponse before HttpResponse")
-				w.WriteHeader(http.StatusBadGateway)
-				return
-			}
-			if len(resp.Body) == 0 {
-				cleanClose = true
-				return
-			}
-			w.Write(resp.Body)
-			if isChunked {
-				flusher.Flush()
-			}
-		case nil:
-			// ignore for now
-		default:
-			log.Printf("Received unknown message: %T", x)
-		}
-	}
-}
-
 func runHTTPSServer(serverCert tls.Certificate) {
 	log.Printf("Running generic API HTTPS listener on port %d", config.ServicePort)
 
@@ -246,7 +136,6 @@ func runHTTPSServer(serverCert tls.Certificate) {
 		Certificates: []tls.Certificate{serverCert},
 		MinVersion:   tls.VersionTLS12,
 	}
-	//tlsConfig.BuildNameToCertificate()
 
 	mux := http.NewServeMux()
 
