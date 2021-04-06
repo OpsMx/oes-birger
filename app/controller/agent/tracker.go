@@ -151,8 +151,10 @@ func (s *ConnectedAgents) Send(ep AgentSearch, message interface{}) (string, boo
 	}
 	if len(possibleAgents) == 0 {
 		log.Printf("Request for %s, no such path exists or all are unconfigured.", ep)
+		return "", false
 	}
-	a := agentList[rnd.Intn(len(agentList))]
+	selected := possibleAgents[rnd.Intn(len(possibleAgents))]
+	a := agentList[selected]
 	session := a.Send(message)
 	return session, true
 }

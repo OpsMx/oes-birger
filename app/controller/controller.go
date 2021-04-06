@@ -28,7 +28,7 @@ import (
 var (
 	configFile = flag.String("configFile", "/app/config/config.yaml", "The file with the controller config")
 
-	jwtKeyset     jwk.Set
+	jwtKeyset     = jwk.NewSet()
 	jwtCurrentKey string
 
 	config *ControllerConfig
@@ -75,7 +75,7 @@ func getAgentNameFromContext(ctx context.Context) (string, error) {
 func makeHeaders(headers map[string][]string) []*tunnel.HttpHeader {
 	ret := make([]*tunnel.HttpHeader, 0)
 	for name, values := range headers {
-		if name != "Accept-Encoding" {
+		if name != "Authorization" {
 			ret = append(ret, &tunnel.HttpHeader{Name: name, Values: values})
 		}
 	}
@@ -181,6 +181,7 @@ func loadKeyset() {
 		log.Printf("No service keys configured.")
 		return
 	}
+	jwtCurrentKey = config.ServiceAuth.CurrentKeyName
 	for _, k := range config.ServiceAuth.Keys {
 		key, err := jwk.New([]byte(k.Content))
 		if err != nil {
@@ -190,6 +191,16 @@ func loadKeyset() {
 		jwtKeyset.Add(key)
 	}
 	log.Printf("Loaded %d serviceKeys", jwtKeyset.Len())
+}
+
+func printSampleKey() {
+	if key, ok := jwtKeyset.LookupKeyID(jwtCurrentKey); ok {
+		token, err := MakeJWT(key, "jenkins", "jenkins1", "agent1")
+		if err != nil {
+			log.Fatal(err)
+		}
+		log.Printf("token for jenkins1/jenkins/agent1: %s", token)
+	}
 }
 
 func main() {
@@ -203,6 +214,7 @@ func main() {
 	c.Dump()
 
 	loadKeyset()
+	printSampleKey()
 
 	if len(config.Webhook) > 0 {
 		hook = webhook.NewRunner(config.Webhook)

@@ -12,7 +12,9 @@ import (
 func makeHeaders(headers map[string][]string) []*tunnel.HttpHeader {
 	ret := make([]*tunnel.HttpHeader, 0)
 	for name, values := range headers {
-		ret = append(ret, &tunnel.HttpHeader{Name: name, Values: values})
+		if name != "Authorization" {
+			ret = append(ret, &tunnel.HttpHeader{Name: name, Values: values})
+		}
 	}
 	return ret
 }
