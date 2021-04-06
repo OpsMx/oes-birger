@@ -15,6 +15,7 @@ import (
 // environment variables are applied.
 type ControllerConfig struct {
 	Agents              map[string]*agentConfig `yaml:"agents,omitempty"`
+	ServiceAuth         serviceAuthConfig       `yaml:"serviceAuth,omitempty"`
 	Webhook             string                  `yaml:"webhook,omitempty"`
 	ServerNames         []string                `yaml:"serverNames,omitempty"`
 	CAConfig            ca.Config               `yaml:"caConfig,omitempty"`
@@ -31,6 +32,16 @@ type ControllerConfig struct {
 
 type agentConfig struct {
 	Identity string `yaml:"identity,omitempty"`
+}
+
+type serviceKeyConfig struct {
+	Name    string `yaml:"name,omitempty"`
+	Content string `yaml:"content,omitempty"`
+}
+
+type serviceAuthConfig struct {
+	CurrentKeyName string             `yaml:"currentKeyName,omitempty"`
+	Keys           []serviceKeyConfig `yaml:"keys,omitempty"`
 }
 
 // LoadConfig will load YAML configuration from the provided filename,

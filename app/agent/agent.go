@@ -196,6 +196,8 @@ func configureEndpoints() {
 			switch service.Type {
 			case "kubernetes":
 				instance, configured, err = MakeKubernetesEndpoint(service.Name, config)
+			case "jenkins":
+				instance, configured, err = MakeJenkinsEndpoint(service.Name, config)
 			default:
 				log.Fatalf("Unknown service type %s, name %s", service.Type, service.Name)
 			}

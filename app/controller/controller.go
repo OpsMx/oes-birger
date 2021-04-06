@@ -28,7 +28,8 @@ import (
 var (
 	configFile = flag.String("configFile", "/app/config/config.yaml", "The file with the controller config")
 
-	jwtKeyset jwk.Set
+	jwtKeyset     jwk.Set
+	jwtCurrentKey string
 
 	config *ControllerConfig
 
@@ -175,6 +176,22 @@ func runPrometheusHTTPServer(port uint16) {
 	agent.PrometheusRegister()
 }
 
+func loadKeyset() {
+	if config.ServiceAuth.CurrentKeyName == "" {
+		log.Printf("No service keys configured.")
+		return
+	}
+	for _, k := range config.ServiceAuth.Keys {
+		key, err := jwk.New([]byte(k.Content))
+		if err != nil {
+			log.Fatalf("cannot load key '%s': %v", k.Name, err)
+		}
+		key.Set(jwk.KeyIDKey, k.Name)
+		jwtKeyset.Add(key)
+	}
+	log.Printf("Loaded %d serviceKeys", jwtKeyset.Len())
+}
+
 func main() {
 	flag.Parse()
 
@@ -184,6 +201,8 @@ func main() {
 	}
 	config = c
 	c.Dump()
+
+	loadKeyset()
 
 	if len(config.Webhook) > 0 {
 		hook = webhook.NewRunner(config.Webhook)
