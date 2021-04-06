@@ -28,12 +28,17 @@ func certificateAuthAPIHandler(serviceType string, w http.ResponseWriter, r *htt
 		w.WriteHeader(http.StatusForbidden)
 		return
 	}
+
 	ep := agent.AgentSearch{
 		Identity:     agentIdentity,
 		EndpointType: endpointType,
 		EndpointName: endpointName,
 	}
-	apiRequestCounter.WithLabelValues(agentIdentity).Inc()
+	runAPIHandler(ep, w, r)
+}
+
+func runAPIHandler(ep agent.AgentSearch, w http.ResponseWriter, r *http.Request) {
+	apiRequestCounter.WithLabelValues(ep.Identity).Inc()
 
 	transactionID := ulidContext.Ulid()
 
