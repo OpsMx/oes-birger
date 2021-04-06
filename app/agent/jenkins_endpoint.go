@@ -20,9 +20,9 @@ type JenkinsCredentials struct {
 }
 
 type JenkinsConfig struct {
-	URL         string `yaml:"url,omitempty"`
-	Insecure    bool   `yaml:"insecure,omitempty"`
-	Credentials JenkinsCredentials
+	URL         string             `yaml:"url,omitempty"`
+	Insecure    bool               `yaml:"insecure,omitempty"`
+	Credentials JenkinsCredentials `yaml:"credentials,omitempty"`
 }
 
 type JenkinsEndpoint struct {
