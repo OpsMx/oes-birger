@@ -197,7 +197,7 @@ func configureEndpoints() {
 			case "kubernetes":
 				instance, configured, err = MakeKubernetesEndpoint(service.Name, config)
 			default:
-				instance, configured, err = MakeJenkinsEndpoint(service.Type, service.Name, config)
+				instance, configured, err = MakeGenericEndpoint(service.Type, service.Name, config)
 			}
 
 			// If the instance-specific make method returns an error, catch it here.

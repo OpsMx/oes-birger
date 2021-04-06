@@ -12,26 +12,26 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-type JenkinsCredentials struct {
+type GenericEndpointCredentials struct {
 	Type     string `yaml:"type,omitempty"`
 	Username string `yaml:"username,omitempty"`
 	Password string `yaml:"password,omitempty"`
 	Token    string `yaml:"token,omitempty"`
 }
 
-type JenkinsConfig struct {
-	URL         string             `yaml:"url,omitempty"`
-	Insecure    bool               `yaml:"insecure,omitempty"`
-	Credentials JenkinsCredentials `yaml:"credentials,omitempty"`
+type GenericEndpointConfig struct {
+	URL         string                     `yaml:"url,omitempty"`
+	Insecure    bool                       `yaml:"insecure,omitempty"`
+	Credentials GenericEndpointCredentials `yaml:"credentials,omitempty"`
 }
 
-type JenkinsEndpoint struct {
+type GenericEndpoint struct {
 	endpointType string
 	endpointName string
-	config       JenkinsConfig
+	config       GenericEndpointConfig
 }
 
-func (ke JenkinsEndpoint) cleanupCreds() bool {
+func (ke GenericEndpoint) cleanupCreds() bool {
 	creds := ke.config.Credentials
 	switch creds.Type {
 	case "":
@@ -66,13 +66,13 @@ func (ke JenkinsEndpoint) cleanupCreds() bool {
 	return false
 }
 
-func MakeJenkinsEndpoint(endpointType string, endpointName string, configBytes []byte) (*JenkinsEndpoint, bool, error) {
-	ep := &JenkinsEndpoint{
+func MakeGenericEndpoint(endpointType string, endpointName string, configBytes []byte) (*GenericEndpoint, bool, error) {
+	ep := &GenericEndpoint{
 		endpointType: endpointType,
 		endpointName: endpointName,
 	}
 
-	var config JenkinsConfig
+	var config GenericEndpointConfig
 	err := yaml.Unmarshal(configBytes, &config)
 	if err != nil {
 		return nil, false, err
@@ -90,7 +90,7 @@ func MakeJenkinsEndpoint(endpointType string, endpointName string, configBytes [
 	return ep, true, nil
 }
 
-func (ke *JenkinsEndpoint) executeHTTPRequest(dataflow chan *tunnel.AgentToControllerWrapper, req *tunnel.HttpRequest) {
+func (ke *GenericEndpoint) executeHTTPRequest(dataflow chan *tunnel.AgentToControllerWrapper, req *tunnel.HttpRequest) {
 	log.Printf("Running request %v", req)
 	tlsConfig := &tls.Config{
 		MinVersion: tls.VersionTLS12,
