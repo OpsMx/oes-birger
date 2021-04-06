@@ -5,6 +5,7 @@ go 1.16
 require (
 	github.com/golang/protobuf v1.4.3
 	github.com/kr/text v0.2.0 // indirect
+	github.com/lestrrat-go/jwx v1.1.7
 	github.com/oklog/ulid/v2 v2.0.2
 	github.com/prometheus/client_golang v1.9.0
 	github.com/prometheus/common v0.17.0 // indirect
@@ -13,7 +14,6 @@ require (
 	golang.org/x/net v0.0.0-20210224082022-3d97a244fca7
 	golang.org/x/sys v0.0.0-20210225080010-8e9945a5478f // indirect
 	golang.org/x/text v0.3.5 // indirect
-	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
 	google.golang.org/genproto v0.0.0-20210224155714-063164c882e6 // indirect
 	google.golang.org/grpc v1.36.0
 	google.golang.org/protobuf v1.25.0
