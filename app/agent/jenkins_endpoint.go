@@ -12,17 +12,65 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+type JenkinsCredentials struct {
+	Type     string `yaml:"type,omitempty"`
+	Username string `yaml:"username,omitempty"`
+	Password string `yaml:"password,omitempty"`
+	Token    string `yaml:"token,omitempty"`
+}
+
 type JenkinsConfig struct {
-	SecretPath string `yaml:"secretPath,omitempty"`
-	URL        string `yaml:"url,omitempty"`
+	URL         string `yaml:"url,omitempty"`
+	Insecure    bool   `yaml:"insecure,omitempty"`
+	Credentials JenkinsCredentials
 }
 
 type JenkinsEndpoint struct {
-	config JenkinsConfig
+	endpointType string
+	endpointName string
+	config       JenkinsConfig
 }
 
-func MakeJenkinsEndpoint(name string, configBytes []byte) (*JenkinsEndpoint, bool, error) {
-	ep := &JenkinsEndpoint{}
+func (ke JenkinsEndpoint) cleanupCreds() bool {
+	creds := ke.config.Credentials
+	switch creds.Type {
+	case "":
+		creds.Type = "none"
+		return true
+	case "none":
+		return true
+	case "bearer":
+		if creds.Token == "" {
+			log.Printf("Credentials for %s/%s type bearer requires 'token'", ke.endpointType, ke.endpointName)
+			return false
+		}
+		ke.config.Credentials = creds
+		return true
+	case "basic":
+		if creds.Username == "" {
+			log.Printf("Credentials for %s/%s type basic requires 'username'", ke.endpointType, ke.endpointName)
+			return false
+		}
+		if creds.Password == "" && creds.Token == "" {
+			log.Printf("Credentials for %s/%s type basic requires 'password' or 'token'", ke.endpointType, ke.endpointName)
+			return false
+		}
+		if creds.Password != "" && creds.Token != "" {
+			log.Printf("Credentials for %s/%s type basic requires only one of 'password' or 'token'", ke.endpointType, ke.endpointName)
+			return false
+		}
+		ke.config.Credentials = creds
+		return true
+	}
+	log.Printf("Unknown authentication type for %s/%s: %s", ke.endpointType, ke.endpointName, creds.Type)
+	return false
+}
+
+func MakeJenkinsEndpoint(endpointType string, endpointName string, configBytes []byte) (*JenkinsEndpoint, bool, error) {
+	ep := &JenkinsEndpoint{
+		endpointType: endpointType,
+		endpointName: endpointName,
+	}
 
 	var config JenkinsConfig
 	err := yaml.Unmarshal(configBytes, &config)
@@ -30,14 +78,12 @@ func MakeJenkinsEndpoint(name string, configBytes []byte) (*JenkinsEndpoint, boo
 		return nil, false, err
 	}
 	ep.config = config
-
-	if ep.config.SecretPath == "" {
-		log.Printf("secretPath not set for jenkins/%s", name)
+	if !ep.cleanupCreds() {
 		return nil, false, nil
 	}
 
 	if ep.config.URL == "" {
-		log.Printf("url not set for jenkins/%s", name)
+		log.Printf("url not set for %s/%s", endpointType, endpointName)
 		return nil, false, nil
 	}
 
@@ -55,6 +101,9 @@ func (ke *JenkinsEndpoint) executeHTTPRequest(dataflow chan *tunnel.AgentToContr
 		DisableCompression: true,
 		TLSClientConfig:    tlsConfig,
 	}
+	if ke.config.Insecure {
+		tr.TLSClientConfig.InsecureSkipVerify = true
+	}
 	client := &http.Client{
 		Transport: tr,
 	}
@@ -71,6 +120,18 @@ func (ke *JenkinsEndpoint) executeHTTPRequest(dataflow chan *tunnel.AgentToContr
 	}
 
 	copyHeaders(req, httpRequest)
+
+	creds := ke.config.Credentials
+	switch creds.Type {
+	case "basic":
+		if creds.Password == "" {
+			httpRequest.SetBasicAuth(creds.Username, creds.Token)
+		} else {
+			httpRequest.SetBasicAuth(creds.Username, creds.Password)
+		}
+	case "bearer":
+		httpRequest.Header.Set("Authorization", "Bearer "+creds.Token)
+	}
 
 	runHTTPRequest(client, req, httpRequest, dataflow, ke.config.URL)
 }
