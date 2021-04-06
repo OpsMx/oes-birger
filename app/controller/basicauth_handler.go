@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -10,28 +11,59 @@ import (
 	"github.com/opsmx/oes-birger/pkg/tunnel"
 )
 
-func labels(name string) (serviceName string, agentName string, certType string) {
-	items := strings.Split(name, ".")
-	return items[0], items[1], items[2]
+func getAuthParts(username string) (epType string, epName string, agent string, err error) {
+	items := strings.Split(username, ".")
+	if len(items) != 3 {
+		return "", "", "", fmt.Errorf("username has invalid format")
+	}
+	return items[0], items[1], items[2], nil
 }
 
-func kubernetesAPIHandler(w http.ResponseWriter, r *http.Request) {
-	if len(r.TLS.PeerCertificates) == 0 {
-		log.Printf("Kubernetes:  client did not present a certificate, returning Forbidden")
+func basicAuthAPIHandler(serviceType string, w http.ResponseWriter, r *http.Request) {
+	var authUsername string
+	var authPassword string
+	var ok bool
+	if authUsername, authPassword, ok = r.BasicAuth(); !ok {
+		log.Printf("No credentials provided, epType %s", serviceType)
+	}
+
+	// Pull fields from the username, which is of the format
+	// eptype.epname.agentid
+	usernameType, usernameName, usernameAgent, err := getAuthParts(authUsername)
+	if err != nil {
+		log.Printf("%v", err)
 		w.WriteHeader(http.StatusForbidden)
 		return
 	}
 
-	endpointName, endpointType, agentIdentity := labels(r.TLS.PeerCertificates[0].Subject.CommonName)
-	if endpointType != "kubernetes" {
-		log.Printf("Kubernetes: client cert type is %s, expected 'client", endpointType)
+	// Pull fields from the password, and if they validate, compare to the
+	// username.
+	epType, epName, agentIdentity, err := ValidateJWT(jwtKeyset, authPassword)
+	if err != nil {
+		log.Printf("%v", err)
 		w.WriteHeader(http.StatusForbidden)
 		return
 	}
+	if usernameType != epType {
+		log.Printf("usernameType %s does not match JWT field %s", usernameType, epType)
+		w.WriteHeader(http.StatusForbidden)
+		return
+	}
+	if usernameName != epName {
+		log.Printf("usernameName %s does not match JWT field %s", usernameName, epName)
+		w.WriteHeader(http.StatusForbidden)
+		return
+	}
+	if usernameAgent != agentIdentity {
+		log.Printf("usernameAgent %s does not match JWT field %s", usernameAgent, agentIdentity)
+		w.WriteHeader(http.StatusForbidden)
+		return
+	}
+
 	ep := agent.AgentSearch{
 		Identity:     agentIdentity,
-		EndpointType: endpointType,
-		EndpointName: endpointName,
+		EndpointType: epType,
+		EndpointName: epName,
 	}
 	apiRequestCounter.WithLabelValues(agentIdentity).Inc()
 

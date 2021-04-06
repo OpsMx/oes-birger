@@ -14,6 +14,7 @@ import (
 	"google.golang.org/grpc/peer"
 	"google.golang.org/grpc/status"
 
+	"github.com/lestrrat-go/jwx/jwk"
 	"github.com/opsmx/oes-birger/app/controller/agent"
 	"github.com/opsmx/oes-birger/pkg/ca"
 	"github.com/opsmx/oes-birger/pkg/tunnel"
@@ -26,6 +27,8 @@ import (
 
 var (
 	configFile = flag.String("configFile", "/app/config/config.yaml", "The file with the controller config")
+
+	jwtKeyset jwk.Set
 
 	config *ControllerConfig
 
@@ -116,9 +119,7 @@ func serviceAPIHandler(w http.ResponseWriter, r *http.Request) {
 	if serviceType == "kubernetes" {
 		kubernetesAPIHandler(w, r)
 	} else {
-		log.Printf("unknown service type: %s", serviceType)
-		w.WriteHeader(http.StatusBadGateway)
-		return
+		basicAuthAPIHandler(serviceType, w, r)
 	}
 }
 
