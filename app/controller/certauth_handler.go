@@ -15,16 +15,16 @@ func labels(name string) (serviceName string, agentName string, certType string)
 	return items[0], items[1], items[2]
 }
 
-func kubernetesAPIHandler(w http.ResponseWriter, r *http.Request) {
+func certificateAuthAPIHandler(serviceType string, w http.ResponseWriter, r *http.Request) {
 	if len(r.TLS.PeerCertificates) == 0 {
-		log.Printf("Kubernetes:  client did not present a certificate, returning Forbidden")
+		log.Printf("client did not present a certificate, returning Forbidden")
 		w.WriteHeader(http.StatusForbidden)
 		return
 	}
 
 	endpointName, endpointType, agentIdentity := labels(r.TLS.PeerCertificates[0].Subject.CommonName)
-	if endpointType != "kubernetes" {
-		log.Printf("Kubernetes: client cert type is %s, expected 'client", endpointType)
+	if endpointType != serviceType {
+		log.Printf("client cert type is %s, expected %s", endpointType, serviceType)
 		w.WriteHeader(http.StatusForbidden)
 		return
 	}

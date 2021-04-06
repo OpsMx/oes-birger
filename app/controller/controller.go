@@ -117,7 +117,7 @@ func getServiceTypeFromName(httpRequest *http.Request) string {
 func serviceAPIHandler(w http.ResponseWriter, r *http.Request) {
 	serviceType := getServiceTypeFromName(r)
 	if serviceType == "kubernetes" {
-		kubernetesAPIHandler(w, r)
+		certificateAuthAPIHandler(serviceType, w, r)
 	} else {
 		basicAuthAPIHandler(serviceType, w, r)
 	}
