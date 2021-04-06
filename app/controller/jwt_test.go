@@ -27,30 +27,33 @@ func loadkeys(t *testing.T) jwk.Set {
 func TestMakeJWT(t *testing.T) {
 	keyset := loadkeys(t)
 	tests := []struct {
-		name     string
-		keyid    string
-		keyset   jwk.Set
-		username string
-		agent    string
-		want     string
-		wantErr  bool
+		name    string
+		keyid   string
+		keyset  jwk.Set
+		epType  string
+		epName  string
+		agent   string
+		want    string
+		wantErr bool
 	}{
 		{
 			"key1",
 			"key1",
 			keyset,
+			"artifactory",
 			"bob",
 			"agent1",
-			"eyJhbGciOiJIUzI1NiIsImtpZCI6ImtleTEiLCJ0eXAiOiJKV1QifQ.eyJhZ2VudCI6ImFnZW50MSIsImlzcyI6Im9wc214IiwidXNlcm5hbWUiOiJib2IifQ.9cJIQwYIp9pnA7y8zfc2qo0SAMjYPzzYVF-WE1buLEQ",
+			"eyJhbGciOiJIUzI1NiIsImtpZCI6ImtleTEiLCJ0eXAiOiJKV1QifQ.eyJhIjoiYWdlbnQxIiwiaXNzIjoib3BzbXgiLCJuIjoiYm9iIiwidCI6ImFydGlmYWN0b3J5In0.TdshkeQ7ScSkWWkkl8QRMZ4ZmoJWQkqNiDceKCIH8ms",
 			false,
 		},
 		{
 			"key2",
 			"key2",
 			keyset,
+			"jenkins",
 			"bob",
 			"agent1",
-			"eyJhbGciOiJIUzI1NiIsImtpZCI6ImtleTIiLCJ0eXAiOiJKV1QifQ.eyJhZ2VudCI6ImFnZW50MSIsImlzcyI6Im9wc214IiwidXNlcm5hbWUiOiJib2IifQ.fLQZV45Sx3kQ4P1np6g1xklEoYnA-Fv1XYU7kp9EO5A",
+			"eyJhbGciOiJIUzI1NiIsImtpZCI6ImtleTIiLCJ0eXAiOiJKV1QifQ.eyJhIjoiYWdlbnQxIiwiaXNzIjoib3BzbXgiLCJuIjoiYm9iIiwidCI6ImplbmtpbnMifQ.QvTMDpqsmC8KsUt5J3bvSAp9noLOYjboMiyinWR7uVA",
 			false,
 		},
 	}
@@ -62,7 +65,7 @@ func TestMakeJWT(t *testing.T) {
 				t.Errorf("key not found: %s", tt.keyid)
 				t.FailNow()
 			}
-			got, err := MakeJWT(key, tt.username, tt.agent)
+			got, err := MakeJWT(key, tt.epType, tt.epName, tt.agent)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("MakeJWT() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -77,17 +80,19 @@ func TestMakeJWT(t *testing.T) {
 func TestValidateJWT(t *testing.T) {
 	keyset := loadkeys(t)
 	tests := []struct {
-		name         string
-		keyset       jwk.Set
-		token        string
-		wantUsername string
-		wantAgent    string
-		wantErr      bool
+		name      string
+		keyset    jwk.Set
+		token     string
+		wantType  string
+		wantName  string
+		wantAgent string
+		wantErr   bool
 	}{
 		{
 			"valid",
 			keyset,
-			"eyJhbGciOiJIUzI1NiIsImtpZCI6ImtleTEiLCJ0eXAiOiJKV1QifQ.eyJhZ2VudCI6ImFnZW50MSIsImlzcyI6Im9wc214IiwidXNlcm5hbWUiOiJib2IifQ.9cJIQwYIp9pnA7y8zfc2qo0SAMjYPzzYVF-WE1buLEQ",
+			"eyJhbGciOiJIUzI1NiIsImtpZCI6ImtleTEiLCJ0eXAiOiJKV1QifQ.eyJhIjoiYWdlbnQxIiwiaXNzIjoib3BzbXgiLCJuIjoiYm9iIiwidCI6ImFydGlmYWN0b3J5In0.TdshkeQ7ScSkWWkkl8QRMZ4ZmoJWQkqNiDceKCIH8ms",
+			"artifactory",
 			"bob",
 			"agent1",
 			false,
@@ -95,7 +100,8 @@ func TestValidateJWT(t *testing.T) {
 		{
 			"invalid1",
 			keyset,
-			"eyJhbGciOiJIUzI1NiIsImtpZCI6ImtleTEiLCJ0eXAiOiJKV1QifQ.eyJhZ2VudCI6ImFnZW50MSIsImlzcyI6Im9wc214IiwidXNlcm5hbWUiOiJib2IifQ.",
+			"eyJhbGciOiJIUzI1NiIsImtpZCI6ImtleTEiLCJ0eXAiOiJKV1QifQ.eyJhIjoiYWdlbnQxIiwiaXNzIjoib3BzbXgiLCJuIjoiYm9iIiwidCI6ImFydGlmYWN0b3J5In0.",
+			"",
 			"",
 			"",
 			true,
@@ -103,13 +109,16 @@ func TestValidateJWT(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotUsername, gotAgent, err := ValidateJWT(tt.keyset, tt.token)
+			gotType, gotName, gotAgent, err := ValidateJWT(tt.keyset, tt.token)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ValidateJWT() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if gotUsername != tt.wantUsername {
-				t.Errorf("ValidateJWT() gotUsername = %v, want %v", gotUsername, tt.wantUsername)
+			if gotType != tt.wantType {
+				t.Errorf("ValidateJWT() gotType = %v, want %v", gotType, tt.wantType)
+			}
+			if gotName != tt.wantName {
+				t.Errorf("ValidateJWT() gotName = %v, want %v", gotName, tt.wantName)
 			}
 			if gotAgent != tt.wantAgent {
 				t.Errorf("ValidateJWT() gotAgent = %v, want %v", gotAgent, tt.wantAgent)

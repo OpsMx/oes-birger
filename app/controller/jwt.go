@@ -8,11 +8,12 @@ import (
 	"github.com/lestrrat-go/jwx/jwt"
 )
 
-func MakeJWT(key jwk.Key, username string, agent string) (string, error) {
+func MakeJWT(key jwk.Key, epType string, epName string, agent string) (string, error) {
 	t := jwt.New()
 	t.Set(jwt.IssuerKey, "opsmx")
-	t.Set("username", username)
-	t.Set("agent", agent)
+	t.Set("t", epType)
+	t.Set("n", epName)
+	t.Set("a", agent)
 
 	signed, err := jwt.Sign(t, jwa.HS256, key)
 	if err != nil {
@@ -21,7 +22,7 @@ func MakeJWT(key jwk.Key, username string, agent string) (string, error) {
 	return string(signed), nil
 }
 
-func ValidateJWT(keyset jwk.Set, tokenString string) (username string, agent string, err error) {
+func ValidateJWT(keyset jwk.Set, tokenString string) (epType string, epName string, agent string, err error) {
 	token, err := jwt.Parse(
 		[]byte(tokenString),
 		jwt.WithValidate(true),
@@ -30,15 +31,20 @@ func ValidateJWT(keyset jwk.Set, tokenString string) (username string, agent str
 	if err != nil {
 		return
 	}
-	if iname, ok := token.Get("username"); ok {
-		username = iname.(string)
+	if itype, ok := token.Get("t"); ok {
+		epType = itype.(string)
 	} else {
-		return "", "", fmt.Errorf("missing username")
+		return "", "", "", fmt.Errorf("missing epType")
 	}
-	if iagent, ok := token.Get("agent"); ok {
+	if iname, ok := token.Get("n"); ok {
+		epName = iname.(string)
+	} else {
+		return "", "", "", fmt.Errorf("missing epName")
+	}
+	if iagent, ok := token.Get("a"); ok {
 		agent = iagent.(string)
 	} else {
-		return "", "", fmt.Errorf("missing agent")
+		return "", "", "", fmt.Errorf("missing agent")
 	}
 	return
 }
