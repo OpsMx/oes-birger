@@ -28,6 +28,13 @@ func MakeJWT(key jwk.Key, epType string, epName string, agent string) (string, e
 	return string(signed), nil
 }
 
+func getField(token jwt.Token, name string) (string, error) {
+	if i, ok := token.Get(name); ok {
+		return i.(string), nil
+	}
+	return "", fmt.Errorf("missing %s", name)
+}
+
 func ValidateJWT(keyset jwk.Set, tokenString string) (epType string, epName string, agent string, err error) {
 	token, err := jwt.Parse(
 		[]byte(tokenString),
@@ -37,20 +44,14 @@ func ValidateJWT(keyset jwk.Set, tokenString string) (epType string, epName stri
 	if err != nil {
 		return
 	}
-	if itype, ok := token.Get(JWTEndpointTypeKey); ok {
-		epType = itype.(string)
-	} else {
-		return "", "", "", fmt.Errorf("missing epType")
+	if epType, err = getField(token, JWTEndpointTypeKey); err != nil {
+		return "", "", "", err
 	}
-	if iname, ok := token.Get(JWTEndpointNameKey); ok {
-		epName = iname.(string)
-	} else {
-		return "", "", "", fmt.Errorf("missing epName")
+	if epName, err = getField(token, JWTEndpointNameKey); err != nil {
+		return "", "", "", err
 	}
-	if iagent, ok := token.Get(JWTAgentKey); ok {
-		agent = iagent.(string)
-	} else {
-		return "", "", "", fmt.Errorf("missing agent")
+	if agent, err = getField(token, JWTAgentKey); err != nil {
+		return "", "", "", err
 	}
 	return
 }
