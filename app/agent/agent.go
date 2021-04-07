@@ -30,8 +30,10 @@ var (
 
 	emptyBytes = []byte("")
 
-	config    *cfg.AgentConfig
-	endpoints = []Endpoint{}
+	config              *cfg.AgentConfig
+	agentServiceConfig *cfg.AgentServiceConfig
+
+	endpoints []Endpoint
 )
 
 type serverContext struct {
@@ -184,7 +186,8 @@ func loadCert() []byte {
 
 func configureEndpoints() {
 	// For each service, if it is enabled, find and create an instance.
-	for _, service := range config.Services {
+	endpoints = []Endpoint{}
+	for _, service := range agentServiceConfig.Services {
 		var instance HTTPRequestProcessor
 		var configured bool
 
@@ -228,6 +231,12 @@ func main() {
 	}
 	config = c
 	log.Printf("controller hostname: %s", config.ControllerHostname)
+
+	uc, err := cfg.LoadServiceConfig(config.ServicesConfigPath)
+	if err != nil {
+		log.Fatalf("Error loading services config: %v", err)
+	}
+	agentServiceConfig = uc
 
 	configureEndpoints()
 

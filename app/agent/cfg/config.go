@@ -7,44 +7,20 @@ import (
 )
 
 const (
-	DEFAULT_CERT_PATH = "/app/secrets/agent/tls.crt"
-	DEFAULT_KEY_PATH  = "/app/secrets/agent/tls.key"
+	DEFAULT_CERT_PATH       = "/app/secrets/agent/tls.crt"
+	DEFAULT_KEY_PATH        = "/app/secrets/agent/tls.key"
+	DEFAULT_USERCONFIG_PATH = "/app/config/services.yaml"
 )
-
-// CommandConfig defines a remote host we can run commands on.
-// Each host has a `Name`, which can be targeted from Spinnaker.
-// There are no environment overrides for these.
-type CommandConfig struct {
-	Enabled               bool   `yaml:"enabled"`
-	Name                  string `yaml:"name"`
-	Host                  string `yaml:"host"`
-	Username              string `yaml:"username"`
-	KnownHosts            string `yaml:"knownHostsPath"`
-	InsecureIgnoreHostKey bool   `yaml:"insecureIgnoreHostKey"`
-	UserKeyPath           string `yaml:"userKeyPath"`
-	PasswordPath          string `yaml:"passwordPath"`
-}
-
-//
-// ServiceConfig holds configuration for a service, like a Jenkins endpoint.
-//
-type ServiceConfig struct {
-	Enabled bool                        `yaml:"enabled"`
-	Name    string                      `yaml:"name"`
-	Type    string                      `yaml:"type"`
-	Config  map[interface{}]interface{} `yaml:"config"`
-}
 
 // AgentConfig holds all the configuration for the agent.  The
 // configuration file is loaded from disk first, and then any
 // environment variables are applied.
 type AgentConfig struct {
-	ControllerHostname string          `yaml:"controllerHostname,omitempty"`
-	CACert64           *string         `yaml:"caCert64,omitempty"`
-	Commands           []CommandConfig `yaml:"commands,omitempty"`
-	Services           []ServiceConfig `yaml:"services,omitempty"`
-	CertFile           string          `yaml:"certFile,omitempty"`
-	KeyFile            string          `yaml:"keyFile,omitempty"`
+	ControllerHostname string  `yaml:"controllerHostname,omitempty"`
+	CACert64           *string `yaml:"caCert64,omitempty"`
+	CertFile           string  `yaml:"certFile,omitempty"`
+	KeyFile            string  `yaml:"keyFile,omitempty"`
+	ServicesConfigPath string  `yaml:"servicesConfigPath,omitempty"`
 }
 
 func (c *AgentConfig) applyDefaults() {
@@ -58,6 +34,10 @@ func (c *AgentConfig) applyDefaults() {
 
 	if len(c.KeyFile) == 0 {
 		c.KeyFile = DEFAULT_KEY_PATH
+	}
+
+	if len(c.ServicesConfigPath) == 0 {
+		c.ServicesConfigPath = DEFAULT_USERCONFIG_PATH
 	}
 }
 
