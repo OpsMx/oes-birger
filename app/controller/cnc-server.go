@@ -219,7 +219,9 @@ func cncGenerateServiceCredentials(w http.ResponseWriter, r *http.Request) {
 
 	token, err := MakeJWT(key, req.Type, req.Name, req.Identity)
 	if err != nil {
-		log.Fatal(err)
+		w.Write(httpError(err))
+		w.WriteHeader(statusCode)
+		return
 	}
 
 	ret := serviceCredentialResponse{
@@ -238,7 +240,6 @@ func cncGenerateServiceCredentials(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Write(json)
-
 }
 
 func runCommandHTTPServer(serverCert tls.Certificate) {
