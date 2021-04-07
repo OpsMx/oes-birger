@@ -14,10 +14,12 @@ import (
 
 type kubeConfigRequest struct {
 	Identity string `json:"identity"`
+	Name     string `json:"name"`
 }
 
 type kubeConfigResponse struct {
 	Identity        string `json:"identity"`
+	Name            string `json:"name"`
 	ServerURL       string `json:"serverUrl"`
 	UserCertificate string `json:"userCertificate"`
 	UserKey         string `json:"userKey"`
@@ -58,7 +60,7 @@ func httpError(err error) []byte {
 	}
 	json, err := json.Marshal(ret)
 	if err != nil {
-		return []byte("{\"error\":{\"message\":\"Unknown Error\"}}")
+		return []byte(`{"error":{"message":"Unknown Error"}}`)
 	}
 	return json
 }
@@ -79,7 +81,8 @@ func cncGenerateKubectlComponents(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ca64, user64, key64, err := authority.GenerateCertificate("kubernetes1.kubernetes." + req.Identity)
+	certSubject := fmt.Sprintf("%s.kubernetes.%s", req.Name, req.Identity)
+	ca64, user64, key64, err := authority.GenerateCertificate(certSubject)
 	if err != nil {
 		w.Write(httpError(err))
 		w.WriteHeader(http.StatusBadRequest)
@@ -128,7 +131,7 @@ func cncGenerateAgentManifestComponents(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	ca64, user64, key64, err := authority.GenerateCertificate(req.Identity + ".agent")
+	ca64, user64, key64, err := authority.GenerateCertificate(req.Identity)
 	if err != nil {
 		w.Write(httpError(err))
 		w.WriteHeader(http.StatusBadRequest)
