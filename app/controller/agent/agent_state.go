@@ -21,8 +21,17 @@ func (s *AgentState) GetIdentity() string {
 	return s.Identity
 }
 
+func (s *AgentState) GetEndpoints() []Endpoint {
+	return s.Endpoints
+}
+
 func (s AgentState) String() string {
 	return fmt.Sprintf("(identity=%s, session=%s)", s.Identity, s.Session)
+}
+
+func (s *AgentState) Close() {
+	close(s.InRequest)
+	close(s.InCancelRequest)
 }
 
 //
@@ -53,15 +62,26 @@ func (s *AgentState) HasEndpoint(endpointType string, endpointName string) bool 
 }
 
 //
+// DirectlyConnectedAgentStatistics describes statistics for a directly connected agent.
+//
+type DirectlyConnectedAgentStatistics struct {
+	AgentStatistics
+	ConnectedAt uint64 `json:"connectedAt"`
+	LastPing    uint64 `json:"lastPing"`
+	LastUse     uint64 `json:"lastUse"`
+}
+
+//
 // Get statistics for this agent
 //
 func (s *AgentState) GetStatistics() interface{} {
-	return &DirectlyConnectedAgentStatistics{
-		Identity:       s.Identity,
-		Session:        s.Session,
-		ConnectedAt:    s.ConnectedAt,
-		LastPing:       s.LastPing,
-		LastUse:        s.LastUse,
-		ConnectionType: "direct",
+	ret := &DirectlyConnectedAgentStatistics{
+		ConnectedAt: s.ConnectedAt,
+		LastPing:    s.LastPing,
+		LastUse:     s.LastUse,
 	}
+	ret.Identity = s.Identity
+	ret.Session = s.Session
+	ret.ConnectionType = "direct"
+	return ret
 }

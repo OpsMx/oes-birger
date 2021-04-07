@@ -12,16 +12,25 @@ var (
 	rnd = rand.New(rand.NewSource(time.Now().UnixNano())) // not used for crypto
 )
 
+type AgentStatistics struct {
+	Identity       string     `json:"identity,omitempty"`
+	Session        string     `json:"session,omitempty"`
+	ConnectionType string     `json:"connectionType,omitempty"`
+	Endpoints      []Endpoint `json:"endpoints,omitempty"`
+}
+
 //
 // Agent is a thing that looks like a connected agent, either directly connected or
 // through another controller.
 //
 type Agent interface {
+	Close()
 	Send(interface{}) string
 	Cancel(string)
 	HasEndpoint(string, string) bool
 	GetSession() string
 	GetIdentity() string
+	GetEndpoints() []Endpoint
 
 	GetStatistics() interface{}
 }
@@ -32,18 +41,6 @@ type Agent interface {
 type ConnectedAgents struct {
 	sync.RWMutex
 	m map[string][]Agent
-}
-
-//
-// DirectlyConnectedAgentStatistics describes statistics for a directly connected agent.
-//
-type DirectlyConnectedAgentStatistics struct {
-	Identity       string `json:"identity"`
-	Session        string `json:"session"`
-	ConnectedAt    uint64 `json:"connectedAt"`
-	LastPing       uint64 `json:"lastPing"`
-	LastUse        uint64 `json:"lastUse"`
-	ConnectionType string `json:"connectionType"`
 }
 
 //
@@ -85,51 +82,53 @@ func sliceIndex(limit int, predicate func(i int) bool) int {
 //
 // AddAgent will add a new agent to our list.
 //
-func (s *ConnectedAgents) AddAgent(state *AgentState) {
+func (s *ConnectedAgents) AddAgent(state Agent) {
 	s.Lock()
 	defer s.Unlock()
-	agentList, ok := s.m[state.Identity]
+	agentList, ok := s.m[state.GetIdentity()]
 	if !ok {
 		agentList = make([]Agent, 0)
 	}
 	agentList = append(agentList, state)
-	s.m[state.Identity] = agentList
-	log.Printf("Agent %s added, now at %d paths, %d endpoints", state, len(agentList), len(state.Endpoints))
-	for _, endpoint := range state.Endpoints {
+	s.m[state.GetIdentity()] = agentList
+	log.Printf("Agent %s added, now at %d paths, %d endpoints", state, len(agentList), len(state.GetEndpoints()))
+	for _, endpoint := range state.GetEndpoints() {
 		log.Printf("  agent %s, endpoint: %s", state, &endpoint)
 	}
-	connectedAgentsGauge.WithLabelValues(state.Identity).Inc()
+	connectedAgentsGauge.WithLabelValues(state.GetIdentity()).Inc()
 }
 
 //
 // RemoveAgent will remove an agent and signal to it that closing down is started.
 //
-func (s *ConnectedAgents) RemoveAgent(state *AgentState) {
+func (s *ConnectedAgents) RemoveAgent(state Agent) error {
 	s.Lock()
 	defer s.Unlock()
 
-	close(state.InRequest)
-	close(state.InCancelRequest)
+	state.Close()
 
-	agentList, ok := s.m[state.Identity]
+	agentList, ok := s.m[state.GetIdentity()]
 	if !ok {
 		// This should not be possible.
-		log.Printf("RemoveAgent: No agents known by the name of %s", state)
-		return
+		err := fmt.Errorf("no agents known by the name of %s", state)
+		log.Printf("%v", err)
+		return err
 	}
 
 	// TODO: We should always find our entry...
 	i := sliceIndex(len(agentList), func(i int) bool { return agentList[i] == state })
 	if i == -1 {
-		log.Printf("Attempt to remove unknown agent %s", state)
-		return
+		err := fmt.Errorf("attempt to remove unknown agent %s", state)
+		log.Printf("%v", err)
+		return err
 	}
 	agentList[i] = agentList[len(agentList)-1]
 	agentList[len(agentList)-1] = nil
 	agentList = agentList[:len(agentList)-1]
-	s.m[state.Identity] = agentList
-	connectedAgentsGauge.WithLabelValues(state.Identity).Dec()
-	log.Printf("Agent %s removed, now at %d paths", state, len(agentList))
+	s.m[state.GetIdentity()] = agentList
+	connectedAgentsGauge.WithLabelValues(state.GetIdentity()).Dec()
+	log.Printf("agent %s removed, now at %d paths", state, len(agentList))
+	return nil
 }
 
 func (s *ConnectedAgents) findService(ep AgentSearch) (Agent, error) {
@@ -168,31 +167,26 @@ func (s *ConnectedAgents) Send(ep AgentSearch, message interface{}) (string, boo
 
 //
 // Cancel will cancel an ongoing request.
-// XXXMLG this is broken...  it needs to send the cancel to the specific agent
-// which owns this ID...  not one at random.
 //
-func (s *ConnectedAgents) Cancel(ep AgentSearch, id string) bool {
+func (s *ConnectedAgents) Cancel(ep AgentSearch, id string) error {
 	// The session must be set, if not this is an error.
 	if len(ep.Session) == 0 {
-		log.Printf("ERROR: session is not set.  Coding error.")
-		return false
+		return fmt.Errorf("session is not set (coding error)")
 	}
 
 	s.RLock()
 	defer s.RUnlock()
 	agentList, ok := s.m[ep.Identity]
 	if !ok || len(agentList) == 0 {
-		log.Printf("ERROR: No agents connected for: %s.  Likely coding error.", ep)
-		return false
+		return fmt.Errorf("no agents connected for: %s (likely coding error)", ep)
 	}
 
 	for _, a := range agentList {
 		if ep.MatchesAgent(a) {
 			a.Cancel(id)
-			return true
+			return nil
 		}
 	}
 
-	log.Printf("ERROR: No agents with specific session exist for %s.  Likely coding error.", ep)
-	return false
+	return fmt.Errorf("no agents with specific session exist for %s (likely coding error)", ep)
 }
