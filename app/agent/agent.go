@@ -256,7 +256,7 @@ func main() {
 		log.Fatal(err)
 	}
 	for k, v := range secret {
-		log.Printf("secret key %s, data %s", k, string(v))
+		log.Printf("secret key %s, data len %d", k, len(v))
 	}
 
 	// load client cert/key, cacert
