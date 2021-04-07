@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"os"
 	"strings"
 
 	"google.golang.org/grpc/codes"
@@ -18,7 +17,6 @@ import (
 	"github.com/lestrrat-go/jwx/jwk"
 	"github.com/opsmx/oes-birger/app/controller/agent"
 	"github.com/opsmx/oes-birger/pkg/ca"
-	"github.com/opsmx/oes-birger/pkg/kube"
 	"github.com/opsmx/oes-birger/pkg/tunnel"
 	"github.com/opsmx/oes-birger/pkg/ulid"
 	"github.com/opsmx/oes-birger/pkg/webhook"
@@ -206,23 +204,6 @@ func main() {
 	c.Dump()
 
 	loadKeyset()
-
-	namespace, ok := os.LookupEnv("POD_NAMESPACE")
-	if !ok {
-		log.Fatalf("envar POD_NAMESPACE not set to the pod's namespace")
-	}
-
-	secretLoader, err := kube.MakeSecretsLoader(namespace)
-	if err != nil {
-		log.Fatal(err)
-	}
-	secret, err := secretLoader.GetSecret("opsmx-agent-agent1")
-	if err != nil {
-		log.Fatal(err)
-	}
-	for k, v := range secret {
-		log.Printf("secret key %s, data len %d", k, len(v))
-	}
 
 	if len(config.Webhook) > 0 {
 		hook = webhook.NewRunner(config.Webhook)

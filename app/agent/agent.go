@@ -9,6 +9,7 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
+	"os"
 	"runtime"
 	"sync"
 	"time"
@@ -20,6 +21,7 @@ import (
 	"google.golang.org/grpc/credentials"
 
 	"github.com/opsmx/oes-birger/app/agent/cfg"
+	"github.com/opsmx/oes-birger/pkg/kube"
 	"github.com/opsmx/oes-birger/pkg/tunnel"
 )
 
@@ -239,6 +241,23 @@ func main() {
 	agentServiceConfig = uc
 
 	configureEndpoints()
+
+	namespace, ok := os.LookupEnv("POD_NAMESPACE")
+	if !ok {
+		log.Fatalf("envar POD_NAMESPACE not set to the pod's namespace")
+	}
+
+	secretLoader, err := kube.MakeSecretsLoader(namespace)
+	if err != nil {
+		log.Fatal(err)
+	}
+	secret, err := secretLoader.GetSecret("opsmx-agent-agent1")
+	if err != nil {
+		log.Fatal(err)
+	}
+	for k, v := range secret {
+		log.Printf("secret key %s, data len %d", k, len(v))
+	}
 
 	// load client cert/key, cacert
 	clcert, err := tls.LoadX509KeyPair(config.CertFile, config.KeyFile)
