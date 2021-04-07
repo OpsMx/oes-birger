@@ -224,11 +224,16 @@ func (c *CA) GenerateCertificate(name string) (string, string, string, error) {
 		return "", "", "", err
 	}
 
-	ca64 := bytesTo64("CERTIFICATE", c.caCert.Certificate[0])
+	ca64 := c.GetCACert()
 	cert64 := bytesTo64("CERTIFICATE", certBytes)
 	certPrivKey64 := bytesTo64("RSA PRIVATE KEY", x509.MarshalPKCS1PrivateKey(certPrivKey))
 
 	return ca64, cert64, certPrivKey64, nil
+}
+
+// GetCACert returns the authority certificate encoded as base64.
+func (c *CA) GetCACert() string {
+	return bytesTo64("CERTIFICATE", c.caCert.Certificate[0])
 }
 
 func bytesTo64(prefix string, data []byte) string {

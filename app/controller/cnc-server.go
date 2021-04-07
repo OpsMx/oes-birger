@@ -186,6 +186,7 @@ type serviceCredentialResponse struct {
 	Username string `json:"username,omitempty"`
 	Password string `json:"password,omitempty"`
 	URL      string `json:"url,omitempty"`
+	CACert   string `json:"caCert"`
 }
 
 func cncGenerateServiceCredentials(w http.ResponseWriter, r *http.Request) {
@@ -225,6 +226,7 @@ func cncGenerateServiceCredentials(w http.ResponseWriter, r *http.Request) {
 		Username: fmt.Sprintf("%s.%s", req.Name, req.Identity),
 		Password: token,
 		URL:      fmt.Sprintf("https://%s.%s:%d", req.Type, *config.ServiceBaseHostname, config.ServicePort),
+		CACert:   authority.GetCACert(),
 	}
 	json, err := json.Marshal(ret)
 	if err != nil {

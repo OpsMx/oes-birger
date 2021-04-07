@@ -1,21 +1,11 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"net/http"
-	"strings"
 
 	"github.com/opsmx/oes-birger/app/controller/agent"
 )
-
-func getAuthParts(username string) (epType string, epName string, agent string, err error) {
-	items := strings.Split(username, ".")
-	if len(items) != 3 {
-		return "", "", "", fmt.Errorf("username has invalid format")
-	}
-	return items[0], items[1], items[2], nil
-}
 
 func basicAuthAPIHandler(serviceType string, w http.ResponseWriter, r *http.Request) {
 	var authPassword string
