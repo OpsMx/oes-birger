@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"fmt"
 	"log"
 	"math/rand"
 	"sync"
@@ -82,7 +83,7 @@ func sliceIndex(limit int, predicate func(i int) bool) int {
 }
 
 //
-// AddAgent will add a bew agent to our list.
+// AddAgent will add a new agent to our list.
 //
 func (s *ConnectedAgents) AddAgent(state *AgentState) {
 	s.Lock()
@@ -131,17 +132,10 @@ func (s *ConnectedAgents) RemoveAgent(state *AgentState) {
 	log.Printf("Agent %s removed, now at %d paths", state, len(agentList))
 }
 
-//
-// Send will search for the specific agent and endpoint. send a message to an agent, and return true if an agent
-// was found.
-//
-func (s *ConnectedAgents) Send(ep AgentSearch, message interface{}) (string, bool) {
-	s.RLock()
-	defer s.RUnlock()
+func (s *ConnectedAgents) findService(ep AgentSearch) (Agent, error) {
 	agentList, ok := s.m[ep.Identity]
 	if !ok || len(agentList) == 0 {
-		log.Printf("No agents connected for: %s", ep)
-		return "", false
+		return nil, fmt.Errorf("no agents connected for %s", ep)
 	}
 	possibleAgents := []int{}
 	for i, a := range agentList {
@@ -150,12 +144,25 @@ func (s *ConnectedAgents) Send(ep AgentSearch, message interface{}) (string, boo
 		}
 	}
 	if len(possibleAgents) == 0 {
-		log.Printf("Request for %s, no such path exists or all are unconfigured.", ep)
-		return "", false
+		return nil, fmt.Errorf("request for %s, no such path exists or all are unconfigured", ep)
 	}
 	selected := possibleAgents[rnd.Intn(len(possibleAgents))]
-	a := agentList[selected]
-	session := a.Send(message)
+	return agentList[selected], nil
+}
+
+//
+// Send will search for the specific agent and endpoint. send a message to an agent, and return true if an agent
+// was found.
+//
+func (s *ConnectedAgents) Send(ep AgentSearch, message interface{}) (string, bool) {
+	s.RLock()
+	defer s.RUnlock()
+	agent, err := s.findService(ep)
+	if err != nil {
+		log.Printf("%v", err)
+		return "", false
+	}
+	session := agent.Send(message)
 	return session, true
 }
 
