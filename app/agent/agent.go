@@ -30,7 +30,7 @@ var (
 
 	emptyBytes = []byte("")
 
-	config              *cfg.AgentConfig
+	config             *cfg.AgentConfig
 	agentServiceConfig *cfg.AgentServiceConfig
 
 	endpoints []Endpoint
