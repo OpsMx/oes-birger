@@ -255,7 +255,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	for k, v := range secret {
+	for k, v := range *secret {
 		log.Printf("secret key %s, data len %d", k, len(v))
 	}
 

@@ -42,12 +42,12 @@ func makeClientset(namespace string, config *rest.Config) (*SecretsLoader, error
 	}, nil
 }
 
-func (s *SecretsLoader) GetSecret(name string) (map[string][]byte, error) {
+func (s *SecretsLoader) GetSecret(name string) (*map[string][]byte, error) {
 	deploymentsClient := s.clientset.CoreV1().Secrets(s.namespace)
 
 	secret, err := deploymentsClient.Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
-		return map[string][]byte{}, err
+		return nil, err
 	}
-	return secret.Data, nil
+	return &secret.Data, nil
 }
