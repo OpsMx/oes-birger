@@ -193,16 +193,6 @@ func loadKeyset() {
 	log.Printf("Loaded %d serviceKeys", jwtKeyset.Len())
 }
 
-func printSampleKey() {
-	if key, ok := jwtKeyset.LookupKeyID(jwtCurrentKey); ok {
-		token, err := MakeJWT(key, "jenkins", "jenkins1", "agent1")
-		if err != nil {
-			log.Fatal(err)
-		}
-		log.Printf("token for jenkins1/jenkins/agent1: %s", token)
-	}
-}
-
 func main() {
 	flag.Parse()
 
@@ -214,7 +204,6 @@ func main() {
 	c.Dump()
 
 	loadKeyset()
-	printSampleKey()
 
 	if len(config.Webhook) > 0 {
 		hook = webhook.NewRunner(config.Webhook)

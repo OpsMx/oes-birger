@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/lestrrat-go/jwx/jwk"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -172,6 +173,69 @@ func cncGetStatistics(w http.ResponseWriter, r *http.Request) {
 	w.Write(json)
 }
 
+type serviceCredentialRequest struct {
+	Identity string `json:"identity,omitempty"`
+	Type     string `json:"Type,omitempty"`
+	Name     string `json:"Name,omitempty"`
+}
+
+type serviceCredentialResponse struct {
+	Identity string `json:"identity,omitempty"`
+	Name     string `json:"name,omitempty"`
+	Type     string `json:"type,omitempty"`
+	Username string `json:"username,omitempty"`
+	Password string `json:"password,omitempty"`
+	URL      string `json:"url,omitempty"`
+}
+
+func cncGenerateServiceCredentials(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("content-type", "application/json")
+	statusCode, err := authenticate(r, "POST")
+	if err != nil {
+		w.Write(httpError(err))
+		w.WriteHeader(statusCode)
+		return
+	}
+
+	var req serviceCredentialRequest
+	err = json.NewDecoder(r.Body).Decode(&req)
+	if err != nil {
+		w.Write(httpError(err))
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	var key jwk.Key
+	var ok bool
+	if key, ok = jwtKeyset.LookupKeyID(jwtCurrentKey); !ok {
+		w.Write(httpError(fmt.Errorf("unable to find service key '%s'", jwtCurrentKey)))
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	token, err := MakeJWT(key, req.Type, req.Name, req.Identity)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	ret := serviceCredentialResponse{
+		Identity: req.Identity,
+		Name:     req.Name,
+		Type:     req.Type,
+		Username: fmt.Sprintf("%s.%s", req.Name, req.Identity),
+		Password: token,
+		URL:      fmt.Sprintf("https://%s.%s:%d", req.Type, *config.ServiceBaseHostname, config.ServicePort),
+	}
+	json, err := json.Marshal(ret)
+	if err != nil {
+		w.Write(httpError(err))
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	w.Write(json)
+
+}
+
 func runCommandHTTPServer(serverCert tls.Certificate) {
 	log.Printf("Running Command and Control API HTTPS listener on port %d", config.CommandPort)
 
@@ -186,12 +250,12 @@ func runCommandHTTPServer(serverCert tls.Certificate) {
 		Certificates: []tls.Certificate{serverCert},
 		MinVersion:   tls.VersionTLS12,
 	}
-	//tlsConfig.BuildNameToCertificate()
 
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/api/v1/generateKubectlComponents", cncGenerateKubectlComponents)
 	mux.HandleFunc("/api/v1/generateAgentManifestComponents", cncGenerateAgentManifestComponents)
+	mux.HandleFunc("/api/v1/generateServiceCredentials", cncGenerateServiceCredentials)
 	mux.HandleFunc("/api/v1/getAgentStatistics", cncGetStatistics)
 
 	server := &http.Server{
