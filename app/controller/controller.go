@@ -193,7 +193,7 @@ func loadKeyset() {
 		if err != nil {
 			return err
 		}
-		if info.IsDir() {
+		if !info.Type().IsRegular() {
 			return nil
 		}
 		content, err := ioutil.ReadFile(path)
