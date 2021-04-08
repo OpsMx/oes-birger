@@ -5,10 +5,10 @@ import (
 	"crypto/tls"
 	"flag"
 	"fmt"
+	"io/fs"
 	"io/ioutil"
 	"log"
 	"net/http"
-	"os"
 	"path/filepath"
 	"strings"
 
@@ -185,12 +185,17 @@ func runPrometheusHTTPServer(port uint16) {
 
 func loadKeyset() {
 	if config.ServiceAuth.CurrentKeyName == "" {
-		log.Printf("No service keys configured.")
-		return
+		log.Fatalf("No primary serviceAuth key name provided")
 	}
 	jwtCurrentKey = config.ServiceAuth.CurrentKeyName
 
-	err := filepath.Walk(serviceAuthPath, func(path string, info os.FileInfo, err error) error {
+	err := filepath.WalkDir(serviceAuthPath, func(path string, info fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			return nil
+		}
 		content, err := ioutil.ReadFile(info.Name())
 		if err != nil {
 			return err
@@ -201,6 +206,7 @@ func loadKeyset() {
 		}
 		key.Set(jwk.KeyIDKey, info.Name())
 		jwtKeyset.Add(key)
+		log.Printf("Loaded service key name %s, length %d", info.Name(), len(content))
 		return nil
 	})
 	if err != nil {
