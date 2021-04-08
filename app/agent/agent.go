@@ -23,6 +23,7 @@ import (
 	"github.com/opsmx/oes-birger/app/agent/cfg"
 	"github.com/opsmx/oes-birger/pkg/secrets"
 	"github.com/opsmx/oes-birger/pkg/tunnel"
+	"github.com/opsmx/oes-birger/pkg/updater"
 )
 
 var (
@@ -226,6 +227,13 @@ func configureEndpoints(secretsLoader secrets.SecretLoader) {
 
 func main() {
 	var err error
+
+	arg0hash, err := updater.HashSelf()
+	if err != nil {
+		log.Printf("Could not hash self: %v", err)
+		arg0hash = "unknown"
+	}
+	log.Printf("Binary hash: %s\n", arg0hash)
 
 	flag.Parse()
 
