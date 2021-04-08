@@ -29,6 +29,7 @@ RUN GOOS=linux GOARCH=arm64 go build -o /out/agent-binaries/agent.arm64.latest a
 FROM scratch AS agent-image
 WORKDIR /app
 COPY --from=build-binaries /out/agent /app
+COPY --from=alpine:3.12 /etc/ssl/cert.pem /etc/ssl/cert.pem
 EXPOSE 9102
 CMD ["/app/agent"]
 
