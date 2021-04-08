@@ -14,11 +14,11 @@ type SecretLoader interface {
 }
 
 type KubernetesSecretLoader struct {
-	clientset *kubernetes.Clientset
+	clientset kubernetes.Interface
 	namespace string
 }
 
-func MakeKubernetesSecretsLoader(namespace string) (*KubernetesSecretLoader, error) {
+func MakeKubernetesSecretLoader(namespace string) (*KubernetesSecretLoader, error) {
 	config, err := rest.InClusterConfig()
 	if err != nil {
 		return nil, err
@@ -26,12 +26,19 @@ func MakeKubernetesSecretsLoader(namespace string) (*KubernetesSecretLoader, err
 	return makeClientset(namespace, config)
 }
 
-func MakeKubernetesSecretsLoaderFromKubectl(namespace string, kubeconfig string) (*KubernetesSecretLoader, error) {
+func MakeKubernetesSecretLoaderFromKubectl(namespace string, kubeconfig string) (*KubernetesSecretLoader, error) {
 	config, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
 	if err != nil {
 		return nil, err
 	}
 	return makeClientset(namespace, config)
+}
+
+func MakeKubernetesSecretLoaderFromClientset(namespace string, clientset kubernetes.Interface) *KubernetesSecretLoader {
+	return &KubernetesSecretLoader{
+		clientset: clientset,
+		namespace: namespace,
+	}
 }
 
 func makeClientset(namespace string, config *rest.Config) (*KubernetesSecretLoader, error) {

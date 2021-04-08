@@ -235,7 +235,7 @@ func main() {
 	if !ok {
 		log.Fatalf("envar POD_NAMESPACE not set to the pod's namespace")
 	}
-	secretsLoader, err = secrets.MakeKubernetesSecretsLoader(namespace)
+	secretsLoader, err = secrets.MakeKubernetesSecretLoader(namespace)
 	if err != nil {
 		log.Fatal(err)
 	}
