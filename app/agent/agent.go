@@ -35,6 +35,8 @@ var (
 	config             *cfg.AgentConfig
 	agentServiceConfig *cfg.AgentServiceConfig
 
+	secretsLoader *kube.SecretsLoader
+
 	endpoints []Endpoint
 )
 
@@ -186,7 +188,7 @@ func loadCert() []byte {
 	return cert
 }
 
-func configureEndpoints() {
+func configureEndpoints(secretsLoader *kube.SecretsLoader) {
 	// For each service, if it is enabled, find and create an instance.
 	endpoints = []Endpoint{}
 	for _, service := range agentServiceConfig.Services {
@@ -202,7 +204,7 @@ func configureEndpoints() {
 			case "kubernetes":
 				instance, configured, err = MakeKubernetesEndpoint(service.Name, config)
 			default:
-				instance, configured, err = MakeGenericEndpoint(service.Type, service.Name, config)
+				instance, configured, err = MakeGenericEndpoint(service.Type, service.Name, config, secretsLoader)
 			}
 
 			// If the instance-specific make method returns an error, catch it here.
@@ -223,9 +225,20 @@ func configureEndpoints() {
 }
 
 func main() {
+	var err error
+
 	flag.Parse()
 
 	log.Printf("OS type: %s, CPU: %s, cores: %d", runtime.GOOS, runtime.GOARCH, runtime.NumCPU())
+
+	namespace, ok := os.LookupEnv("POD_NAMESPACE")
+	if !ok {
+		log.Fatalf("envar POD_NAMESPACE not set to the pod's namespace")
+	}
+	secretsLoader, err = kube.MakeSecretsLoader(namespace)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	c, err := cfg.Load(*configFile)
 	if err != nil {
@@ -240,24 +253,7 @@ func main() {
 	}
 	agentServiceConfig = uc
 
-	configureEndpoints()
-
-	namespace, ok := os.LookupEnv("POD_NAMESPACE")
-	if !ok {
-		log.Fatalf("envar POD_NAMESPACE not set to the pod's namespace")
-	}
-
-	secretLoader, err := kube.MakeSecretsLoader(namespace)
-	if err != nil {
-		log.Fatal(err)
-	}
-	secret, err := secretLoader.GetSecret("opsmx-agent-agent1")
-	if err != nil {
-		log.Fatal(err)
-	}
-	for k, v := range *secret {
-		log.Printf("secret key %s, data len %d", k, len(v))
-	}
+	configureEndpoints(secretsLoader)
 
 	// load client cert/key, cacert
 	clcert, err := tls.LoadX509KeyPair(config.CertFile, config.KeyFile)
