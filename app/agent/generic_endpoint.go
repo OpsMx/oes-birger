@@ -22,9 +22,9 @@ type GenericEndpointCredentials struct {
 	Token      string `yaml:"token,omitempty"`
 	SecretName string `yaml:"secretName,omitempty"`
 
-	rawUsername []byte `yamp:"-"`
-	rawPassword []byte `yamp:"-"`
-	rawToken    []byte `yamp:"-"`
+	rawUsername string `yaml:"-"`
+	rawPassword string `yaml:"-"`
+	rawToken    string `yaml:"-"`
 }
 
 type GenericEndpointConfig struct {
@@ -39,7 +39,7 @@ type GenericEndpoint struct {
 	config       GenericEndpointConfig
 }
 
-func (ep *GenericEndpoint) loadSecrets(secretsLoader *kube.SecretsLoader) error {
+func (ep *GenericEndpoint) loadSecrets(secretsLoader kube.SecretLoader) error {
 	if ep.config.Credentials.SecretName == "" {
 		return ep.loadBase64Secrets()
 	}
@@ -52,10 +52,11 @@ func (ep *GenericEndpoint) loadBase64Secrets() error {
 	password := ep.config.Credentials.Password
 
 	switch ep.config.Credentials.Type {
-	case "none":
+	case "none", "":
 		if token != "" || username != "" || password != "" {
 			return fmt.Errorf("username, password, or token set for credential type none")
 		}
+		ep.config.Credentials.Type = "none"
 		return nil
 	case "basic":
 		if token != "" {
@@ -72,8 +73,8 @@ func (ep *GenericEndpoint) loadBase64Secrets() error {
 		if err != nil {
 			return err
 		}
-		ep.config.Credentials.rawUsername = rawUsername
-		ep.config.Credentials.rawPassword = rawPassword
+		ep.config.Credentials.rawUsername = string(rawUsername)
+		ep.config.Credentials.rawPassword = string(rawPassword)
 		return nil
 	case "bearer":
 		if token == "" {
@@ -86,57 +87,62 @@ func (ep *GenericEndpoint) loadBase64Secrets() error {
 		if err != nil {
 			return err
 		}
-		ep.config.Credentials.rawToken = rawToken
+		ep.config.Credentials.rawToken = string(rawToken)
 		return nil
 	default:
 		return fmt.Errorf("unknown credential type %s", ep.config.Credentials.Type)
 	}
 }
 
-func (ep *GenericEndpoint) loadKubernetesSecrets(secretsLoader *kube.SecretsLoader) error {
+func (ep *GenericEndpoint) loadKubernetesSecrets(secretsLoader kube.SecretLoader) error {
+	if ep.config.Credentials.Type == "none" || ep.config.Credentials.Type == "" {
+		return fmt.Errorf("none: secretName should not be set")
+	}
+
 	secret, err := secretsLoader.GetSecret(ep.config.Credentials.SecretName)
 	if err != nil {
 		return err
 	}
 
 	token, hasToken := (*secret)["token"]
+	hasToken = hasToken && len(token) > 0
 	username, hasUsername := (*secret)["username"]
+	hasUsername = hasUsername && len(username) > 0
 	password, hasPassword := (*secret)["password"]
+	hasPassword = hasPassword && len(password) > 0
 
 	switch ep.config.Credentials.Type {
-	case "none":
-		return fmt.Errorf("secretName set, but credential type set to none")
 	case "basic":
 		if !hasUsername {
-			return fmt.Errorf("username not set for credential type basic")
+			return fmt.Errorf("basic: username missing in secret")
 		}
 		if !hasPassword {
-			return fmt.Errorf("password not set for credential type basic")
+			return fmt.Errorf("basic: password missing in secret")
 		}
 		if hasToken {
-			return fmt.Errorf("token set in secret, but credential type set to basic")
+			return fmt.Errorf("basic: token should not be set in secret")
 		}
-		ep.config.Credentials.rawUsername = username
-		ep.config.Credentials.rawPassword = password
+		ep.config.Credentials.rawUsername = string(username)
+		ep.config.Credentials.rawPassword = string(password)
 		return nil
 	case "bearer":
 		if hasUsername {
-			return fmt.Errorf("username set, but credential type is bearer")
+			return fmt.Errorf("bearer: username should not be set in secret")
 		}
 		if hasPassword {
-			return fmt.Errorf("password set, but credential type is bearer")
+			return fmt.Errorf("bearer: password should not be set in secret")
 		}
 		if !hasToken {
-			return fmt.Errorf("token not set in secret for credential type bearer")
+			return fmt.Errorf("bearer: token missing in secret")
 		}
-		ep.config.Credentials.rawToken = token
+		ep.config.Credentials.rawToken = string(token)
 		return nil
 	default:
 		return fmt.Errorf("unknown credential type %s", ep.config.Credentials.Type)
 	}
 }
 
-func MakeGenericEndpoint(endpointType string, endpointName string, configBytes []byte, secretsLoader *kube.SecretsLoader) (*GenericEndpoint, bool, error) {
+func MakeGenericEndpoint(endpointType string, endpointName string, configBytes []byte, secretsLoader kube.SecretLoader) (*GenericEndpoint, bool, error) {
 	ep := &GenericEndpoint{
 		endpointType: endpointType,
 		endpointName: endpointName,
@@ -197,13 +203,9 @@ func (ep *GenericEndpoint) executeHTTPRequest(dataflow chan *tunnel.AgentToContr
 	creds := ep.config.Credentials
 	switch creds.Type {
 	case "basic":
-		if creds.Password == "" {
-			httpRequest.SetBasicAuth(creds.Username, creds.Token)
-		} else {
-			httpRequest.SetBasicAuth(creds.Username, creds.Password)
-		}
+		httpRequest.SetBasicAuth(creds.rawUsername, creds.rawPassword)
 	case "bearer":
-		httpRequest.Header.Set("Authorization", "Bearer "+creds.Token)
+		httpRequest.Header.Set("Authorization", "Bearer "+creds.rawToken)
 	}
 
 	runHTTPRequest(client, req, httpRequest, dataflow, ep.config.URL)

@@ -35,7 +35,7 @@ var (
 	config             *cfg.AgentConfig
 	agentServiceConfig *cfg.AgentServiceConfig
 
-	secretsLoader *kube.SecretsLoader
+	secretsLoader kube.SecretLoader
 
 	endpoints []Endpoint
 )
@@ -188,7 +188,7 @@ func loadCert() []byte {
 	return cert
 }
 
-func configureEndpoints(secretsLoader *kube.SecretsLoader) {
+func configureEndpoints(secretsLoader kube.SecretLoader) {
 	// For each service, if it is enabled, find and create an instance.
 	endpoints = []Endpoint{}
 	for _, service := range agentServiceConfig.Services {
@@ -235,7 +235,7 @@ func main() {
 	if !ok {
 		log.Fatalf("envar POD_NAMESPACE not set to the pod's namespace")
 	}
-	secretsLoader, err = kube.MakeSecretsLoader(namespace)
+	secretsLoader, err = kube.MakeKubernetesSecretsLoader(namespace)
 	if err != nil {
 		log.Fatal(err)
 	}
