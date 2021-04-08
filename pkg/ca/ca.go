@@ -108,7 +108,7 @@ func toPEM(data []byte, t string) []byte {
 //
 func MakeCertificateAuthority() ([]byte, []byte, error) {
 	now := time.Now().UTC()
-	cert := &x509.Certificate{
+	rootTemplate := &x509.Certificate{
 		SerialNumber: big.NewInt(now.UnixNano()),
 		Subject: pkix.Name{
 			Organization: []string{"OpsMX API Forwarder CA"},
@@ -116,28 +116,29 @@ func MakeCertificateAuthority() ([]byte, []byte, error) {
 			Province:     []string{""},
 			Locality:     []string{"San Francisco"},
 		},
-		NotBefore:             now,
+		NotBefore:             now.Add(-10 * time.Second),
 		NotAfter:              now.AddDate(10, 0, 0),
-		IsCA:                  true,
+		KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
 		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
-		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
 		BasicConstraintsValid: true,
+		IsCA:                  true,
+		MaxPathLen:            2,
 	}
 	empty := []byte{}
 
-	certPrivKey, err := rsa.GenerateKey(crand.Reader, 4096)
+	priv, err := rsa.GenerateKey(crand.Reader, 4096)
 	if err != nil {
 		return empty, empty, err
 	}
 
 	// Self-sign the CA key.
-	certBytes, err := x509.CreateCertificate(crand.Reader, cert, cert, &certPrivKey.PublicKey, certPrivKey)
+	certBytes, err := x509.CreateCertificate(crand.Reader, rootTemplate, rootTemplate, &priv.PublicKey, priv)
 	if err != nil {
 		return empty, empty, err
 	}
 
 	certPEM := toPEM(certBytes, "CERTIFICATE")
-	certPrivKeyPEM := toPEM(x509.MarshalPKCS1PrivateKey(certPrivKey), "RSA PRIVATE KEY")
+	certPrivKeyPEM := toPEM(x509.MarshalPKCS1PrivateKey(priv), "RSA PRIVATE KEY")
 	return certPEM, certPrivKeyPEM, nil
 }
 
@@ -158,7 +159,7 @@ func (c *CA) MakeServerCert(names []string) (*tls.Certificate, error) {
 		return nil, err
 	}
 
-	cert := &x509.Certificate{
+	certTemplate := &x509.Certificate{
 		SerialNumber: big.NewInt(now.UnixNano()),
 		Subject: pkix.Name{
 			Organization: []string{"OpsMX API Forwarder"},
@@ -166,14 +167,16 @@ func (c *CA) MakeServerCert(names []string) (*tls.Certificate, error) {
 			Province:     []string{},
 			Locality:     []string{"San Francisco"},
 		},
-		NotBefore:   now,
-		NotAfter:    now.AddDate(1, 0, 0),
-		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
-		KeyUsage:    x509.KeyUsageDigitalSignature,
-		DNSNames:    names,
+		NotBefore:      now.Add(-10 * time.Second),
+		NotAfter:       now.AddDate(1, 0, 0),
+		KeyUsage:       x509.KeyUsageCRLSign,
+		ExtKeyUsage:    []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		IsCA:           false,
+		MaxPathLenZero: true,
+		DNSNames:       names,
 	}
 
-	certBytes, err := x509.CreateCertificate(crand.Reader, cert, caCert, &certPrivKey.PublicKey, c.caCert.PrivateKey)
+	certBytes, err := x509.CreateCertificate(crand.Reader, certTemplate, caCert, &certPrivKey.PublicKey, c.caCert.PrivateKey)
 	if err != nil {
 		return nil, err
 	}
