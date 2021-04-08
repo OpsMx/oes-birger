@@ -34,14 +34,9 @@ type agentConfig struct {
 	Identity string `yaml:"identity,omitempty"`
 }
 
-type serviceKeyConfig struct {
-	Name    string `yaml:"name,omitempty"`
-	Content string `yaml:"content,omitempty"`
-}
-
 type serviceAuthConfig struct {
-	CurrentKeyName string             `yaml:"currentKeyName,omitempty"`
-	Keys           []serviceKeyConfig `yaml:"keys,omitempty"`
+	CurrentKeyName string            `yaml:"currentKeyName,omitempty"`
+	keys           map[string]string `yaml:"-"`
 }
 
 // LoadConfig will load YAML configuration from the provided filename,

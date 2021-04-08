@@ -5,8 +5,11 @@ import (
 	"crypto/tls"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"google.golang.org/grpc/codes"
@@ -23,6 +26,10 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+)
+
+const (
+	serviceAuthPath = "/app/secrets/serviceAuth"
 )
 
 var (
@@ -182,14 +189,24 @@ func loadKeyset() {
 		return
 	}
 	jwtCurrentKey = config.ServiceAuth.CurrentKeyName
-	for _, k := range config.ServiceAuth.Keys {
-		key, err := jwk.New([]byte(k.Content))
+
+	err := filepath.Walk(serviceAuthPath, func(path string, info os.FileInfo, err error) error {
+		content, err := ioutil.ReadFile(info.Name())
 		if err != nil {
-			log.Fatalf("cannot load key '%s': %v", k.Name, err)
+			return err
 		}
-		key.Set(jwk.KeyIDKey, k.Name)
+		key, err := jwk.New(content)
+		if err != nil {
+			return err
+		}
+		key.Set(jwk.KeyIDKey, info.Name())
 		jwtKeyset.Add(key)
+		return nil
+	})
+	if err != nil {
+		log.Fatalf("cannot load key serviceAuth keys: %v", err)
 	}
+
 	log.Printf("Loaded %d serviceKeys", jwtKeyset.Len())
 }
 
