@@ -15,6 +15,7 @@ RUN go mod download
 #
 FROM buildmod AS build-binaries
 COPY . .
+RUN touch pkg/tunnel/tunnel.pb.go
 RUN mkdir /out /out/agent-binaries
 RUN go build -o /out/agent app/agent/*.go
 RUN go build -o /out/controller app/controller/*.go
