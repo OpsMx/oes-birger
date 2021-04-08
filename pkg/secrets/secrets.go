@@ -9,10 +9,6 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 )
 
-type SecretLoader interface {
-	GetSecret(string) (*map[string][]byte, error)
-}
-
 type KubernetesSecretLoader struct {
 	clientset kubernetes.Interface
 	namespace string
