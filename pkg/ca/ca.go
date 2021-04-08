@@ -252,7 +252,7 @@ func (c *CA) MakeCertPool() (*x509.CertPool, error) {
 	for _, cert := range c.caCert.Certificate {
 		x, err := x509.ParseCertificate(cert)
 		if err != nil {
-			return nil, fmt.Errorf("unable to parse certificate ASN.1: %v", err)
+			return nil, fmt.Errorf("unable to parse certificate: %v", err)
 		}
 		caCertPool.AddCert(x)
 		caCertPool.AppendCertsFromPEM(cert)
