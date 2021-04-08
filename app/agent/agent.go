@@ -21,7 +21,7 @@ import (
 	"google.golang.org/grpc/credentials"
 
 	"github.com/opsmx/oes-birger/app/agent/cfg"
-	"github.com/opsmx/oes-birger/pkg/kube"
+	"github.com/opsmx/oes-birger/pkg/secrets"
 	"github.com/opsmx/oes-birger/pkg/tunnel"
 )
 
@@ -35,7 +35,7 @@ var (
 	config             *cfg.AgentConfig
 	agentServiceConfig *cfg.AgentServiceConfig
 
-	secretsLoader kube.SecretLoader
+	secretsLoader secrets.SecretLoader
 
 	endpoints []Endpoint
 )
@@ -188,7 +188,7 @@ func loadCert() []byte {
 	return cert
 }
 
-func configureEndpoints(secretsLoader kube.SecretLoader) {
+func configureEndpoints(secretsLoader secrets.SecretLoader) {
 	// For each service, if it is enabled, find and create an instance.
 	endpoints = []Endpoint{}
 	for _, service := range agentServiceConfig.Services {
@@ -235,7 +235,7 @@ func main() {
 	if !ok {
 		log.Fatalf("envar POD_NAMESPACE not set to the pod's namespace")
 	}
-	secretsLoader, err = kube.MakeKubernetesSecretsLoader(namespace)
+	secretsLoader, err = secrets.MakeKubernetesSecretsLoader(namespace)
 	if err != nil {
 		log.Fatal(err)
 	}

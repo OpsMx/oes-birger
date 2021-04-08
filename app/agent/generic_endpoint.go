@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/opsmx/oes-birger/pkg/kube"
+	"github.com/opsmx/oes-birger/pkg/secrets"
 	"github.com/opsmx/oes-birger/pkg/tunnel"
 	"golang.org/x/net/context"
 	"gopkg.in/yaml.v3"
@@ -39,7 +39,7 @@ type GenericEndpoint struct {
 	config       GenericEndpointConfig
 }
 
-func (ep *GenericEndpoint) loadSecrets(secretsLoader kube.SecretLoader) error {
+func (ep *GenericEndpoint) loadSecrets(secretsLoader secrets.SecretLoader) error {
 	if ep.config.Credentials.SecretName == "" {
 		return ep.loadBase64Secrets()
 	}
@@ -94,7 +94,7 @@ func (ep *GenericEndpoint) loadBase64Secrets() error {
 	}
 }
 
-func (ep *GenericEndpoint) loadKubernetesSecrets(secretsLoader kube.SecretLoader) error {
+func (ep *GenericEndpoint) loadKubernetesSecrets(secretsLoader secrets.SecretLoader) error {
 	if ep.config.Credentials.Type == "none" || ep.config.Credentials.Type == "" {
 		return fmt.Errorf("none: secretName should not be set")
 	}
@@ -142,7 +142,7 @@ func (ep *GenericEndpoint) loadKubernetesSecrets(secretsLoader kube.SecretLoader
 	}
 }
 
-func MakeGenericEndpoint(endpointType string, endpointName string, configBytes []byte, secretsLoader kube.SecretLoader) (*GenericEndpoint, bool, error) {
+func MakeGenericEndpoint(endpointType string, endpointName string, configBytes []byte, secretsLoader secrets.SecretLoader) (*GenericEndpoint, bool, error) {
 	ep := &GenericEndpoint{
 		endpointType: endpointType,
 		endpointName: endpointName,

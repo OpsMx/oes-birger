@@ -29,7 +29,7 @@ var (
 	barString = "YmFy"
 	bazString = "YmF6"
 
-	secrets = map[string]*map[string][]byte{
+	keyset = map[string]*map[string][]byte{
 		"u__": makeMap(sp("foo"), nil, nil),
 		"_p_": makeMap(nil, sp("bar"), nil),
 		"__t": makeMap(nil, nil, sp("baz")),
@@ -48,7 +48,7 @@ type FakeSecretLoader struct {
 }
 
 func (f *FakeSecretLoader) GetSecret(name string) (*map[string][]byte, error) {
-	if m, found := secrets[name]; found {
+	if m, found := keyset[name]; found {
 		return m, nil
 	}
 
