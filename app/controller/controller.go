@@ -55,28 +55,26 @@ var (
 	}, []string{"agent"})
 )
 
-func getNamesFromContext(ctx context.Context) ([]string, error) {
+func getAgentNameFromContext(ctx context.Context) (string, error) {
 	p, ok := peer.FromContext(ctx)
-	empty := make([]string, 0)
 	if !ok {
-		return empty, status.Error(codes.Unauthenticated, "no peer found")
+		return "", status.Error(codes.Unauthenticated, "no peer found")
 	}
 	tlsAuth, ok := p.AuthInfo.(credentials.TLSInfo)
 	if !ok {
-		return empty, status.Error(codes.Unauthenticated, "unexpected peer transport credentials")
+		return "", status.Error(codes.Unauthenticated, "unexpected peer transport credentials")
 	}
 	if len(tlsAuth.State.VerifiedChains) == 0 || len(tlsAuth.State.VerifiedChains[0]) == 0 {
-		return empty, status.Error(codes.Unauthenticated, "could not verify peer certificate")
+		return "", status.Error(codes.Unauthenticated, "could not verify peer certificate")
 	}
-	return strings.Split(tlsAuth.State.VerifiedChains[0][0].Subject.CommonName, "."), nil
-}
-
-func getAgentNameFromContext(ctx context.Context) (string, error) {
-	names, err := getNamesFromContext(ctx)
+	names, err := ca.GetCertificateNameFromCert(tlsAuth.State.VerifiedChains[0][0])
 	if err != nil {
 		return "", err
 	}
-	return names[0], nil
+	if names.Purpose != ca.CertificatePurposeAgent {
+		return "", fmt.Errorf("not an agent certificate")
+	}
+	return names.Agent, nil
 }
 
 func makeHeaders(headers map[string][]string) []*tunnel.HttpHeader {
@@ -132,7 +130,7 @@ func serviceAPIHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func runHTTPSServer(serverCert tls.Certificate) {
-	log.Printf("Running generic API HTTPS listener on port %d", config.ServicePort)
+	log.Printf("Running service HTTPS listener on port %d", config.ServicePort)
 
 	certPool, err := authority.MakeCertPool()
 	if err != nil {

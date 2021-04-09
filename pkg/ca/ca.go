@@ -8,6 +8,7 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/base64"
+	"encoding/json"
 	"encoding/pem"
 	"fmt"
 	"math/big"
@@ -112,9 +113,7 @@ func MakeCertificateAuthority() ([]byte, []byte, error) {
 		SerialNumber: big.NewInt(now.UnixNano()),
 		Subject: pkix.Name{
 			Organization: []string{"OpsMX API Forwarder CA"},
-			Country:      []string{"US"},
-			Province:     []string{""},
-			Locality:     []string{"San Francisco"},
+			Country:      []string{"DF"},
 		},
 		NotBefore:             now.Add(-10 * time.Second),
 		NotAfter:              now.AddDate(10, 0, 0),
@@ -163,9 +162,7 @@ func (c *CA) MakeServerCert(names []string) (*tls.Certificate, error) {
 		SerialNumber: big.NewInt(now.UnixNano()),
 		Subject: pkix.Name{
 			Organization: []string{"OpsMX API Forwarder"},
-			Country:      []string{"US"},
-			Province:     []string{},
-			Locality:     []string{"San Francisco"},
+			Country:      []string{"DF"},
 		},
 		NotBefore:      now.Add(-10 * time.Second),
 		NotAfter:       now.AddDate(1, 0, 0),
@@ -190,20 +187,57 @@ func (c *CA) MakeServerCert(names []string) (*tls.Certificate, error) {
 	return &serverCert, nil
 }
 
+type CertificateName struct {
+	Name    string `json:"name,omitempty"`
+	Type    string `json:"type,omitempty"`
+	Agent   string `json:"agent,omitempty"`
+	Purpose string `json:"purpose,omitempty"`
+}
+
+const (
+	CertificatePurposeControl       = "control"
+	CertificatePurposeAgent         = "agent"
+	CertificatePurposeService       = "service"
+	CertificatePurposeRemoteCommand = "remote-command"
+)
+
+func GetCertificateNameFromCert(cert *x509.Certificate) (*CertificateName, error) {
+	for _, atv := range cert.Subject.Names {
+		if atv.Type.Equal([]int{2, 5, 4, 87344389388288}) {
+			var name CertificateName
+			value, ok := atv.Value.(string)
+			if !ok {
+				return nil, fmt.Errorf("cannot extract custom name from cert, unable to csast to string")
+			}
+			err := json.Unmarshal([]byte(value), &name)
+			if err != nil {
+				return nil, err
+			}
+			return &name, nil
+		}
+	}
+	return nil, fmt.Errorf("did not find custom name in cert")
+}
+
 //
 // GenerateCertificate will make a new certificate, and return a base64 encoded
 // string for the certificate, key, and authority certificate.
 //
-func (c *CA) GenerateCertificate(name string) (string, string, string, error) {
+func (c *CA) GenerateCertificate(name CertificateName) (string, string, string, error) {
 	now := time.Now().UTC()
+	jsonName, err := json.Marshal(name)
+	if err != nil {
+		return "", "", "", err
+	}
 	cert := &x509.Certificate{
 		SerialNumber: big.NewInt(now.UnixNano()),
 		Subject: pkix.Name{
-			CommonName:   name,
-			Organization: []string{"OpsMX API Forwarder Client"},
-			Country:      []string{"US"},
-			Province:     []string{},
-			Locality:     []string{"San Francisco"},
+			ExtraNames: []pkix.AttributeTypeAndValue{
+				{
+					Type:  []int{2, 5, 4, 87344389388288},
+					Value: string(jsonName),
+				},
+			},
 		},
 		NotBefore:   now,
 		NotAfter:    now.AddDate(1, 0, 0),

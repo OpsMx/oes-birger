@@ -37,7 +37,11 @@ func main() {
 		log.Fatalf("%v", err)
 	}
 
-	ca64too, cert64, certPrivKey64, err := authority.GenerateCertificate("oes.command")
+	name := ca.CertificateName{
+		Name:    "oes",
+		Purpose: ca.CertificatePurposeControl,
+	}
+	ca64too, cert64, certPrivKey64, err := authority.GenerateCertificate(name)
 	if err != nil {
 		log.Fatalf("%v", err)
 	}

@@ -4,16 +4,11 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
-	"strings"
 
 	"github.com/opsmx/oes-birger/app/controller/agent"
+	"github.com/opsmx/oes-birger/pkg/ca"
 	"github.com/opsmx/oes-birger/pkg/tunnel"
 )
-
-func labels(name string) (serviceName string, agentName string, certType string) {
-	items := strings.Split(name, ".")
-	return items[0], items[1], items[2]
-}
 
 func certificateAuthAPIHandler(serviceType string, w http.ResponseWriter, r *http.Request) {
 	if len(r.TLS.PeerCertificates) == 0 {
@@ -22,7 +17,22 @@ func certificateAuthAPIHandler(serviceType string, w http.ResponseWriter, r *htt
 		return
 	}
 
-	endpointName, endpointType, agentIdentity := labels(r.TLS.PeerCertificates[0].Subject.CommonName)
+	names, err := ca.GetCertificateNameFromCert(r.TLS.PeerCertificates[0])
+	if err != nil {
+		log.Printf("%v", err)
+		w.WriteHeader(http.StatusForbidden)
+		return
+	}
+
+	if names.Purpose != ca.CertificatePurposeService {
+		w.WriteHeader(http.StatusForbidden)
+		return
+	}
+
+	endpointType := names.Type
+	endpointName := names.Name
+	agentIdentity := names.Agent
+
 	if endpointType != serviceType {
 		log.Printf("client cert type is %s, expected %s", endpointType, serviceType)
 		w.WriteHeader(http.StatusForbidden)

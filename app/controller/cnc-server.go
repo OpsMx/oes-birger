@@ -6,10 +6,10 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"strings"
 
 	"github.com/lestrrat-go/jwx/jwk"
 	"github.com/oklog/ulid/v2"
+	"github.com/opsmx/oes-birger/pkg/ca"
 )
 
 type kubeConfigRequest struct {
@@ -81,8 +81,13 @@ func cncGenerateKubectlComponents(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	certSubject := fmt.Sprintf("%s.kubernetes.%s", req.Name, req.Identity)
-	ca64, user64, key64, err := authority.GenerateCertificate(certSubject)
+	name := ca.CertificateName{
+		Name:    req.Name,
+		Type:    "kubernetes",
+		Agent:   req.Identity,
+		Purpose: ca.CertificatePurposeService,
+	}
+	ca64, user64, key64, err := authority.GenerateCertificate(name)
 	if err != nil {
 		w.Write(httpError(err))
 		w.WriteHeader(http.StatusBadRequest)
@@ -104,9 +109,12 @@ func cncGenerateKubectlComponents(w http.ResponseWriter, r *http.Request) {
 }
 
 func authenticate(r *http.Request, method string) (int, error) {
-	names := strings.Split(r.TLS.PeerCertificates[0].Subject.CommonName, ".")
-	if names[1] != "command" {
-		return http.StatusForbidden, fmt.Errorf("identity does not end with 'command': %v", names)
+	names, err := ca.GetCertificateNameFromCert(r.TLS.PeerCertificates[0])
+	if err != nil {
+		return http.StatusForbidden, err
+	}
+	if names.Purpose != ca.CertificatePurposeControl {
+		return http.StatusForbidden, fmt.Errorf("identity does not end with 'control': %v", names)
 	}
 	if r.Method != method {
 		return http.StatusMethodNotAllowed, fmt.Errorf("only '%s' is accepted", method)
@@ -131,7 +139,11 @@ func cncGenerateAgentManifestComponents(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	ca64, user64, key64, err := authority.GenerateCertificate(req.Identity)
+	name := ca.CertificateName{
+		Agent:   req.Identity,
+		Purpose: ca.CertificatePurposeAgent,
+	}
+	ca64, user64, key64, err := authority.GenerateCertificate(name)
 	if err != nil {
 		w.Write(httpError(err))
 		w.WriteHeader(http.StatusBadRequest)
