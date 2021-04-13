@@ -10,51 +10,12 @@ import (
 	"github.com/lestrrat-go/jwx/jwk"
 	"github.com/oklog/ulid/v2"
 	"github.com/opsmx/oes-birger/pkg/ca"
+	"github.com/opsmx/oes-birger/pkg/fwdapi"
 )
 
-type kubeConfigRequest struct {
-	Identity string `json:"identity"`
-	Name     string `json:"name"`
-}
-
-type kubeConfigResponse struct {
-	Identity        string `json:"identity"`
-	Name            string `json:"name"`
-	ServerURL       string `json:"serverUrl"`
-	UserCertificate string `json:"userCertificate"`
-	UserKey         string `json:"userKey"`
-	CACert          string `json:"caCert"`
-}
-
-type manifestRequest struct {
-	Identity string `json:"identity"`
-}
-
-type manifestResponse struct {
-	Identity         string `json:"identity"`
-	ServerHostname   string `json:"serverHostname"`
-	ServerPort       uint16 `json:"serverPort"`
-	AgentCertificate string `json:"agentCertificate"`
-	AgentKey         string `json:"agentKey"`
-	CACert           string `json:"caCert"`
-}
-
-type statisticsResponse struct {
-	ServerTime      uint64      `json:"serverTime"`
-	ConnectedAgents interface{} `json:"connectedAgents"`
-}
-
-type httpErrorMessage struct {
-	Message string `json:"message"`
-}
-
-type httpErrorResponse struct {
-	Error *httpErrorMessage `json:"error"`
-}
-
 func httpError(err error) []byte {
-	ret := &httpErrorResponse{
-		Error: &httpErrorMessage{
+	ret := &fwdapi.HttpErrorResponse{
+		Error: &fwdapi.HttpErrorMessage{
 			Message: fmt.Sprintf("Unable to process request: %v", err),
 		},
 	}
@@ -73,7 +34,7 @@ func cncGenerateKubectlComponents(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(statusCode)
 	}
 
-	var req kubeConfigRequest
+	var req fwdapi.KubeConfigRequest
 	err = json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
 		w.Write(httpError(err))
@@ -92,7 +53,7 @@ func cncGenerateKubectlComponents(w http.ResponseWriter, r *http.Request) {
 		w.Write(httpError(err))
 		w.WriteHeader(http.StatusBadRequest)
 	}
-	ret := kubeConfigResponse{
+	ret := fwdapi.KubeConfigResponse{
 		Identity:        req.Identity,
 		ServerURL:       config.getKubernetesURL(),
 		UserCertificate: user64,
@@ -131,7 +92,7 @@ func cncGenerateAgentManifestComponents(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	var req manifestRequest
+	var req fwdapi.ManifestRequest
 	err = json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
 		w.Write(httpError(err))
@@ -149,7 +110,7 @@ func cncGenerateAgentManifestComponents(w http.ResponseWriter, r *http.Request) 
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	ret := manifestResponse{
+	ret := fwdapi.ManifestResponse{
 		Identity:         req.Identity,
 		ServerHostname:   config.getAgentHostname(),
 		ServerPort:       config.getAgentPort(),
@@ -175,7 +136,7 @@ func cncGetStatistics(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ret := statisticsResponse{
+	ret := fwdapi.StatisticsResponse{
 		ServerTime:      ulid.Now(),
 		ConnectedAgents: agents.GetStatistics(),
 	}
@@ -188,22 +149,6 @@ func cncGetStatistics(w http.ResponseWriter, r *http.Request) {
 	w.Write(json)
 }
 
-type serviceCredentialRequest struct {
-	Identity string `json:"identity,omitempty"`
-	Type     string `json:"Type,omitempty"`
-	Name     string `json:"Name,omitempty"`
-}
-
-type serviceCredentialResponse struct {
-	Identity string `json:"identity,omitempty"`
-	Name     string `json:"name,omitempty"`
-	Type     string `json:"type,omitempty"`
-	Username string `json:"username,omitempty"`
-	Password string `json:"password,omitempty"`
-	URL      string `json:"url,omitempty"`
-	CACert   string `json:"caCert"`
-}
-
 func cncGenerateServiceCredentials(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("content-type", "application/json")
 	statusCode, err := authenticate(r, "POST")
@@ -213,7 +158,7 @@ func cncGenerateServiceCredentials(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req serviceCredentialRequest
+	var req fwdapi.ServiceCredentialRequest
 	err = json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
 		w.Write(httpError(err))
@@ -236,7 +181,7 @@ func cncGenerateServiceCredentials(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ret := serviceCredentialResponse{
+	ret := fwdapi.ServiceCredentialResponse{
 		Identity: req.Identity,
 		Name:     req.Name,
 		Type:     req.Type,
