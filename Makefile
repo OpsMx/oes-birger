@@ -8,7 +8,7 @@ IMAGE_PREFIX=docker.flame.org/library/
 #
 
 # These are targets for "make local"
-BINARIES = agent controller make-ca remote-command
+BINARIES = agent controller make-ca remote-command get-creds
 
 # These are the targets for Docker images, used both for the multi-arch and
 # single (local) Docker builds.
