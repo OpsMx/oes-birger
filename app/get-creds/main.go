@@ -8,6 +8,7 @@ import (
 	"os"
 
 	"github.com/go-resty/resty/v2"
+	"github.com/opsmx/oes-birger/pkg/fwdapi"
 )
 
 var (
@@ -18,7 +19,7 @@ var (
 	endpointName  = flag.String("name", "", "Item name")
 	agentIdentity = flag.String("agent", "", "agent name")
 	endpointType  = flag.String("type", "", "endpoint type")
-	action        = flag.String("action", "", "action, one of: kubectl, agent, remote-command, control")
+	action        = flag.String("action", "", "action, one of: agent, kubectl, agent-manifest, remote-command, control")
 )
 
 func usage(message string) {
@@ -48,7 +49,7 @@ func getKubeconfigCreds() {
 	client := makeClient()
 	resp, err := client.R().
 		EnableTrace().
-		Post("...")
+		Post(fmt.Sprintf("%s%s", *host, fwdapi.KUBECONFIG_ENDPOINT))
 	if err != nil {
 		fmt.Printf("%v\n", err)
 	}
@@ -70,17 +71,28 @@ func main() {
 	switch *action {
 	case "agent":
 		insist(agentIdentity, "agent", true)
+		insist(endpointName, "name", false)
+		insist(endpointType, "type", false)
 	case "kubectl":
 		insist(agentIdentity, "agent", true)
 		insist(endpointName, "name", true)
+		insist(endpointType, "type", false)
+	case "agent-manifest":
+		insist(agentIdentity, "agent", true)
+		insist(endpointName, "name", true)
+		insist(endpointType, "type", false)
 	case "remote-command":
 		insist(agentIdentity, "agent", true)
 		insist(endpointName, "name", true)
+		insist(endpointType, "type", false)
 	case "http":
 		insist(agentIdentity, "agent", true)
 		insist(endpointName, "name", true)
 		insist(endpointType, "type", true)
 	case "control":
+		insist(agentIdentity, "agent", false)
+		insist(endpointName, "name", false)
+		insist(endpointType, "type", false)
 	default:
 		log.Fatalf("Unknown action: %s", *action)
 	}

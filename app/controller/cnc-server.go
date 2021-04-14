@@ -216,10 +216,10 @@ func runCommandHTTPServer(serverCert tls.Certificate) {
 
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("/api/v1/generateKubectlComponents", cncGenerateKubectlComponents)
-	mux.HandleFunc("/api/v1/generateAgentManifestComponents", cncGenerateAgentManifestComponents)
-	mux.HandleFunc("/api/v1/generateServiceCredentials", cncGenerateServiceCredentials)
-	mux.HandleFunc("/api/v1/getAgentStatistics", cncGetStatistics)
+	mux.HandleFunc(fwdapi.KUBECONFIG_ENDPOINT, cncGenerateKubectlComponents)
+	mux.HandleFunc(fwdapi.MANIFEST_ENDPOINT, cncGenerateAgentManifestComponents)
+	mux.HandleFunc(fwdapi.SERVICE_ENDPOINT, cncGenerateServiceCredentials)
+	mux.HandleFunc(fwdapi.STATISTICS_ENDPOINT, cncGetStatistics)
 
 	server := &http.Server{
 		Addr:      fmt.Sprintf(":%d", config.CommandPort),
