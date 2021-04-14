@@ -16,8 +16,9 @@ var (
 	caCertFile    = flag.String("caCertFile", "ca.pem", "The file containing the CA certificate we will use to verify the controller's cert")
 	host          = flag.String("host", "forwarder-controller:9003", "The hostname of the controller")
 	endpointName  = flag.String("name", "", "Item name")
-	agentIdentity = flag.String("agent", "", "agent name (required)")
+	agentIdentity = flag.String("agent", "", "agent name")
 	endpointType  = flag.String("type", "", "endpoint type")
+	action        = flag.String("action", "", "action, one of: kubectl, agent, remote-command, control")
 )
 
 func usage(message string) {
@@ -25,6 +26,10 @@ func usage(message string) {
 		fmt.Fprintf(os.Stderr, "ERROR: %s\n", message)
 	}
 	flag.Usage()
+	fmt.Fprintf(os.Stderr, "\n")
+	fmt.Fprintf(os.Stderr, "  'kubectl' requires: agent, endpointName\n")
+	fmt.Fprintf(os.Stderr, "  'agent' requires: ")
+	fmt.Fprintf(os.Stderr, "  'remote-command' requires: agent, endpointName")
 	os.Exit(-1)
 }
 
@@ -50,10 +55,33 @@ func getKubeconfigCreds() {
 	fmt.Printf("%#v\n", resp)
 }
 
+func insist(s *string, name string, expected bool) {
+	if expected && (s == nil || *s == "") {
+		usage(fmt.Sprintf("%s: required", name))
+	}
+	if !expected && (s != nil || *s != "") {
+		log.Fatalf("%s: not allowed for this action", name)
+	}
+}
+
 func main() {
 	flag.Parse()
 
-	if len(*agentIdentity) == 0 {
-		usage("'agent' must be specified")
+	switch *action {
+	case "agent":
+		insist(agentIdentity, "agent", true)
+	case "kubectl":
+		insist(agentIdentity, "agent", true)
+		insist(endpointName, "name", true)
+	case "remote-command":
+		insist(agentIdentity, "agent", true)
+		insist(endpointName, "name", true)
+	case "http":
+		insist(agentIdentity, "agent", true)
+		insist(endpointName, "name", true)
+		insist(endpointType, "type", true)
+	case "control":
+	default:
+		log.Fatalf("Unknown action: %s", *action)
 	}
 }
