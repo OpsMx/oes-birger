@@ -14,20 +14,20 @@ import (
 // configuration file is loaded from disk first, and then any
 // environment variables are applied.
 type ControllerConfig struct {
-	Agents              map[string]*agentConfig `yaml:"agents,omitempty"`
-	ServiceAuth         serviceAuthConfig       `yaml:"serviceAuth,omitempty"`
-	Webhook             string                  `yaml:"webhook,omitempty"`
-	ServerNames         []string                `yaml:"serverNames,omitempty"`
-	CAConfig            ca.Config               `yaml:"caConfig,omitempty"`
-	PrometheusPort      uint16                  `yaml:"prometheusPort"`
-	ServiceBaseHostname *string                 `yaml:"serviceBaseHostname"`
-	ServicePort         uint16                  `yaml:"servicePort"`
-	CommandHostname     *string                 `yaml:"commandHostname"`
-	CommandPort         uint16                  `yaml:"commandPort"`
-	AgentHostname       *string                 `yaml:"agentHostname"`
-	AgentPort           uint16                  `yaml:"agentPort"`
-	CmdToolHostname     *string                 `yaml:"cmdToolHostname"`
-	CmdToolPort         uint16                  `yaml:"cmdToolPort"`
+	Agents                map[string]*agentConfig `yaml:"agents,omitempty"`
+	ServiceAuth           serviceAuthConfig       `yaml:"serviceAuth,omitempty"`
+	Webhook               string                  `yaml:"webhook,omitempty"`
+	ServerNames           []string                `yaml:"serverNames,omitempty"`
+	CAConfig              ca.Config               `yaml:"caConfig,omitempty"`
+	PrometheusPort        uint16                  `yaml:"prometheusPort"`
+	ServiceBaseHostname   *string                 `yaml:"serviceBaseHostname"`
+	ServicePort           uint16                  `yaml:"servicePort"`
+	ControlHostname       *string                 `yaml:"controlHostname"`
+	ControlPort           uint16                  `yaml:"controlPort"`
+	AgentHostname         *string                 `yaml:"agentHostname"`
+	AgentPort             uint16                  `yaml:"agentPort"`
+	RemoteCommandHostname *string                 `yaml:"remoteCommandHostname"`
+	RemoteCommandPort     uint16                  `yaml:"remoteCommandPort"`
 }
 
 type agentConfig struct {
@@ -65,12 +65,12 @@ func LoadConfig(filename string) (*ControllerConfig, error) {
 		config.ServicePort = 9002
 	}
 
-	if config.CommandPort == 0 {
-		config.CommandPort = 9003
+	if config.ControlPort == 0 {
+		config.ControlPort = 9003
 	}
 
-	if config.CmdToolPort == 0 {
-		config.CmdToolPort = 9004
+	if config.RemoteCommandPort == 0 {
+		config.RemoteCommandPort = 9004
 	}
 
 	if config.PrometheusPort == 0 {
@@ -100,11 +100,11 @@ func (c *ControllerConfig) addIfMissing(target *string, reason string) {
 
 func (c *ControllerConfig) addAllHostnames() {
 	c.addIfMissing(c.AgentHostname, "agentHostname")
-	c.addIfMissing(c.CommandHostname, "commandHostname")
+	c.addIfMissing(c.ControlHostname, "commandHostname")
 	c.addIfMissing(c.ServiceBaseHostname, "ServiceBaseHostname")
 	baseWildcard := "*." + *c.ServiceBaseHostname
 	c.addIfMissing(&baseWildcard, "Service wildcard")
-	c.addIfMissing(c.CmdToolHostname, "cmdToolHostname")
+	c.addIfMissing(c.RemoteCommandHostname, "cmdToolHostname")
 }
 
 func (c *ControllerConfig) getAgentHostname() string {
@@ -122,22 +122,22 @@ func (c *ControllerConfig) getKubernetesURL() string {
 	return fmt.Sprintf("https://kubernetes.%s:%d", *c.ServiceBaseHostname, c.ServicePort)
 }
 
-func (c *ControllerConfig) getCommandHostname() string {
-	if c.CommandHostname != nil {
-		return *c.CommandHostname
+func (c *ControllerConfig) getControlHostname() string {
+	if c.ControlHostname != nil {
+		return *c.ControlHostname
 	}
 	return c.ServerNames[0]
 }
 
-func (c *ControllerConfig) getCmdToolHostname() string {
-	if c.CmdToolHostname != nil {
-		return *c.CmdToolHostname
-	}
-	return c.ServerNames[0]
+func (c *ControllerConfig) getControlURL() string {
+	return fmt.Sprintf("https://%s:%d", c.getControlHostname(), c.ControlPort)
 }
 
-func (c *ControllerConfig) getCmdToolURL() string {
-	return fmt.Sprintf("https://%s:%d", c.getCmdToolHostname(), c.CmdToolPort)
+func (c *ControllerConfig) getRemoteCommandHostname() string {
+	if c.RemoteCommandHostname != nil {
+		return *c.RemoteCommandHostname
+	}
+	return c.ServerNames[0]
 }
 
 //
@@ -149,6 +149,6 @@ func (c *ControllerConfig) Dump() {
 	log.Printf("Base service hostname: %s, port: %d", *c.ServiceBaseHostname, c.ServicePort)
 	log.Printf("URL returned for kubectl components: %s", c.getKubernetesURL())
 	log.Printf("Agent hostname: %s, port %d", c.getAgentHostname(), c.getAgentPort())
-	log.Printf("Command Hostname: %s, port %d", c.getCommandHostname(), c.CommandPort)
-	log.Printf("CmdTool URL: %s, port %d", c.getCmdToolHostname(), c.CmdToolPort)
+	log.Printf("Control hostname: %s, port %d", c.getControlHostname(), c.ControlPort)
+	log.Printf("RemoteCommand hostname: %s, port %d", c.getRemoteCommandHostname(), c.RemoteCommandPort)
 }

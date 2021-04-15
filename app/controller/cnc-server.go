@@ -231,7 +231,7 @@ func cncGenerateControlCredentials(w http.ResponseWriter, r *http.Request) {
 	}
 	ret := fwdapi.ControlCredentialsResponse{
 		Name:        req.Name,
-		URL:         config.getCmdToolURL(),
+		URL:         config.getControlURL(),
 		Certificate: user64,
 		Key:         key64,
 		CACert:      ca64,
@@ -246,7 +246,7 @@ func cncGenerateControlCredentials(w http.ResponseWriter, r *http.Request) {
 }
 
 func runCommandHTTPServer(serverCert tls.Certificate) {
-	log.Printf("Running Command and Control API HTTPS listener on port %d", config.CommandPort)
+	log.Printf("Running Command and Control API HTTPS listener on port %d", config.ControlPort)
 
 	certPool, err := authority.MakeCertPool()
 	if err != nil {
@@ -269,7 +269,7 @@ func runCommandHTTPServer(serverCert tls.Certificate) {
 	mux.HandleFunc(fwdapi.STATISTICS_ENDPOINT, cncGetStatistics)
 
 	server := &http.Server{
-		Addr:      fmt.Sprintf(":%d", config.CommandPort),
+		Addr:      fmt.Sprintf(":%d", config.ControlPort),
 		TLSConfig: tlsConfig,
 		Handler:   mux,
 	}

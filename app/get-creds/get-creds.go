@@ -15,7 +15,7 @@ var (
 	certFile      = flag.String("certFile", "tls.crt", "The file containing the certificate used to connect to the controller")
 	keyFile       = flag.String("keyFile", "tls.key", "The file containing the certificate used to connect to the controller")
 	caCertFile    = flag.String("caCertFile", "ca.pem", "The file containing the CA certificate we will use to verify the controller's cert")
-	host          = flag.String("host", "forwarder-controller:9003", "The hostname of the controller")
+	url           = flag.String("url", "https://forwarder-controller:9003", "The URL of the controller's control endpoint")
 	endpointName  = flag.String("name", "", "Item name")
 	agentIdentity = flag.String("agent", "", "agent name")
 	endpointType  = flag.String("type", "", "endpoint type")
@@ -56,7 +56,7 @@ func getKubeconfigCreds() {
 	resp, err := client.R().
 		EnableTrace().
 		SetBody(request).
-		Post(fmt.Sprintf("https://%s%s", *host, fwdapi.KUBECONFIG_ENDPOINT))
+		Post(fmt.Sprintf("%s/%s", *url, fwdapi.KUBECONFIG_ENDPOINT))
 	if err != nil {
 		fmt.Printf("%v\n", err)
 	}
@@ -74,7 +74,7 @@ func getAgentManifest() {
 	resp, err := client.R().
 		EnableTrace().
 		SetBody(request).
-		Post(fmt.Sprintf("https://%s%s", *host, fwdapi.MANIFEST_ENDPOINT))
+		Post(fmt.Sprintf("%s/%s", *url, fwdapi.MANIFEST_ENDPOINT))
 	if err != nil {
 		fmt.Printf("%v\n", err)
 	}
@@ -94,7 +94,7 @@ func getService() {
 	resp, err := client.R().
 		EnableTrace().
 		SetBody(request).
-		Post(fmt.Sprintf("https://%s%s", *host, fwdapi.SERVICE_ENDPOINT))
+		Post(fmt.Sprintf("%s/%s", *url, fwdapi.SERVICE_ENDPOINT))
 	if err != nil {
 		fmt.Printf("%v\n", err)
 	}
@@ -112,7 +112,7 @@ func getControl() {
 	resp, err := client.R().
 		EnableTrace().
 		SetBody(request).
-		Post(fmt.Sprintf("https://%s%s", *host, fwdapi.CONTROL_ENDPOINT))
+		Post(fmt.Sprintf("%s/%s", *url, fwdapi.CONTROL_ENDPOINT))
 	if err != nil {
 		fmt.Printf("%v\n", err)
 	}
@@ -126,7 +126,7 @@ func getStatistics() {
 	client := makeClient()
 	resp, err := client.R().
 		EnableTrace().
-		Get(fmt.Sprintf("https://%s%s", *host, fwdapi.STATISTICS_ENDPOINT))
+		Get(fmt.Sprintf("%s/%s", *url, fwdapi.STATISTICS_ENDPOINT))
 	if err != nil {
 		fmt.Printf("%v\n", err)
 	}
