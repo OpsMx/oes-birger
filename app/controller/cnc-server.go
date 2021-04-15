@@ -78,10 +78,10 @@ func authenticate(r *http.Request, method string) (int, error) {
 		return http.StatusForbidden, err
 	}
 	if names.Purpose != ca.CertificatePurposeControl {
-		return http.StatusForbidden, fmt.Errorf("identity does not end with 'control': %v", names)
+		return http.StatusForbidden, fmt.Errorf("identity is not authorized for 'control': %v", names)
 	}
 	if r.Method != method {
-		return http.StatusMethodNotAllowed, fmt.Errorf("only '%s' is accepted", method)
+		return http.StatusMethodNotAllowed, fmt.Errorf("only '%s' is accepted (not '%s')", method, r.Method)
 	}
 	return -1, nil
 }

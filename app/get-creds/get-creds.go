@@ -56,7 +56,7 @@ func getKubeconfigCreds() {
 	resp, err := client.R().
 		EnableTrace().
 		SetBody(request).
-		Post(fmt.Sprintf("%s/%s", *url, fwdapi.KUBECONFIG_ENDPOINT))
+		Post(fmt.Sprintf("%s%s", *url, fwdapi.KUBECONFIG_ENDPOINT))
 	if err != nil {
 		fmt.Printf("%v\n", err)
 	}
@@ -74,7 +74,7 @@ func getAgentManifest() {
 	resp, err := client.R().
 		EnableTrace().
 		SetBody(request).
-		Post(fmt.Sprintf("%s/%s", *url, fwdapi.MANIFEST_ENDPOINT))
+		Post(fmt.Sprintf("%s%s", *url, fwdapi.MANIFEST_ENDPOINT))
 	if err != nil {
 		fmt.Printf("%v\n", err)
 	}
@@ -94,7 +94,7 @@ func getService() {
 	resp, err := client.R().
 		EnableTrace().
 		SetBody(request).
-		Post(fmt.Sprintf("%s/%s", *url, fwdapi.SERVICE_ENDPOINT))
+		Post(fmt.Sprintf("%s%s", *url, fwdapi.SERVICE_ENDPOINT))
 	if err != nil {
 		fmt.Printf("%v\n", err)
 	}
@@ -112,7 +112,7 @@ func getControl() {
 	resp, err := client.R().
 		EnableTrace().
 		SetBody(request).
-		Post(fmt.Sprintf("%s/%s", *url, fwdapi.CONTROL_ENDPOINT))
+		Post(fmt.Sprintf("%s%s", *url, fwdapi.CONTROL_ENDPOINT))
 	if err != nil {
 		fmt.Printf("%v\n", err)
 	}
@@ -126,7 +126,7 @@ func getStatistics() {
 	client := makeClient()
 	resp, err := client.R().
 		EnableTrace().
-		Get(fmt.Sprintf("%s/%s", *url, fwdapi.STATISTICS_ENDPOINT))
+		Get(fmt.Sprintf("%s%s", *url, fwdapi.STATISTICS_ENDPOINT))
 	if err != nil {
 		fmt.Printf("%v\n", err)
 	}
