@@ -32,6 +32,7 @@ func cncGenerateKubectlComponents(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		w.Write(httpError(err))
 		w.WriteHeader(statusCode)
+		return
 	}
 
 	var req fwdapi.KubeConfigRequest
@@ -55,6 +56,7 @@ func cncGenerateKubectlComponents(w http.ResponseWriter, r *http.Request) {
 	}
 	ret := fwdapi.KubeConfigResponse{
 		Identity:        req.Identity,
+		Name:            req.Name,
 		ServerURL:       config.getKubernetesURL(),
 		UserCertificate: user64,
 		UserKey:         key64,

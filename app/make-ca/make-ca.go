@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"os"
 
 	"github.com/opsmx/oes-birger/pkg/ca"
 )
@@ -15,9 +16,9 @@ var (
 	commandSecretName = flag.String("commandSecretName", "oes-command-secret", "the name of the secret for the command secret")
 )
 
-func maybePrintNamespace() {
+func maybePrintNamespace(f *os.File) {
 	if namespace != nil && len(*namespace) > 0 {
-		fmt.Printf("  namespace: %s\n", *namespace)
+		fmt.Fprintf(f, "  namespace: %s\n", *namespace)
 	}
 }
 
@@ -49,25 +50,46 @@ func main() {
 		log.Fatal("Code error, returned CA cert base64 doesn't match generated CA cert")
 	}
 
-	fmt.Println("apiVersion: v1")
-	fmt.Println("kind: Secret")
-	fmt.Println("type: kubernetes.io/tls")
-	fmt.Println("metadata:")
-	maybePrintNamespace()
-	fmt.Printf("  name: %s\n", *caSecretName)
-	fmt.Println("data:")
-	fmt.Printf("  tls.crt: %s\n", ca64)
-	fmt.Printf("  tls.key: %s\n", caPrivateKey64)
+	f, err := os.OpenFile("controller-secrets.yaml", os.O_WRONLY|os.O_CREATE, os.FileMode(0600))
+	if err != nil {
+		log.Panicf("%v", err)
+	}
+	fmt.Fprintln(f, "apiVersion: v1")
+	fmt.Fprintln(f, "kind: Secret")
+	fmt.Fprintln(f, "type: kubernetes.io/tls")
+	fmt.Fprintln(f, "metadata:")
+	maybePrintNamespace(f)
+	fmt.Fprintf(f, "  name: %s\n", *caSecretName)
+	fmt.Fprintln(f, "data:")
+	fmt.Fprintf(f, "  tls.crt: %s\n", ca64)
+	fmt.Fprintf(f, "  tls.key: %s\n", caPrivateKey64)
 
-	fmt.Println("---")
+	fmt.Fprintln(f, "---")
 
-	fmt.Println("apiVersion: v1")
-	fmt.Println("kind: Secret")
-	fmt.Println("type: kubernetes.io/tls")
-	fmt.Println("metadata:")
-	maybePrintNamespace()
-	fmt.Printf("  name: %s\n", *commandSecretName)
-	fmt.Println("data:")
-	fmt.Printf("  tls.crt: %s\n", cert64)
-	fmt.Printf("  tls.key: %s\n", certPrivKey64)
+	fmt.Fprintln(f, "apiVersion: v1")
+	fmt.Fprintln(f, "kind: Secret")
+	fmt.Fprintln(f, "type: kubernetes.io/tls")
+	fmt.Fprintln(f, "metadata:")
+	maybePrintNamespace(f)
+	fmt.Fprintf(f, "  name: %s\n", *commandSecretName)
+	fmt.Fprintln(f, "data:")
+	fmt.Fprintf(f, "  tls.crt: %s\n", cert64)
+	fmt.Fprintf(f, "  tls.key: %s\n", certPrivKey64)
+
+	err = f.Close()
+	if err != nil {
+		log.Panicf("%v", err)
+	}
+
+	cert, err := base64.StdEncoding.DecodeString(cert64)
+	if err != nil {
+		log.Panicf("%v", err)
+	}
+	key, err := base64.StdEncoding.DecodeString(certPrivKey64)
+	if err != nil {
+		log.Panicf("%v", err)
+	}
+	os.WriteFile("control-cert.pem", []byte(cert), 0600)
+	os.WriteFile("control-key.pem", []byte(key), 0600)
+	os.WriteFile("ca-cert.pem", cacert, 0600)
 }

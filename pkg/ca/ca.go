@@ -18,10 +18,8 @@ import (
 const (
 	DEFAULT_TLS_CERTIFICATE_PATH = "/app/secrets/ca/tls.crt" // use as const
 	DEFAULT_TLS_KEY_PATH         = "/app/secrets/ca/tls.key" // use as const
-)
 
-var (
-	OPSMX_OID = []int{2, 5, 4, 0x6f706d78}
+	OPSMX_OID_VALUE = 0x6f706d78 // 31-bit max
 )
 
 //
@@ -207,7 +205,7 @@ const (
 
 func GetCertificateNameFromCert(cert *x509.Certificate) (*CertificateName, error) {
 	for _, atv := range cert.Subject.Names {
-		if atv.Type.Equal(OPSMX_OID) {
+		if atv.Type.Equal([]int{2, 5, 4, OPSMX_OID_VALUE}) {
 			var name CertificateName
 			value, ok := atv.Value.(string)
 			if !ok {
@@ -238,7 +236,7 @@ func (c *CA) GenerateCertificate(name CertificateName) (string, string, string, 
 		Subject: pkix.Name{
 			ExtraNames: []pkix.AttributeTypeAndValue{
 				{
-					Type:  OPSMX_OID,
+					Type:  []int{2, 5, 4, OPSMX_OID_VALUE},
 					Value: string(jsonName),
 				},
 			},

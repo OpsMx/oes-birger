@@ -53,15 +53,20 @@ func getKubeconfigCreds() {
 		Identity: *agentIdentity,
 		Name:     *endpointName,
 	}
+	result := fwdapi.KubeConfigResponse{}
 	client := makeClient()
 	resp, err := client.R().
 		EnableTrace().
 		SetBody(request).
-		Post(fmt.Sprintf("%s%s", *host, fwdapi.KUBECONFIG_ENDPOINT))
+		SetResult(&result).
+		Post(fmt.Sprintf("https://%s%s", *host, fwdapi.KUBECONFIG_ENDPOINT))
 	if err != nil {
 		fmt.Printf("%v\n", err)
 	}
-	fmt.Printf("%#v\n", resp)
+	if resp.StatusCode() != 200 {
+		log.Fatalf("Request failed: %s", resp.Status())
+	}
+	fmt.Printf("%#v\n", result)
 }
 
 func insist(s *string, name string, expected bool) {
