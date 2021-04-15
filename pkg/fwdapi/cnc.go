@@ -76,10 +76,9 @@ type ControlCredentialsRequest struct {
 }
 
 type ControlCredentialsResponse struct {
-	Name            string `json:"name,omitempty"`
-	URL             string `json:"url,omitempty"`
-	ServerURL       string `json:"serverUrl,omitempty"`
-	UserCertificate string `json:"userCertificate,omitempty"`
-	UserKey         string `json:"userKey,omitempty"`
-	CACert          string `json:"caCert,omitempty"`
+	Name        string `json:"name,omitempty"`
+	URL         string `json:"url,omitempty"`
+	Certificate string `json:"userCertificate,omitempty"`
+	Key         string `json:"userKey,omitempty"`
+	CACert      string `json:"caCert,omitempty"`
 }

@@ -136,6 +136,10 @@ func (c *ControllerConfig) getCmdToolHostname() string {
 	return c.ServerNames[0]
 }
 
+func (c *ControllerConfig) getCmdToolURL() string {
+	return fmt.Sprintf("https://%s:%d", c.getCmdToolHostname(), c.CmdToolPort)
+}
+
 //
 // Dump will display MOST of the controller's configuration.
 //
@@ -146,5 +150,5 @@ func (c *ControllerConfig) Dump() {
 	log.Printf("URL returned for kubectl components: %s", c.getKubernetesURL())
 	log.Printf("Agent hostname: %s, port %d", c.getAgentHostname(), c.getAgentPort())
 	log.Printf("Command Hostname: %s, port %d", c.getCommandHostname(), c.CommandPort)
-	log.Printf("CmdTool Hostname: %s, port %d", c.getCmdToolHostname(), c.CmdToolPort)
+	log.Printf("CmdTool URL: %s, port %d", c.getCmdToolHostname(), c.CmdToolPort)
 }

@@ -84,6 +84,44 @@ func getAgentManifest() {
 	fmt.Printf("%s\n", string(resp.Body()))
 }
 
+func getService() {
+	request := fwdapi.ServiceCredentialRequest{
+		AgentName: *agentIdentity,
+		Type:      *endpointType,
+		Name:      *endpointName,
+	}
+	client := makeClient()
+	resp, err := client.R().
+		EnableTrace().
+		SetBody(request).
+		Post(fmt.Sprintf("https://%s%s", *host, fwdapi.SERVICE_ENDPOINT))
+	if err != nil {
+		fmt.Printf("%v\n", err)
+	}
+	if resp.StatusCode() != 200 {
+		log.Fatalf("Request failed: %s", resp.Status())
+	}
+	fmt.Printf("%s\n", string(resp.Body()))
+}
+
+func getControl() {
+	request := fwdapi.ControlCredentialsRequest{
+		Name: *endpointName,
+	}
+	client := makeClient()
+	resp, err := client.R().
+		EnableTrace().
+		SetBody(request).
+		Post(fmt.Sprintf("https://%s%s", *host, fwdapi.CONTROL_ENDPOINT))
+	if err != nil {
+		fmt.Printf("%v\n", err)
+	}
+	if resp.StatusCode() != 200 {
+		log.Fatalf("Request failed: %s", resp.Status())
+	}
+	fmt.Printf("%s\n", string(resp.Body()))
+}
+
 func getStatistics() {
 	client := makeClient()
 	resp, err := client.R().
@@ -129,10 +167,12 @@ func main() {
 		insist(agentIdentity, "agent", true)
 		insist(endpointName, "name", true)
 		insist(endpointType, "type", true)
+		getService()
 	case "control":
 		insist(agentIdentity, "agent", false)
-		insist(endpointName, "name", false)
+		insist(endpointName, "name", true)
 		insist(endpointType, "type", false)
+		getControl()
 	case "statistics":
 		//insist(agentIdentity, "agent", false)
 		insist(endpointName, "name", false)

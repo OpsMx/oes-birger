@@ -53,6 +53,7 @@ func cncGenerateKubectlComponents(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		w.Write(httpError(err))
 		w.WriteHeader(http.StatusBadRequest)
+		return
 	}
 	ret := fwdapi.KubeConfigResponse{
 		AgentName:       req.AgentName,
@@ -201,6 +202,49 @@ func cncGenerateServiceCredentials(w http.ResponseWriter, r *http.Request) {
 	w.Write(json)
 }
 
+func cncGenerateControlCredentials(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("content-type", "application/json")
+	statusCode, err := authenticate(r, "POST")
+	if err != nil {
+		w.Write(httpError(err))
+		w.WriteHeader(statusCode)
+		return
+	}
+
+	var req fwdapi.ControlCredentialsRequest
+	err = json.NewDecoder(r.Body).Decode(&req)
+	if err != nil {
+		w.Write(httpError(err))
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	name := ca.CertificateName{
+		Name:    req.Name,
+		Purpose: ca.CertificatePurposeAgent,
+	}
+	ca64, user64, key64, err := authority.GenerateCertificate(name)
+	if err != nil {
+		w.Write(httpError(err))
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	ret := fwdapi.ControlCredentialsResponse{
+		Name:        req.Name,
+		URL:         config.getCmdToolURL(),
+		Certificate: user64,
+		Key:         key64,
+		CACert:      ca64,
+	}
+	json, err := json.Marshal(ret)
+	if err != nil {
+		w.Write(httpError(err))
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	w.Write(json)
+}
+
 func runCommandHTTPServer(serverCert tls.Certificate) {
 	log.Printf("Running Command and Control API HTTPS listener on port %d", config.CommandPort)
 
@@ -221,6 +265,7 @@ func runCommandHTTPServer(serverCert tls.Certificate) {
 	mux.HandleFunc(fwdapi.KUBECONFIG_ENDPOINT, cncGenerateKubectlComponents)
 	mux.HandleFunc(fwdapi.MANIFEST_ENDPOINT, cncGenerateAgentManifestComponents)
 	mux.HandleFunc(fwdapi.SERVICE_ENDPOINT, cncGenerateServiceCredentials)
+	mux.HandleFunc(fwdapi.CONTROL_ENDPOINT, cncGenerateControlCredentials)
 	mux.HandleFunc(fwdapi.STATISTICS_ENDPOINT, cncGetStatistics)
 
 	server := &http.Server{
