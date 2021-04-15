@@ -12,12 +12,12 @@ const (
 /// KUBECONFIG_ENDPOINT
 ///
 type KubeConfigRequest struct {
-	Identity string `json:"identity"`
-	Name     string `json:"name"`
+	AgentName string `json:"agentName"`
+	Name      string `json:"name"`
 }
 
 type KubeConfigResponse struct {
-	Identity        string `json:"identity"`
+	AgentName       string `json:"agentName"`
 	Name            string `json:"name"`
 	ServerURL       string `json:"serverUrl"`
 	UserCertificate string `json:"userCertificate"`
@@ -29,11 +29,11 @@ type KubeConfigResponse struct {
 /// MANIFEST_ENDPOINT
 ///
 type ManifestRequest struct {
-	Identity string `json:"identity"`
+	AgentName string `json:"agentName"`
 }
 
 type ManifestResponse struct {
-	Identity         string `json:"identity"`
+	AgentName        string `json:"agentName"`
 	ServerHostname   string `json:"serverHostname"`
 	ServerPort       uint16 `json:"serverPort"`
 	AgentCertificate string `json:"agentCertificate"`
@@ -53,19 +53,19 @@ type StatisticsResponse struct {
 /// SERVICE_ENDPOINT
 ///
 type ServiceCredentialRequest struct {
-	Identity string `json:"identity,omitempty"`
-	Type     string `json:"Type,omitempty"`
-	Name     string `json:"Name,omitempty"`
+	AgentName string `json:"agentName,omitempty"`
+	Type      string `json:"Type,omitempty"`
+	Name      string `json:"Name,omitempty"`
 }
 
 type ServiceCredentialResponse struct {
-	Identity string `json:"identity,omitempty"`
-	Name     string `json:"name,omitempty"`
-	Type     string `json:"type,omitempty"`
-	Username string `json:"username,omitempty"`
-	Password string `json:"password,omitempty"`
-	URL      string `json:"url,omitempty"`
-	CACert   string `json:"caCert"`
+	AgentName string `json:"agentName,omitempty"`
+	Name      string `json:"name,omitempty"`
+	Type      string `json:"type,omitempty"`
+	Username  string `json:"username,omitempty"`
+	Password  string `json:"password,omitempty"`
+	URL       string `json:"url,omitempty"`
+	CACert    string `json:"caCert"`
 }
 
 ///

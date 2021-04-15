@@ -46,7 +46,7 @@ func cncGenerateKubectlComponents(w http.ResponseWriter, r *http.Request) {
 	name := ca.CertificateName{
 		Name:    req.Name,
 		Type:    "kubernetes",
-		Agent:   req.Identity,
+		Agent:   req.AgentName,
 		Purpose: ca.CertificatePurposeService,
 	}
 	ca64, user64, key64, err := authority.GenerateCertificate(name)
@@ -55,7 +55,7 @@ func cncGenerateKubectlComponents(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 	}
 	ret := fwdapi.KubeConfigResponse{
-		Identity:        req.Identity,
+		AgentName:       req.AgentName,
 		Name:            req.Name,
 		ServerURL:       config.getKubernetesURL(),
 		UserCertificate: user64,
@@ -103,7 +103,7 @@ func cncGenerateAgentManifestComponents(w http.ResponseWriter, r *http.Request) 
 	}
 
 	name := ca.CertificateName{
-		Agent:   req.Identity,
+		Agent:   req.AgentName,
 		Purpose: ca.CertificatePurposeAgent,
 	}
 	ca64, user64, key64, err := authority.GenerateCertificate(name)
@@ -113,7 +113,7 @@ func cncGenerateAgentManifestComponents(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	ret := fwdapi.ManifestResponse{
-		Identity:         req.Identity,
+		AgentName:        req.AgentName,
 		ServerHostname:   config.getAgentHostname(),
 		ServerPort:       config.getAgentPort(),
 		AgentCertificate: user64,
@@ -176,7 +176,7 @@ func cncGenerateServiceCredentials(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token, err := MakeJWT(key, req.Type, req.Name, req.Identity)
+	token, err := MakeJWT(key, req.Type, req.Name, req.AgentName)
 	if err != nil {
 		w.Write(httpError(err))
 		w.WriteHeader(statusCode)
@@ -184,13 +184,13 @@ func cncGenerateServiceCredentials(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ret := fwdapi.ServiceCredentialResponse{
-		Identity: req.Identity,
-		Name:     req.Name,
-		Type:     req.Type,
-		Username: fmt.Sprintf("%s.%s", req.Name, req.Identity),
-		Password: token,
-		URL:      fmt.Sprintf("https://%s.%s:%d", req.Type, *config.ServiceBaseHostname, config.ServicePort),
-		CACert:   authority.GetCACert(),
+		AgentName: req.AgentName,
+		Name:      req.Name,
+		Type:      req.Type,
+		Username:  fmt.Sprintf("%s.%s", req.Name, req.AgentName),
+		Password:  token,
+		URL:       fmt.Sprintf("https://%s.%s:%d", req.Type, *config.ServiceBaseHostname, config.ServicePort),
+		CACert:    authority.GetCACert(),
 	}
 	json, err := json.Marshal(ret)
 	if err != nil {

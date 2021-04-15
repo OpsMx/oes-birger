@@ -50,8 +50,8 @@ func makeClient() *resty.Client {
 
 func getKubeconfigCreds() {
 	request := fwdapi.KubeConfigRequest{
-		Identity: *agentIdentity,
-		Name:     *endpointName,
+		AgentName: *agentIdentity,
+		Name:      *endpointName,
 	}
 	result := fwdapi.KubeConfigResponse{}
 	client := makeClient()
