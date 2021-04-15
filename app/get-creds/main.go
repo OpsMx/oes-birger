@@ -28,27 +28,35 @@ func usage(message string) {
 	}
 	flag.Usage()
 	fmt.Fprintf(os.Stderr, "\n")
-	fmt.Fprintf(os.Stderr, "  'kubectl' requires: agent, endpointName\n")
-	fmt.Fprintf(os.Stderr, "  'agent' requires: ")
-	fmt.Fprintf(os.Stderr, "  'remote-command' requires: agent, endpointName")
+	fmt.Fprintf(os.Stderr, "  'kubectl' requires: agent, endpointName.\n")
+	fmt.Fprintf(os.Stderr, "  'service' requires: agent, endpointType, endpointName.\n")
+	fmt.Fprintf(os.Stderr, "  'remote-command' requires: agent, endpointName.\n")
+	fmt.Fprintf(os.Stderr, "  'agent-manifest' requires: agent.\n")
+	fmt.Fprintf(os.Stderr, "  'control' requires no other options.\n")
 	os.Exit(-1)
 }
 
 func makeClient() *resty.Client {
 	client := resty.New()
 	client.SetRootCertificate(*caCertFile)
+	log.Printf("Loaded CA key...")
 	cert, err := tls.LoadX509KeyPair(*certFile, *keyFile)
 	if err != nil {
-		log.Fatalf("%v", err)
+		log.Panicf("%v", err)
 	}
 	client.SetCertificates(cert)
 	return client
 }
 
 func getKubeconfigCreds() {
+	request := fwdapi.KubeConfigRequest{
+		Identity: *agentIdentity,
+		Name:     *endpointName,
+	}
 	client := makeClient()
 	resp, err := client.R().
 		EnableTrace().
+		SetBody(request).
 		Post(fmt.Sprintf("%s%s", *host, fwdapi.KUBECONFIG_ENDPOINT))
 	if err != nil {
 		fmt.Printf("%v\n", err)
@@ -60,8 +68,8 @@ func insist(s *string, name string, expected bool) {
 	if expected && (s == nil || *s == "") {
 		usage(fmt.Sprintf("%s: required", name))
 	}
-	if !expected && (s != nil || *s != "") {
-		log.Fatalf("%s: not allowed for this action", name)
+	if !expected && (s != nil && *s != "") {
+		log.Panicf("%s: not allowed for this action", name)
 	}
 }
 
@@ -69,14 +77,11 @@ func main() {
 	flag.Parse()
 
 	switch *action {
-	case "agent":
-		insist(agentIdentity, "agent", true)
-		insist(endpointName, "name", false)
-		insist(endpointType, "type", false)
 	case "kubectl":
 		insist(agentIdentity, "agent", true)
 		insist(endpointName, "name", true)
 		insist(endpointType, "type", false)
+		getKubeconfigCreds()
 	case "agent-manifest":
 		insist(agentIdentity, "agent", true)
 		insist(endpointName, "name", true)
@@ -85,7 +90,7 @@ func main() {
 		insist(agentIdentity, "agent", true)
 		insist(endpointName, "name", true)
 		insist(endpointType, "type", false)
-	case "http":
+	case "service":
 		insist(agentIdentity, "agent", true)
 		insist(endpointName, "name", true)
 		insist(endpointType, "type", true)
@@ -94,6 +99,6 @@ func main() {
 		insist(endpointName, "name", false)
 		insist(endpointType, "type", false)
 	default:
-		log.Fatalf("Unknown action: %s", *action)
+		log.Panicf("Unknown action: %s", *action)
 	}
 }
