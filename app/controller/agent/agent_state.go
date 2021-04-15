@@ -83,5 +83,6 @@ func (s *AgentState) GetStatistics() interface{} {
 	ret.Identity = s.Identity
 	ret.Session = s.Session
 	ret.ConnectionType = "direct"
+	ret.Endpoints = s.Endpoints
 	return ret
 }
