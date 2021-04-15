@@ -219,10 +219,11 @@ func main() {
 
 	c, err := LoadConfig(*configFile)
 	if err != nil {
-		log.Printf("Server names for generated certificate: %v", config.ServerNames)
+		log.Fatalf("Error loading config: %v", err)
 	}
 	config = c
 	c.Dump()
+	log.Printf("Server names for generated certificate: %v", config.ServerNames)
 
 	loadKeyset()
 

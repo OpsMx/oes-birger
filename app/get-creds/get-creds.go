@@ -39,7 +39,6 @@ func usage(message string) {
 func makeClient() *resty.Client {
 	client := resty.New()
 	client.SetRootCertificate(*caCertFile)
-	log.Printf("Loaded CA key...")
 	cert, err := tls.LoadX509KeyPair(*certFile, *keyFile)
 	if err != nil {
 		log.Panicf("%v", err)
@@ -53,12 +52,10 @@ func getKubeconfigCreds() {
 		AgentName: *agentIdentity,
 		Name:      *endpointName,
 	}
-	result := fwdapi.KubeConfigResponse{}
 	client := makeClient()
 	resp, err := client.R().
 		EnableTrace().
 		SetBody(request).
-		SetResult(&result).
 		Post(fmt.Sprintf("https://%s%s", *host, fwdapi.KUBECONFIG_ENDPOINT))
 	if err != nil {
 		fmt.Printf("%v\n", err)
@@ -66,7 +63,39 @@ func getKubeconfigCreds() {
 	if resp.StatusCode() != 200 {
 		log.Fatalf("Request failed: %s", resp.Status())
 	}
-	fmt.Printf("%#v\n", result)
+	fmt.Printf("%s\n", string(resp.Body()))
+}
+
+func getAgentManifest() {
+	request := fwdapi.ManifestRequest{
+		AgentName: *agentIdentity,
+	}
+	client := makeClient()
+	resp, err := client.R().
+		EnableTrace().
+		SetBody(request).
+		Post(fmt.Sprintf("https://%s%s", *host, fwdapi.MANIFEST_ENDPOINT))
+	if err != nil {
+		fmt.Printf("%v\n", err)
+	}
+	if resp.StatusCode() != 200 {
+		log.Fatalf("Request failed: %s", resp.Status())
+	}
+	fmt.Printf("%s\n", string(resp.Body()))
+}
+
+func getStatistics() {
+	client := makeClient()
+	resp, err := client.R().
+		EnableTrace().
+		Get(fmt.Sprintf("https://%s%s", *host, fwdapi.STATISTICS_ENDPOINT))
+	if err != nil {
+		fmt.Printf("%v\n", err)
+	}
+	if resp.StatusCode() != 200 {
+		log.Fatalf("Request failed: %s", resp.Status())
+	}
+	fmt.Printf("%s\n", string(resp.Body()))
 }
 
 func insist(s *string, name string, expected bool) {
@@ -89,8 +118,9 @@ func main() {
 		getKubeconfigCreds()
 	case "agent-manifest":
 		insist(agentIdentity, "agent", true)
-		insist(endpointName, "name", true)
+		insist(endpointName, "name", false)
 		insist(endpointType, "type", false)
+		getAgentManifest()
 	case "remote-command":
 		insist(agentIdentity, "agent", true)
 		insist(endpointName, "name", true)
@@ -103,6 +133,11 @@ func main() {
 		insist(agentIdentity, "agent", false)
 		insist(endpointName, "name", false)
 		insist(endpointType, "type", false)
+	case "statistics":
+		//insist(agentIdentity, "agent", false)
+		insist(endpointName, "name", false)
+		insist(endpointType, "type", false)
+		getStatistics()
 	default:
 		log.Panicf("Unknown action: %s", *action)
 	}
