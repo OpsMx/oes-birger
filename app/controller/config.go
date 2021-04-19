@@ -110,8 +110,6 @@ func (c *ControllerConfig) addAllHostnames() {
 	c.addIfMissing(c.AgentHostname, "agentHostname")
 	c.addIfMissing(c.ControlHostname, "commandHostname")
 	c.addIfMissing(c.ServiceHostname, "ServiceBaseHostname")
-	baseWildcard := "*." + *c.ServiceHostname
-	c.addIfMissing(&baseWildcard, "Service wildcard")
 	c.addIfMissing(c.RemoteCommandHostname, "cmdToolHostname")
 }
 
