@@ -12,9 +12,9 @@ import (
 )
 
 var (
-	certFile      = flag.String("certFile", "tls.crt", "The file containing the certificate used to connect to the controller")
-	keyFile       = flag.String("keyFile", "tls.key", "The file containing the certificate used to connect to the controller")
-	caCertFile    = flag.String("caCertFile", "ca.pem", "The file containing the CA certificate we will use to verify the controller's cert")
+	certFile      = flag.String("certFile", "control-cert.pem", "The file containing the certificate used to connect to the controller")
+	keyFile       = flag.String("keyFile", "control-key.pem", "The file containing the certificate used to connect to the controller")
+	caCertFile    = flag.String("caCertFile", "ca-cert.pem", "The file containing the CA certificate we will use to verify the controller's cert")
 	url           = flag.String("url", "https://forwarder-controller:9003", "The URL of the controller's control endpoint")
 	endpointName  = flag.String("name", "", "Item name")
 	agentIdentity = flag.String("agent", "", "agent name")
@@ -179,6 +179,6 @@ func main() {
 		insist(endpointType, "type", false)
 		getStatistics()
 	default:
-		log.Panicf("Unknown action: %s", *action)
+		usage(fmt.Sprintf("Unknown action: %s", *action))
 	}
 }
