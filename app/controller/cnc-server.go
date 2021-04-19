@@ -43,14 +43,9 @@ func cncGenerateKubectlComponents(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !fwdapi.NamePresent(req.AgentName) {
-		w.Write(httpError(fmt.Errorf("agentName is invalid")))
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
-	if !fwdapi.NamePresent(req.Name) {
-		w.Write(httpError(fmt.Errorf("name is invalid")))
+	err = req.Validate()
+	if err != nil {
+		w.Write(httpError(err))
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -115,8 +110,9 @@ func cncGenerateAgentManifestComponents(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	if !fwdapi.NamePresent(req.AgentName) {
-		w.Write(httpError(fmt.Errorf("agentName is invalid")))
+	err = req.Validate()
+	if err != nil {
+		w.Write(httpError(err))
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -187,20 +183,9 @@ func cncGenerateServiceCredentials(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !fwdapi.NamePresent(req.AgentName) {
-		w.Write(httpError(fmt.Errorf("agentName is invalid")))
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
-	if !fwdapi.NamePresent(req.Name) {
-		w.Write(httpError(fmt.Errorf("name is invalid")))
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
-	if !fwdapi.TypeValid(req.Name) {
-		w.Write(httpError(fmt.Errorf("type is invalid")))
+	err = req.Validate()
+	if err != nil {
+		w.Write(httpError(err))
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
