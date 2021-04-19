@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"crypto/tls"
 	"flag"
 	"fmt"
 	"io/fs"
@@ -10,7 +9,6 @@ import (
 	"log"
 	"net/http"
 	"path/filepath"
-	"strings"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
@@ -112,49 +110,6 @@ func makeHeaders(headers map[string][]string) []*tunnel.HttpHeader {
 type HTTPMessage struct {
 	Out chan *tunnel.AgentToControllerWrapper
 	Cmd *tunnel.HttpRequest
-}
-
-func getServiceTypeFromName(httpRequest *http.Request) string {
-	items := strings.Split(httpRequest.Host, ":")
-	items2 := strings.Split(items[0], ".")
-	return items2[0]
-}
-
-func serviceAPIHandler(w http.ResponseWriter, r *http.Request) {
-	serviceType := getServiceTypeFromName(r)
-	if serviceType == "kubernetes" {
-		certificateAuthAPIHandler(serviceType, w, r)
-	} else {
-		basicAuthAPIHandler(serviceType, w, r)
-	}
-}
-
-func runHTTPSServer(serverCert tls.Certificate) {
-	log.Printf("Running service HTTPS listener on port %d", config.ServicePort)
-
-	certPool, err := authority.MakeCertPool()
-	if err != nil {
-		log.Fatalf("While making certpool: %v", err)
-	}
-
-	tlsConfig := &tls.Config{
-		ClientCAs:    certPool,
-		ClientAuth:   tls.VerifyClientCertIfGiven,
-		Certificates: []tls.Certificate{serverCert},
-		MinVersion:   tls.VersionTLS12,
-	}
-
-	mux := http.NewServeMux()
-
-	mux.HandleFunc("/", serviceAPIHandler)
-
-	server := &http.Server{
-		Addr:      fmt.Sprintf(":%d", config.ServicePort),
-		TLSConfig: tlsConfig,
-		Handler:   mux,
-	}
-
-	server.ListenAndServeTLS("", "")
 }
 
 func healthcheck(w http.ResponseWriter, r *http.Request) {

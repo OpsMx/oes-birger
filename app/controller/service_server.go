@@ -1,6 +1,8 @@
 package main
 
 import (
+	"crypto/tls"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -10,35 +12,89 @@ import (
 	"github.com/opsmx/oes-birger/pkg/tunnel"
 )
 
-func certificateAuthAPIHandler(serviceType string, w http.ResponseWriter, r *http.Request) {
+func runHTTPSServer(serverCert tls.Certificate) {
+	log.Printf("Running service HTTPS listener on port %d", config.ServicePort)
+
+	certPool, err := authority.MakeCertPool()
+	if err != nil {
+		log.Fatalf("While making certpool: %v", err)
+	}
+
+	tlsConfig := &tls.Config{
+		ClientCAs:    certPool,
+		ClientAuth:   tls.VerifyClientCertIfGiven,
+		Certificates: []tls.Certificate{serverCert},
+		MinVersion:   tls.VersionTLS12,
+	}
+
+	mux := http.NewServeMux()
+
+	mux.HandleFunc("/", serviceAPIHandler)
+
+	server := &http.Server{
+		Addr:      fmt.Sprintf(":%d", config.ServicePort),
+		TLSConfig: tlsConfig,
+		Handler:   mux,
+	}
+
+	server.ListenAndServeTLS("", "")
+}
+
+func extractEndpointFromCert(r *http.Request) (agentIdentity string, endpointType string, endpointName string, validated bool) {
 	if len(r.TLS.PeerCertificates) == 0 {
-		log.Printf("client did not present a certificate, returning Forbidden")
-		w.WriteHeader(http.StatusForbidden)
-		return
+		return "", "", "", false
 	}
 
 	names, err := ca.GetCertificateNameFromCert(r.TLS.PeerCertificates[0])
 	if err != nil {
 		log.Printf("%v", err)
-		w.WriteHeader(http.StatusForbidden)
-		return
+		return "", "", "", false
 	}
 
 	if names.Purpose != ca.CertificatePurposeService {
-		w.WriteHeader(http.StatusForbidden)
-		return
+		return "", "", "", false
 	}
 
-	endpointType := names.Type
-	endpointName := names.Name
-	agentIdentity := names.Agent
+	return names.Agent, names.Type, names.Name, true
+}
 
-	if endpointType != serviceType {
-		log.Printf("client cert type is %s, expected %s", endpointType, serviceType)
-		w.WriteHeader(http.StatusForbidden)
-		return
+func extractEndpointFromJWT(r *http.Request) (agentIdentity string, endpointType string, endpointName string, validated bool) {
+	var authPassword string
+	var ok bool
+	if _, authPassword, ok = r.BasicAuth(); !ok {
+		return "", "", "", false
 	}
 
+	endpointType, endpointName, agentIdentity, err := ValidateJWT(jwtKeyset, authPassword)
+	if err != nil {
+		log.Printf("%v", err)
+		return "", "", "", false
+	}
+
+	return agentIdentity, endpointType, endpointName, true
+}
+
+func extractEndpoint(r *http.Request) (agentIdentity string, endpointType string, endpointName string, err error) {
+	agentIdentity, endpointType, endpointName, found := extractEndpointFromCert(r)
+	if found {
+		return agentIdentity, endpointType, endpointName, nil
+	}
+
+	agentIdentity, endpointType, endpointName, found = extractEndpointFromJWT(r)
+	if found {
+		return agentIdentity, endpointType, endpointName, nil
+	}
+
+	return "", "", "", fmt.Errorf("no valid credentials or JWT found")
+}
+
+func serviceAPIHandler(w http.ResponseWriter, r *http.Request) {
+	agentIdentity, endpointType, endpointName, err := extractEndpoint(r)
+	if err != nil {
+		w.Write(httpError(err))
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
 	ep := agent.AgentSearch{
 		Identity:     agentIdentity,
 		EndpointType: endpointType,
