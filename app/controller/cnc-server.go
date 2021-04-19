@@ -65,7 +65,7 @@ func cncGenerateKubectlComponents(w http.ResponseWriter, r *http.Request) {
 	ret := fwdapi.KubeConfigResponse{
 		AgentName:       req.AgentName,
 		Name:            req.Name,
-		ServerURL:       config.getKubernetesURL(),
+		ServerURL:       config.getServiceURL(),
 		UserCertificate: user64,
 		UserKey:         key64,
 		CACert:          ca64,
@@ -129,8 +129,8 @@ func cncGenerateAgentManifestComponents(w http.ResponseWriter, r *http.Request) 
 	}
 	ret := fwdapi.ManifestResponse{
 		AgentName:        req.AgentName,
-		ServerHostname:   config.getAgentHostname(),
-		ServerPort:       config.getAgentPort(),
+		ServerHostname:   *config.AgentHostname,
+		ServerPort:       config.AgentPort,
 		AgentCertificate: user64,
 		AgentKey:         key64,
 		CACert:           ca64,
@@ -211,7 +211,7 @@ func cncGenerateServiceCredentials(w http.ResponseWriter, r *http.Request) {
 		Type:      req.Type,
 		Username:  fmt.Sprintf("%s.%s", req.Name, req.AgentName),
 		Password:  token,
-		URL:       fmt.Sprintf("https://%s.%s:%d", req.Type, *config.ServiceBaseHostname, config.ServicePort),
+		URL:       config.getServiceURL(),
 		CACert:    authority.GetCACert(),
 	}
 	json, err := json.Marshal(ret)

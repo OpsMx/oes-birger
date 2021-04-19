@@ -20,7 +20,7 @@ type ControllerConfig struct {
 	ServerNames           []string                `yaml:"serverNames,omitempty"`
 	CAConfig              ca.Config               `yaml:"caConfig,omitempty"`
 	PrometheusPort        uint16                  `yaml:"prometheusPort"`
-	ServiceBaseHostname   *string                 `yaml:"serviceBaseHostname"`
+	ServiceHostname       *string                 `yaml:"serviceHostname"`
 	ServicePort           uint16                  `yaml:"servicePort"`
 	ControlHostname       *string                 `yaml:"controlHostname"`
 	ControlPort           uint16                  `yaml:"controlPort"`
@@ -53,24 +53,32 @@ func LoadConfig(filename string) (*ControllerConfig, error) {
 		return nil, err
 	}
 
-	if config.ServiceBaseHostname == nil {
-		log.Fatalf("serviceBaseHostname is not set.")
-	}
-
 	if config.AgentPort == 0 {
 		config.AgentPort = 9001
+	}
+	if config.AgentHostname == nil {
+		return nil, fmt.Errorf("agentHostname not set")
 	}
 
 	if config.ServicePort == 0 {
 		config.ServicePort = 9002
 	}
+	if config.ServiceHostname == nil {
+		return nil, fmt.Errorf("serviceHostname not set")
+	}
 
 	if config.ControlPort == 0 {
 		config.ControlPort = 9003
 	}
+	if config.ControlHostname == nil {
+		return nil, fmt.Errorf("controlHostname not set")
+	}
 
 	if config.RemoteCommandPort == 0 {
 		config.RemoteCommandPort = 9004
+	}
+	if config.RemoteCommandHostname == nil {
+		return nil, fmt.Errorf("remoteCommandHostname not set")
 	}
 
 	if config.PrometheusPort == 0 {
@@ -101,43 +109,18 @@ func (c *ControllerConfig) addIfMissing(target *string, reason string) {
 func (c *ControllerConfig) addAllHostnames() {
 	c.addIfMissing(c.AgentHostname, "agentHostname")
 	c.addIfMissing(c.ControlHostname, "commandHostname")
-	c.addIfMissing(c.ServiceBaseHostname, "ServiceBaseHostname")
-	baseWildcard := "*." + *c.ServiceBaseHostname
+	c.addIfMissing(c.ServiceHostname, "ServiceBaseHostname")
+	baseWildcard := "*." + *c.ServiceHostname
 	c.addIfMissing(&baseWildcard, "Service wildcard")
 	c.addIfMissing(c.RemoteCommandHostname, "cmdToolHostname")
 }
 
-func (c *ControllerConfig) getAgentHostname() string {
-	if c.AgentHostname != nil {
-		return *c.AgentHostname
-	}
-	return c.ServerNames[0]
-}
-
-func (c *ControllerConfig) getAgentPort() uint16 {
-	return c.AgentPort
-}
-
-func (c *ControllerConfig) getKubernetesURL() string {
-	return fmt.Sprintf("https://kubernetes.%s:%d", *c.ServiceBaseHostname, c.ServicePort)
-}
-
-func (c *ControllerConfig) getControlHostname() string {
-	if c.ControlHostname != nil {
-		return *c.ControlHostname
-	}
-	return c.ServerNames[0]
+func (c *ControllerConfig) getServiceURL() string {
+	return fmt.Sprintf("https://%s:%d", *c.ServiceHostname, c.ServicePort)
 }
 
 func (c *ControllerConfig) getControlURL() string {
-	return fmt.Sprintf("https://%s:%d", c.getControlHostname(), c.ControlPort)
-}
-
-func (c *ControllerConfig) getRemoteCommandHostname() string {
-	if c.RemoteCommandHostname != nil {
-		return *c.RemoteCommandHostname
-	}
-	return c.ServerNames[0]
+	return fmt.Sprintf("https://%s:%d", *c.ControlHostname, c.ControlPort)
 }
 
 //
@@ -146,9 +129,9 @@ func (c *ControllerConfig) getRemoteCommandHostname() string {
 func (c *ControllerConfig) Dump() {
 	log.Println("ControllerConfig:")
 	log.Printf("ServerNames: %v", config.ServerNames)
-	log.Printf("Base service hostname: %s, port: %d", *c.ServiceBaseHostname, c.ServicePort)
-	log.Printf("URL returned for kubectl components: %s", c.getKubernetesURL())
-	log.Printf("Agent hostname: %s, port %d", c.getAgentHostname(), c.getAgentPort())
-	log.Printf("Control hostname: %s, port %d", c.getControlHostname(), c.ControlPort)
-	log.Printf("RemoteCommand hostname: %s, port %d", c.getRemoteCommandHostname(), c.RemoteCommandPort)
+	log.Printf("Base service hostname: %s, port: %d", *c.ServiceHostname, c.ServicePort)
+	log.Printf("URL returned for kubectl components: %s", c.getServiceURL())
+	log.Printf("Agent hostname: %s, port %d", *c.AgentHostname, c.AgentPort)
+	log.Printf("Control hostname: %s, port %d", *c.ControlHostname, c.ControlPort)
+	log.Printf("RemoteCommand hostname: %s, port %d", *c.RemoteCommandHostname, c.RemoteCommandPort)
 }
