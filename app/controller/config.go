@@ -126,8 +126,11 @@ func (c *ControllerConfig) getControlURL() string {
 //
 func (c *ControllerConfig) Dump() {
 	log.Println("ControllerConfig:")
-	log.Printf("ServerNames: %v", config.ServerNames)
-	log.Printf("Base service hostname: %s, port: %d", *c.ServiceHostname, c.ServicePort)
+	log.Printf("ServerNames:")
+	for _, n := range config.ServerNames {
+		log.Printf("  %s", n)
+	}
+	log.Printf("Service hostname: %s, port: %d", *c.ServiceHostname, c.ServicePort)
 	log.Printf("URL returned for kubectl components: %s", c.getServiceURL())
 	log.Printf("Agent hostname: %s, port %d", *c.AgentHostname, c.AgentPort)
 	log.Printf("Control hostname: %s, port %d", *c.ControlHostname, c.ControlPort)
