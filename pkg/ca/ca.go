@@ -165,14 +165,11 @@ func (c *CA) MakeServerCert(names []string) (*tls.Certificate, error) {
 			Organization: []string{"OpsMX API Forwarder"},
 			Country:      []string{"DF"},
 		},
-		NotBefore:             now.Add(-10 * time.Second),
-		NotAfter:              now.AddDate(1, 0, 0),
-		KeyUsage:              x509.KeyUsageCRLSign | x509.KeyUsageDigitalSignature,
-		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
-		BasicConstraintsValid: true,
-		IsCA:                  false,
-		MaxPathLenZero:        true,
-		DNSNames:              names,
+		NotBefore:   now.Add(-10 * time.Second),
+		NotAfter:    now.AddDate(1, 0, 0),
+		KeyUsage:    x509.KeyUsageCRLSign | x509.KeyUsageDigitalSignature,
+		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
+		DNSNames:    names,
 	}
 
 	certBytes, err := x509.CreateCertificate(crand.Reader, certTemplate, caCert, &certPrivKey.PublicKey, c.caCert.PrivateKey)
