@@ -13,7 +13,7 @@ import (
 var (
 	namespace         = flag.String("namespace", "", "The namespace to place the secrets into")
 	caSecretName      = flag.String("caSecretName", "ca-secret", "the name of the CA secret")
-	commandSecretName = flag.String("commandSecretName", "oes-command-secret", "the name of the secret for the command secret")
+	controlSecretName = flag.String("controlSecretName", "oes-control-secret", "the name of the secret for the control secret")
 )
 
 func maybePrintNamespace(f *os.File) {
@@ -50,7 +50,8 @@ func main() {
 		log.Fatal("Code error, returned CA cert base64 doesn't match generated CA cert")
 	}
 
-	f, err := os.OpenFile("controller-secrets.yaml", os.O_WRONLY|os.O_CREATE, os.FileMode(0600))
+	log.Printf("Writing controller-secrets.yaml")
+	f, err := os.OpenFile("controller-secrets.yaml", os.O_WRONLY|os.O_CREATE, 0600)
 	if err != nil {
 		log.Panicf("%v", err)
 	}
@@ -71,7 +72,7 @@ func main() {
 	fmt.Fprintln(f, "type: kubernetes.io/tls")
 	fmt.Fprintln(f, "metadata:")
 	maybePrintNamespace(f)
-	fmt.Fprintf(f, "  name: %s\n", *commandSecretName)
+	fmt.Fprintf(f, "  name: %s\n", *controlSecretName)
 	fmt.Fprintln(f, "data:")
 	fmt.Fprintf(f, "  tls.crt: %s\n", cert64)
 	fmt.Fprintf(f, "  tls.key: %s\n", certPrivKey64)
@@ -89,7 +90,22 @@ func main() {
 	if err != nil {
 		log.Panicf("%v", err)
 	}
-	os.WriteFile("control-cert.pem", []byte(cert), 0600)
-	os.WriteFile("control-key.pem", []byte(key), 0600)
-	os.WriteFile("ca-cert.pem", cacert, 0600)
+
+	log.Printf("Writing control secret to control-cert.pem")
+	err = os.WriteFile("control-cert.pem", []byte(cert), 0600)
+	if err != nil {
+		log.Panicf("%v", err)
+	}
+
+	log.Printf("Writing control key to control-key.pem")
+	err = os.WriteFile("control-key.pem", []byte(key), 0600)
+	if err != nil {
+		log.Panicf("%v", err)
+	}
+
+	log.Printf("Writing authority certificate to ca-cert.pem")
+	err = os.WriteFile("ca-cert.pem", cacert, 0600)
+	if err != nil {
+		log.Panicf("%v", err)
+	}
 }
