@@ -170,21 +170,30 @@ func loadKeyset() {
 	log.Printf("Loaded %d serviceKeys", jwtKeyset.Len())
 }
 
-func main() {
-	flag.Parse()
-
+func parseConfig(filename string) (*ControllerConfig, error) {
 	f, err := os.Open(*configFile)
 	if err != nil {
-		log.Fatalf("Error opening configfile: %v", err)
+		return nil, fmt.Errorf("while opening configfile: %w", err)
 	}
 
 	c, err := LoadConfig(f)
 	if err != nil {
-		log.Fatalf("Error loading config: %v", err)
+		return nil, fmt.Errorf("while loading config: %w", err)
 	}
-	config = c
-	c.Dump()
-	log.Printf("Server names for generated certificate: %v", config.ServerNames)
+
+	return c, nil
+}
+
+func main() {
+	flag.Parse()
+
+	var err error
+
+	config, err = parseConfig(*configFile)
+	if err != nil {
+		log.Fatalf("%v", err)
+	}
+	config.Dump()
 
 	loadKeyset()
 
