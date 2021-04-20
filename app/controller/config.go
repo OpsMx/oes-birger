@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 
@@ -41,8 +42,8 @@ type serviceAuthConfig struct {
 // LoadConfig will load YAML configuration from the provided filename,
 // and then apply environment variables to override some subset of
 // available options.
-func LoadConfig(filename string) (*ControllerConfig, error) {
-	buf, err := ioutil.ReadFile(filename)
+func LoadConfig(f io.Reader) (*ControllerConfig, error) {
+	buf, err := ioutil.ReadAll(f)
 	if err != nil {
 		return nil, err
 	}

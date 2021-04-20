@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
 	"path/filepath"
 
 	"google.golang.org/grpc/codes"
@@ -172,7 +173,12 @@ func loadKeyset() {
 func main() {
 	flag.Parse()
 
-	c, err := LoadConfig(*configFile)
+	f, err := os.Open(*configFile)
+	if err != nil {
+		log.Fatalf("Error opening configfile: %v", err)
+	}
+
+	c, err := LoadConfig(f)
 	if err != nil {
 		log.Fatalf("Error loading config: %v", err)
 	}
