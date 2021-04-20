@@ -58,12 +58,9 @@ func (c *CA) loadCertificate() error {
 }
 
 //
-// MakeCA will return a CA based on the configuration passed in.  Note that
-// this follows the GO "Make*() returns a new object" naming, and does not
-// actually create a new CA.  This loads the certificate from the filenames
-// in the configuration.
+// LoadCAFromFile will load an existing authority.
 //
-func MakeCA(c Config) (*CA, error) {
+func LoadCAFromFile(c Config) (*CA, error) {
 	c.applyDefaults()
 
 	ca := &CA{

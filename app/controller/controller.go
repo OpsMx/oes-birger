@@ -205,7 +205,7 @@ func main() {
 	//
 	// Make a new CA, for our use to generate server and other certificates.
 	//
-	caLocal, err := ca.MakeCA(config.CAConfig)
+	caLocal, err := ca.LoadCAFromFile(config.CAConfig)
 	if err != nil {
 		log.Fatalf("Cannot create authority: %v", err)
 	}
