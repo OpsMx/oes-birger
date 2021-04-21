@@ -183,6 +183,7 @@ func (s *agentTunnelServer) EventTunnel(stream tunnel.AgentTunnelService_EventTu
 				}
 			}
 			state.Endpoints = endpoints
+			state.Version = req.AgentVersion
 			agents.AddAgent(state)
 			s.sendWebhook(state, req.Endpoints)
 		case *tunnel.AgentToControllerWrapper_HttpResponse:

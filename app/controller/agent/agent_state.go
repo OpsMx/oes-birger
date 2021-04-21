@@ -6,6 +6,7 @@ type AgentState struct {
 	Identity        string
 	Session         string
 	Endpoints       []Endpoint
+	Version         string
 	InRequest       chan interface{}
 	InCancelRequest chan string
 	ConnectedAt     uint64
@@ -84,5 +85,6 @@ func (s *AgentState) GetStatistics() interface{} {
 	ret.Session = s.Session
 	ret.ConnectionType = "direct"
 	ret.Endpoints = s.Endpoints
+	ret.Version = s.Version
 	return ret
 }

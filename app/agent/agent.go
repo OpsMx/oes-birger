@@ -83,7 +83,8 @@ func runTunnel(wg *sync.WaitGroup, sa *serverContext, conn *grpc.ClientConn, end
 		}
 	}
 	helloMsg := &tunnel.AgentHello{
-		Endpoints: pbEndpoints,
+		AgentVersion: version.String(),
+		Endpoints:    pbEndpoints,
 	}
 	hello := &tunnel.AgentToControllerWrapper{
 		Event: &tunnel.AgentToControllerWrapper_AgentHello{

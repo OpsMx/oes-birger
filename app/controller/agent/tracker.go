@@ -17,6 +17,7 @@ type AgentStatistics struct {
 	Session        string     `json:"session,omitempty"`
 	ConnectionType string     `json:"connectionType,omitempty"`
 	Endpoints      []Endpoint `json:"endpoints,omitempty"`
+	Version        string     `json:"version,omitempty"`
 }
 
 //
