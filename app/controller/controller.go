@@ -185,6 +185,8 @@ func parseConfig(filename string) (*ControllerConfig, error) {
 }
 
 func main() {
+	log.Printf("Controller version %v starting", version)
+
 	flag.Parse()
 
 	var err error

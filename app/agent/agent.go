@@ -226,6 +226,8 @@ func configureEndpoints(secretsLoader secrets.SecretLoader) {
 }
 
 func main() {
+	log.Printf("Agent version %v starting", version)
+
 	var err error
 
 	arg0hash, err := updater.HashSelf()
