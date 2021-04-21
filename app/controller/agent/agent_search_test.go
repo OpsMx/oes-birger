@@ -19,34 +19,34 @@ func TestAgentSearch_MatchesAgent(t *testing.T) {
 		want   bool
 	}{
 		{
-			"matching identity and session",
+			"matching name and session",
 			fields{Identity: "a1", Session: "abc"},
-			args{t: &AgentState{Identity: "a1", Session: "abc"}},
+			args{t: &AgentState{Name: "a1", Session: "abc"}},
 			true,
 		},
 		{
-			"matching identity",
+			"matching name",
 			fields{Identity: "a1"},
-			args{t: &AgentState{Identity: "a1", Session: "abc"}},
+			args{t: &AgentState{Name: "a1", Session: "abc"}},
 			true,
 		},
 		{
-			"non-matching identity",
+			"non-matching name",
 			fields{Identity: "a2"},
-			args{t: &AgentState{Identity: "a1", Session: "abc"}},
+			args{t: &AgentState{Name: "a1", Session: "abc"}},
 			false,
 		},
 		{
-			"matching identity, non-matching session",
+			"matching name, non-matching session",
 			fields{Identity: "a1", Session: "cda"},
-			args{t: &AgentState{Identity: "a1", Session: "abc"}},
+			args{t: &AgentState{Name: "a1", Session: "abc"}},
 			false,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			a := &AgentSearch{
-				Identity:     tt.fields.Identity,
+				Name:         tt.fields.Identity,
 				EndpointType: tt.fields.EndpointType,
 				EndpointName: tt.fields.EndpointName,
 				Session:      tt.fields.Session,

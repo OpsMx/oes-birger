@@ -13,7 +13,7 @@ var (
 )
 
 type AgentStatistics struct {
-	Identity       string     `json:"identity,omitempty"`
+	Name           string     `json:"name,omitempty"`
 	Session        string     `json:"session,omitempty"`
 	ConnectionType string     `json:"connectionType,omitempty"`
 	Endpoints      []Endpoint `json:"endpoints,omitempty"`
@@ -30,7 +30,7 @@ type Agent interface {
 	Cancel(string)
 	HasEndpoint(string, string) bool
 	GetSession() string
-	GetIdentity() string
+	GetName() string
 	GetEndpoints() []Endpoint
 
 	GetStatistics() interface{}
@@ -86,17 +86,17 @@ func sliceIndex(limit int, predicate func(i int) bool) int {
 func (s *ConnectedAgents) AddAgent(state Agent) {
 	s.Lock()
 	defer s.Unlock()
-	agentList, ok := s.m[state.GetIdentity()]
+	agentList, ok := s.m[state.GetName()]
 	if !ok {
 		agentList = make([]Agent, 0)
 	}
 	agentList = append(agentList, state)
-	s.m[state.GetIdentity()] = agentList
+	s.m[state.GetName()] = agentList
 	log.Printf("Agent %s added, now at %d paths, %d endpoints", state, len(agentList), len(state.GetEndpoints()))
 	for _, endpoint := range state.GetEndpoints() {
 		log.Printf("  agent %s, endpoint: %s", state, &endpoint)
 	}
-	connectedAgentsGauge.WithLabelValues(state.GetIdentity()).Inc()
+	connectedAgentsGauge.WithLabelValues(state.GetName()).Inc()
 }
 
 //
@@ -108,7 +108,7 @@ func (s *ConnectedAgents) RemoveAgent(state Agent) error {
 
 	state.Close()
 
-	agentList, ok := s.m[state.GetIdentity()]
+	agentList, ok := s.m[state.GetName()]
 	if !ok {
 		// This should not be possible.
 		err := fmt.Errorf("no agents known by the name of %s", state)
@@ -126,14 +126,14 @@ func (s *ConnectedAgents) RemoveAgent(state Agent) error {
 	agentList[i] = agentList[len(agentList)-1]
 	agentList[len(agentList)-1] = nil
 	agentList = agentList[:len(agentList)-1]
-	s.m[state.GetIdentity()] = agentList
-	connectedAgentsGauge.WithLabelValues(state.GetIdentity()).Dec()
+	s.m[state.GetName()] = agentList
+	connectedAgentsGauge.WithLabelValues(state.GetName()).Dec()
 	log.Printf("agent %s removed, now at %d paths", state, len(agentList))
 	return nil
 }
 
 func (s *ConnectedAgents) findService(ep AgentSearch) (Agent, error) {
-	agentList, ok := s.m[ep.Identity]
+	agentList, ok := s.m[ep.Name]
 	if !ok || len(agentList) == 0 {
 		return nil, fmt.Errorf("no agents connected for %s", ep)
 	}
@@ -177,7 +177,7 @@ func (s *ConnectedAgents) Cancel(ep AgentSearch, id string) error {
 
 	s.RLock()
 	defer s.RUnlock()
-	agentList, ok := s.m[ep.Identity]
+	agentList, ok := s.m[ep.Name]
 	if !ok || len(agentList) == 0 {
 		return fmt.Errorf("no agents connected for: %s (likely coding error)", ep)
 	}

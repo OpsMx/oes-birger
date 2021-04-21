@@ -3,7 +3,7 @@ package agent
 import "fmt"
 
 type AgentState struct {
-	Identity        string
+	Name            string
 	Session         string
 	Endpoints       []Endpoint
 	Version         string
@@ -18,8 +18,8 @@ func (s *AgentState) GetSession() string {
 	return s.Session
 }
 
-func (s *AgentState) GetIdentity() string {
-	return s.Identity
+func (s *AgentState) GetName() string {
+	return s.Name
 }
 
 func (s *AgentState) GetEndpoints() []Endpoint {
@@ -27,7 +27,7 @@ func (s *AgentState) GetEndpoints() []Endpoint {
 }
 
 func (s AgentState) String() string {
-	return fmt.Sprintf("(identity=%s, session=%s)", s.Identity, s.Session)
+	return fmt.Sprintf("(name=%s, session=%s)", s.Name, s.Session)
 }
 
 func (s *AgentState) Close() {
@@ -81,7 +81,7 @@ func (s *AgentState) GetStatistics() interface{} {
 		LastPing:    s.LastPing,
 		LastUse:     s.LastUse,
 	}
-	ret.Identity = s.Identity
+	ret.Name = s.Name
 	ret.Session = s.Session
 	ret.ConnectionType = "direct"
 	ret.Endpoints = s.Endpoints

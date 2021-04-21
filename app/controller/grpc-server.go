@@ -16,13 +16,7 @@ import (
 	"google.golang.org/grpc/credentials"
 )
 
-type agentConnectionNotification struct {
-	Identity  string           `json:"identity,omitempty"`
-	Session   string           `json:"session,omitempty"`
-	Endpoints []agent.Endpoint `json:"endpoints,omitempty"`
-}
-
-func (s *agentTunnelServer) sendWebhook(state *agent.AgentState, endpoints []*tunnel.EndpointHealth) {
+func (s *agentTunnelServer) sendWebhook(state agent.Agent, endpoints []*tunnel.EndpointHealth) {
 	if hook == nil {
 		return
 	}
@@ -34,9 +28,9 @@ func (s *agentTunnelServer) sendWebhook(state *agent.AgentState, endpoints []*tu
 			Configured: ep.Configured,
 		}
 	}
-	req := &agentConnectionNotification{
-		Identity:  state.Identity,
-		Session:   state.Session,
+	req := &agent.AgentStatistics{
+		Name:      state.GetName(),
+		Session:   state.GetSession(),
 		Endpoints: eh,
 	}
 	hook.Send(req)
@@ -98,7 +92,7 @@ func (s *agentTunnelServer) handleHTTPRequests(session string, requestChan chan 
 	}
 }
 
-func (s *agentTunnelServer) handleHTTPCancelRequest(session string, identity string, cancelChan chan string, httpids *sessionList, stream tunnel.AgentTunnelService_EventTunnelServer) {
+func (s *agentTunnelServer) handleHTTPCancelRequest(session string, cancelChan chan string, httpids *sessionList, stream tunnel.AgentTunnelService_EventTunnelServer) {
 	for id := range cancelChan {
 		s.removeHTTPId(httpids, id)
 		resp := &tunnel.ControllerToAgentWrapper{
@@ -135,7 +129,7 @@ func (s *agentTunnelServer) EventTunnel(stream tunnel.AgentTunnelService_EventTu
 	httpids := &sessionList{m: make(map[string]chan *tunnel.AgentToControllerWrapper)}
 
 	state := &agent.AgentState{
-		Identity:        agentIdentity,
+		Name:            agentIdentity,
 		Session:         sessionIdentity,
 		InRequest:       inRequest,
 		InCancelRequest: inCancelRequest,
@@ -146,7 +140,7 @@ func (s *agentTunnelServer) EventTunnel(stream tunnel.AgentTunnelService_EventTu
 
 	go s.handleHTTPRequests(sessionIdentity, inRequest, httpids, stream)
 
-	go s.handleHTTPCancelRequest(sessionIdentity, agentIdentity, inCancelRequest, httpids, stream)
+	go s.handleHTTPCancelRequest(sessionIdentity, inCancelRequest, httpids, stream)
 
 	for {
 		in, err := stream.Recv()
@@ -347,7 +341,7 @@ func (s *cmdToolTunnelServer) EventTunnel(stream tunnel.CmdToolTunnelService_Eve
 
 	operationID := ulidContext.Ulid()
 	ep := agent.AgentSearch{
-		Identity:     agentIdentity,
+		Name:         agentIdentity,
 		EndpointType: "remote-command",
 	}
 

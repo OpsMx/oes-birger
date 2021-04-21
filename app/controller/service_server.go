@@ -96,7 +96,7 @@ func serviceAPIHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ep := agent.AgentSearch{
-		Identity:     agentIdentity,
+		Name:         agentIdentity,
 		EndpointType: endpointType,
 		EndpointName: endpointName,
 	}
@@ -104,7 +104,7 @@ func serviceAPIHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func runAPIHandler(ep agent.AgentSearch, w http.ResponseWriter, r *http.Request) {
-	apiRequestCounter.WithLabelValues(ep.Identity).Inc()
+	apiRequestCounter.WithLabelValues(ep.Name).Inc()
 
 	transactionID := ulidContext.Ulid()
 

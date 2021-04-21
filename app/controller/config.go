@@ -32,7 +32,7 @@ type ControllerConfig struct {
 }
 
 type agentConfig struct {
-	Identity string `yaml:"identity,omitempty"`
+	Name string `yaml:"name,omitempty"`
 }
 
 type serviceAuthConfig struct {

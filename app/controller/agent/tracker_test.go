@@ -16,14 +16,14 @@ var _ = Suite(&MySuite{})
 
 var (
 	agent1Session1 = &FakeAgent{
-		identity:  "agent1",
+		name:      "agent1",
 		session:   "agent1.session1",
 		endpoints: []Endpoint{},
 	}
 
 	agent1Session2 = &FakeAgent{
-		identity: "agent1",
-		session:  "agent1.session2",
+		name:    "agent1",
+		session: "agent1.session2",
 		endpoints: []Endpoint{
 			{Name: "ep1", Type: "type1", Configured: true},
 			{Name: "ep2", Type: "type1", Configured: true},
@@ -33,14 +33,14 @@ var (
 	}
 
 	bogusagent = &FakeAgent{
-		identity:  "agent99",
+		name:      "agent99",
 		session:   "agent99.session1",
 		endpoints: []Endpoint{},
 	}
 )
 
 type FakeAgent struct {
-	identity  string
+	name      string
 	session   string
 	endpoints []Endpoint
 
@@ -68,8 +68,8 @@ func (a *FakeAgent) HasEndpoint(endpointType string, endpointName string) bool {
 	return false
 }
 
-func (a *FakeAgent) GetIdentity() string {
-	return a.identity
+func (a *FakeAgent) GetName() string {
+	return a.name
 }
 func (a *FakeAgent) GetSession() string {
 	return a.session
@@ -78,7 +78,7 @@ func (a *FakeAgent) GetSession() string {
 type FakeStats AgentStatistics
 
 func (a *FakeAgent) GetStatistics() interface{} {
-	return FakeStats{Identity: a.identity, Session: a.session, ConnectionType: "fake"}
+	return FakeStats{Name: a.name, Session: a.session, ConnectionType: "fake"}
 }
 
 func (a *FakeAgent) GetEndpoints() []Endpoint {
@@ -122,17 +122,17 @@ func (s *MySuite) TestConnectedAgents(c *C) {
 	///
 
 	// now that only agent1State2 exists in the list, find some endpoints.
-	agent, err := agents.findService(AgentSearch{Identity: "agent1", EndpointType: "type1", EndpointName: "ep1"})
+	agent, err := agents.findService(AgentSearch{Name: "agent1", EndpointType: "type1", EndpointName: "ep1"})
 	c.Assert(err, IsNil)
-	c.Assert(agent.GetIdentity(), Equals, "agent1")
+	c.Assert(agent.GetName(), Equals, "agent1")
 	c.Assert(agent.GetSession(), Equals, "agent1.session2")
 
 	// Try to find an agent that does not exist
-	_, err = agents.findService(AgentSearch{Identity: "agent99", EndpointType: "type1", EndpointName: "ep1"})
+	_, err = agents.findService(AgentSearch{Name: "agent99", EndpointType: "type1", EndpointName: "ep1"})
 	c.Assert(err, ErrorMatches, "no agents connected for.*")
 
 	// Try to find a service on an agent, where the agent exists but the service does not.
-	_, err = agents.findService(AgentSearch{Identity: "agent1", EndpointType: "type99", EndpointName: "ep1"})
+	_, err = agents.findService(AgentSearch{Name: "agent1", EndpointType: "type99", EndpointName: "ep1"})
 	c.Assert(err, ErrorMatches, ".*no such path exists.*")
 
 	///
@@ -140,12 +140,12 @@ func (s *MySuite) TestConnectedAgents(c *C) {
 	///
 
 	// send to non-existant agent
-	session, found := agents.Send(AgentSearch{Identity: "agent19", EndpointType: "type1", EndpointName: "ep1"}, 5)
+	session, found := agents.Send(AgentSearch{Name: "agent19", EndpointType: "type1", EndpointName: "ep1"}, 5)
 	c.Assert(found, Equals, false)
 	c.Assert(session, Equals, "")
 
 	// working
-	session, found = agents.Send(AgentSearch{Identity: "agent1", EndpointType: "type1", EndpointName: "ep1"}, 5)
+	session, found = agents.Send(AgentSearch{Name: "agent1", EndpointType: "type1", EndpointName: "ep1"}, 5)
 	c.Assert(found, Equals, true)
 	c.Assert(session, Equals, "agent1.session2")
 	c.Assert(agent1Session2.lastMessage, Equals, 5)
@@ -155,19 +155,19 @@ func (s *MySuite) TestConnectedAgents(c *C) {
 	///
 
 	// Broken cancel request
-	err = agents.Cancel(AgentSearch{Identity: "agent1", EndpointType: "type1", EndpointName: "ep1"}, "abc123")
+	err = agents.Cancel(AgentSearch{Name: "agent1", EndpointType: "type1", EndpointName: "ep1"}, "abc123")
 	c.Assert(err, ErrorMatches, ".*session is not set.*")
 
 	// No agent
-	err = agents.Cancel(AgentSearch{Session: "nosession", Identity: "agent99", EndpointType: "type1", EndpointName: "ep1"}, "abc123")
+	err = agents.Cancel(AgentSearch{Session: "nosession", Name: "agent99", EndpointType: "type1", EndpointName: "ep1"}, "abc123")
 	c.Assert(err, ErrorMatches, ".*no agents connected for.*")
 
 	// Agent exists, session does not
-	err = agents.Cancel(AgentSearch{Session: "nosession", Identity: "agent1", EndpointType: "type1", EndpointName: "ep1"}, "abc123")
+	err = agents.Cancel(AgentSearch{Session: "nosession", Name: "agent1", EndpointType: "type1", EndpointName: "ep1"}, "abc123")
 	c.Assert(err, ErrorMatches, ".*with specific session.*")
 
 	// Attempt to cancel an id
-	err = agents.Cancel(AgentSearch{Session: "agent1.session2", Identity: "agent1", EndpointType: "type1", EndpointName: "ep1"}, "abc123")
+	err = agents.Cancel(AgentSearch{Session: "agent1.session2", Name: "agent1", EndpointType: "type1", EndpointName: "ep1"}, "abc123")
 	c.Assert(err, IsNil)
 	c.Assert(agent1Session2.lastCancelled, Equals, "abc123")
 
@@ -178,7 +178,7 @@ func (s *MySuite) TestConnectedAgents(c *C) {
 	stats := agents.GetStatistics()
 	j, err := json.Marshal(stats)
 	c.Assert(err, IsNil) // json should not fail...
-	c.Assert(string(j), Equals, `[{"identity":"agent1","session":"agent1.session2","connectionType":"fake"}]`)
+	c.Assert(string(j), Equals, `[{"name":"agent1","session":"agent1.session2","connectionType":"fake"}]`)
 }
 
 func (s *MySuite) TestConnectedAgents_sliceIndex(c *C) {
