@@ -45,8 +45,9 @@ type ManifestResponse struct {
 /// STATISTICS_ENDPOINT
 ///
 type StatisticsResponse struct {
-	ServerTime      uint64      `json:"serverTime"`
-	ConnectedAgents interface{} `json:"connectedAgents"`
+	ServerTime      uint64      `json:"serverTime,omitempty"`
+	Version         string      `json:"version,omitempty"`
+	ConnectedAgents interface{} `json:"connectedAgents,omitempty"`
 }
 
 ///

@@ -155,6 +155,7 @@ func cncGetStatistics(w http.ResponseWriter, r *http.Request) {
 
 	ret := fwdapi.StatisticsResponse{
 		ServerTime:      ulid.Now(),
+		Version:         version.String(),
 		ConnectedAgents: agents.GetStatistics(),
 	}
 	json, err := json.Marshal(ret)
