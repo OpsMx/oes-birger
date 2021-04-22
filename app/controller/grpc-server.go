@@ -26,6 +26,7 @@ func (s *agentTunnelServer) sendWebhook(state agent.Agent, endpoints []*tunnel.E
 			Name:       ep.Name,
 			Type:       ep.Type,
 			Configured: ep.Configured,
+			Namespaces: ep.Namespaces,
 		}
 	}
 	req := &agent.AgentStatistics{

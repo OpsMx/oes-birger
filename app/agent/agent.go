@@ -41,14 +41,13 @@ var (
 	endpoints []Endpoint
 )
 
-type serverContext struct {
-}
+type serverContext struct{}
 
-// TODO: this is currently copied from the controller.  Should be shared.
 type Endpoint struct {
-	Name       string `json:"name,omitempty"`
-	Type       string `json:"type,omitempty"`
-	Configured bool   `json:"configured,omitempty"`
+	Name       string   `json:"name,omitempty"`
+	Type       string   `json:"type,omitempty"`
+	Configured bool     `json:"configured,omitempty"`
+	Namespace  []string `json:"namespace,omitempty"`
 
 	instance HTTPRequestProcessor
 }
@@ -76,11 +75,13 @@ func runTunnel(wg *sync.WaitGroup, sa *serverContext, conn *grpc.ClientConn, end
 	}
 	pbEndpoints := make([]*tunnel.EndpointHealth, len(endpoints))
 	for i, ep := range endpoints {
-		pbEndpoints[i] = &tunnel.EndpointHealth{
+		endp := &tunnel.EndpointHealth{
 			Name:       ep.Name,
 			Type:       ep.Type,
 			Configured: ep.Configured,
+			Namespaces: ep.Namespace,
 		}
+		pbEndpoints[i] = endp
 	}
 	helloMsg := &tunnel.AgentHello{
 		AgentVersion: version.String(),
@@ -214,14 +215,28 @@ func configureEndpoints(secretsLoader secrets.SecretLoader) {
 				log.Fatal(err)
 			}
 
-			// If it did not return an error, a nil instance means it is not fully configured.
-			log.Printf("Adding endpoint type %s, name %s, configured %v", service.Type, service.Name, configured)
-			endpoints = append(endpoints, Endpoint{
-				Type:       service.Type,
-				Name:       service.Name,
-				Configured: configured,
-				instance:   instance,
-			})
+			if len(service.Namespaces) == 0 {
+				// If it did not return an error, a nil instance means it is not fully configured.
+				log.Printf("Adding endpoint type %s, name %s, configured %v", service.Type, service.Name, configured)
+				endpoints = append(endpoints, Endpoint{
+					Type:       service.Type,
+					Name:       service.Name,
+					Configured: configured,
+					instance:   instance,
+				})
+			} else {
+				for _, ns := range service.Namespaces {
+					log.Printf("Adding endpoint type %s, name %s, configured %v, namespaces %v", service.Type, ns.Name, configured, ns.Namespaces)
+					newep := Endpoint{
+						Type:       service.Type,
+						Name:       ns.Name,
+						Configured: configured,
+						instance:   instance,
+						Namespace:  ns.Namespaces,
+					}
+					endpoints = append(endpoints, newep)
+				}
+			}
 		}
 	}
 }

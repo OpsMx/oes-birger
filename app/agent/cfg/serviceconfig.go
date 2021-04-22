@@ -24,10 +24,16 @@ type CommandConfig struct {
 // ServiceConfig holds configuration for a service, like a Jenkins endpoint.
 //
 type ServiceConfig struct {
-	Enabled bool                        `yaml:"enabled"`
-	Name    string                      `yaml:"name"`
-	Type    string                      `yaml:"type"`
-	Config  map[interface{}]interface{} `yaml:"config"`
+	Enabled    bool                        `yaml:"enabled"`
+	Name       string                      `yaml:"name"`
+	Type       string                      `yaml:"type"`
+	Config     map[interface{}]interface{} `yaml:"config,omitempty"`
+	Namespaces []ServiceNamespace          `yaml:"namespaces,omitempty"`
+}
+
+type ServiceNamespace struct {
+	Name       string   `yaml:"name"`
+	Namespaces []string `yaml:"namespaces"`
 }
 
 type AgentServiceConfig struct {
