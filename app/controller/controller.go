@@ -21,6 +21,7 @@ import (
 	"github.com/opsmx/oes-birger/pkg/ca"
 	"github.com/opsmx/oes-birger/pkg/tunnel"
 	"github.com/opsmx/oes-birger/pkg/ulid"
+	"github.com/opsmx/oes-birger/pkg/util"
 	"github.com/opsmx/oes-birger/pkg/webhook"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
@@ -32,6 +33,9 @@ const (
 )
 
 var (
+	versionBuild = -1
+	version      = util.Versions{Major: 2, Minor: 0, Patch: 1, Build: versionBuild}
+
 	configFile = flag.String("configFile", "/app/config/config.yaml", "The file with the controller config")
 
 	jwtKeyset     = jwk.NewSet()

@@ -24,9 +24,13 @@ import (
 	"github.com/opsmx/oes-birger/pkg/secrets"
 	"github.com/opsmx/oes-birger/pkg/tunnel"
 	"github.com/opsmx/oes-birger/pkg/updater"
+	"github.com/opsmx/oes-birger/pkg/util"
 )
 
 var (
+	versionBuild = -1
+	version      = util.Versions{Major: 2, Minor: 0, Patch: 1, Build: versionBuild}
+
 	tickTime   = flag.Int("tickTime", 30, "Time between sending Ping messages")
 	caCertFile = flag.String("caCertFile", "/app/config/ca.pem", "The file containing the CA certificate we will use to verify the controller's cert")
 	configFile = flag.String("configFile", "/app/config/config.yaml", "The file with the controller config")
