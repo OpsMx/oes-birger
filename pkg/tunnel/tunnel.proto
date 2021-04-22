@@ -103,6 +103,12 @@ message EndpointHealth {
     string name = 1;
     string type = 2;
     bool configured = 3;
+    repeated EndpointNamespace namespace = 4;
+}
+
+message EndpointNamespace {
+    string name = 1;
+    repeated string namespace = 2;
 }
 
 message AgentHello {
