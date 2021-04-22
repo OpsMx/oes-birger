@@ -242,7 +242,7 @@ func configureEndpoints(secretsLoader secrets.SecretLoader) {
 }
 
 func main() {
-	log.Printf("Agent version %v starting", version)
+	log.Printf("Agent version %s starting", version.String())
 
 	var err error
 
