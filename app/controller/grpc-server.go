@@ -175,6 +175,7 @@ func (s *agentTunnelServer) EventTunnel(stream tunnel.AgentTunnelService_EventTu
 					Name:       ep.Name,
 					Type:       ep.Type,
 					Configured: ep.Configured,
+					Namespaces: ep.Namespaces,
 				}
 			}
 			state.Endpoints = endpoints
