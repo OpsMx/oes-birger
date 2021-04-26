@@ -224,7 +224,7 @@ func TestGenericEndpoint_loadKubernetesSecrets(t *testing.T) {
 			"credential type bogus",
 			GenericEndpointCredentials{Type: "X", SecretName: "__t"},
 			"", "", "",
-			"unknown credential type X",
+			"unknown or unsupported credential type",
 		},
 
 		// Type 'none'

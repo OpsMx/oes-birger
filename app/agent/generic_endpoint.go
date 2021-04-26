@@ -54,16 +54,16 @@ func (ep *GenericEndpoint) loadBase64Secrets() error {
 	switch ep.config.Credentials.Type {
 	case "none", "":
 		if token != "" || username != "" || password != "" {
-			return fmt.Errorf("username, password, or token set for credential type none")
+			return fmt.Errorf("username, password, or token set for credential type 'none'")
 		}
 		ep.config.Credentials.Type = "none"
 		return nil
 	case "basic":
 		if token != "" {
-			return fmt.Errorf("token set, but credential type set to basic")
+			return fmt.Errorf("token set, but credential type set to 'basic'")
 		}
 		if username == "" || password == "" {
-			return fmt.Errorf("username or password missing for credential type basic")
+			return fmt.Errorf("username or password missing for credential type 'basic'")
 		}
 		rawUsername, err := base64.StdEncoding.DecodeString(username)
 		if err != nil {
@@ -76,12 +76,12 @@ func (ep *GenericEndpoint) loadBase64Secrets() error {
 		ep.config.Credentials.rawUsername = string(rawUsername)
 		ep.config.Credentials.rawPassword = string(rawPassword)
 		return nil
-	case "bearer":
+	case "bearer", "token":
 		if token == "" {
-			return fmt.Errorf("token missing for credential type bearer")
+			return fmt.Errorf("token missing for credential type '%s'", ep.config.Credentials.Type)
 		}
 		if username != "" || password != "" {
-			return fmt.Errorf("username or password set for credential type bearer")
+			return fmt.Errorf("username or password set for credential type '%s'", ep.config.Credentials.Type)
 		}
 		rawToken, err := base64.StdEncoding.DecodeString(token)
 		if err != nil {
@@ -125,20 +125,21 @@ func (ep *GenericEndpoint) loadKubernetesSecrets(secretsLoader secrets.SecretLoa
 		ep.config.Credentials.rawUsername = string(username)
 		ep.config.Credentials.rawPassword = string(password)
 		return nil
-	case "bearer":
+	case "bearer", "token":
+		at := ep.config.Credentials.Type
 		if hasUsername {
-			return fmt.Errorf("bearer: username should not be set in secret")
+			return fmt.Errorf("%s: username should not be set in secret", at)
 		}
 		if hasPassword {
-			return fmt.Errorf("bearer: password should not be set in secret")
+			return fmt.Errorf("%s: password should not be set in secret", at)
 		}
 		if !hasToken {
-			return fmt.Errorf("bearer: token missing in secret")
+			return fmt.Errorf("%s: token missing in secret", at)
 		}
 		ep.config.Credentials.rawToken = string(token)
 		return nil
 	default:
-		return fmt.Errorf("unknown credential type %s", ep.config.Credentials.Type)
+		return fmt.Errorf("unknown or unsupported credential type %s", ep.config.Credentials.Type)
 	}
 }
 
@@ -206,6 +207,8 @@ func (ep *GenericEndpoint) executeHTTPRequest(dataflow chan *tunnel.AgentToContr
 		httpRequest.SetBasicAuth(creds.rawUsername, creds.rawPassword)
 	case "bearer":
 		httpRequest.Header.Set("Authorization", "Bearer "+creds.rawToken)
+	case "token":
+		httpRequest.Header.Set("Authorization", "Token "+creds.rawToken)
 	}
 
 	runHTTPRequest(client, req, httpRequest, dataflow, ep.config.URL)
