@@ -78,6 +78,10 @@ func runTunnel(wg *sync.WaitGroup, sa *serverContext, conn *grpc.ClientConn, end
 		log.Fatalf("%v.EventTunnel(_) = _, %v", client, err)
 	}
 	pbEndpoints := make([]*tunnel.EndpointHealth, len(endpoints))
+	hostname, err := os.Hostname()
+	if err != nil {
+		log.Printf("Unable to get hostname: %v, using 'unknown'", err)
+	}
 	for i, ep := range endpoints {
 		endp := &tunnel.EndpointHealth{
 			Name:       ep.Name,
@@ -88,8 +92,9 @@ func runTunnel(wg *sync.WaitGroup, sa *serverContext, conn *grpc.ClientConn, end
 		pbEndpoints[i] = endp
 	}
 	helloMsg := &tunnel.AgentHello{
-		AgentVersion: version.String(),
-		Endpoints:    pbEndpoints,
+		Version:   version.String(),
+		Endpoints: pbEndpoints,
+		Hostname:  hostname,
 	}
 	hello := &tunnel.AgentToControllerWrapper{
 		Event: &tunnel.AgentToControllerWrapper_AgentHello{

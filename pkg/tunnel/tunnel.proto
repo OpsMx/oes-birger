@@ -108,7 +108,8 @@ message EndpointHealth {
 
 message AgentHello {
     repeated EndpointHealth endpoints = 1;
-    string agentVersion = 2;
+    string version = 2;
+    string hostname = 3;
 }
 
 // Messages sent from server to agent
