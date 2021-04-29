@@ -59,10 +59,14 @@ func extractEndpointFromCert(r *http.Request) (agentIdentity string, endpointTyp
 }
 
 func extractEndpointFromJWT(r *http.Request) (agentIdentity string, endpointType string, endpointName string, validated bool) {
-	var authPassword string
-	var ok bool
-	if _, authPassword, ok = r.BasicAuth(); !ok {
-		return "", "", "", false
+	authPassword := r.Header.Get("X-Opsmx-Token")
+	r.Header.Del("X-Opsmx-Token")
+
+	if authPassword == "" {
+		var ok bool
+		if _, authPassword, ok = r.BasicAuth(); !ok {
+			return "", "", "", false
+		}
 	}
 
 	endpointType, endpointName, agentIdentity, err := ValidateJWT(jwtKeyset, authPassword)
