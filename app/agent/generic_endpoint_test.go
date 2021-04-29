@@ -87,35 +87,11 @@ func TestGenericEndpoint_loadBase64Secrets(t *testing.T) {
 			"", "", "",
 			false,
 		},
-		{
-			"credential type none, username set",
-			GenericEndpointCredentials{Type: "none", Username: fooString},
-			"", "", "",
-			true,
-		},
-		{
-			"credential type none, password set",
-			GenericEndpointCredentials{Type: "none", Password: fooString},
-			"", "", "",
-			true,
-		},
-		{
-			"credential type none, token set",
-			GenericEndpointCredentials{Type: "none", Token: fooString},
-			"", "", "",
-			true,
-		},
 
 		// Type 'basic'
 		{
 			"credential type basic, nothing set",
 			GenericEndpointCredentials{Type: "basic"},
-			"", "", "",
-			true,
-		},
-		{
-			"credential type basic, token set",
-			GenericEndpointCredentials{Type: "basic", Token: bazString},
 			"", "", "",
 			true,
 		},
@@ -166,18 +142,6 @@ func TestGenericEndpoint_loadBase64Secrets(t *testing.T) {
 		{
 			"credential type bearer, token bogus",
 			GenericEndpointCredentials{Type: "bearer", Token: "X"},
-			"", "", "",
-			true,
-		},
-		{
-			"credential type bearer, username set",
-			GenericEndpointCredentials{Type: "bearer", Token: bazString, Username: fooString},
-			"", "", "",
-			true,
-		},
-		{
-			"credential type bearer, password set",
-			GenericEndpointCredentials{Type: "bearer", Token: bazString, Password: barString},
 			"", "", "",
 			true,
 		},
@@ -260,12 +224,6 @@ func TestGenericEndpoint_loadKubernetesSecrets(t *testing.T) {
 			"foo", "bar", "",
 			"",
 		},
-		{
-			"credential type basic, secretName has token",
-			GenericEndpointCredentials{Type: "basic", SecretName: "upt"},
-			"", "", "",
-			"basic: token should not be set",
-		},
 
 		// Type 'bearer'
 		{
@@ -275,22 +233,10 @@ func TestGenericEndpoint_loadKubernetesSecrets(t *testing.T) {
 			"",
 		},
 		{
-			"credential type bearer, secretName has username and token",
-			GenericEndpointCredentials{Type: "bearer", SecretName: "u_t"},
-			"", "", "",
-			"bearer: username should not be set",
-		},
-		{
 			"credential type bearer, secretName has no token",
 			GenericEndpointCredentials{Type: "bearer", SecretName: "___"},
 			"", "", "",
 			"bearer: token missing in secret",
-		},
-		{
-			"credential type bearer, secretName has password and token",
-			GenericEndpointCredentials{Type: "bearer", SecretName: "_pt"},
-			"", "", "",
-			"bearer: password should not be set",
 		},
 	}
 	for _, tt := range tests {

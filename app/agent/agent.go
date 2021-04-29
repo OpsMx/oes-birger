@@ -215,6 +215,8 @@ func configureEndpoints(secretsLoader secrets.SecretLoader) {
 			switch service.Type {
 			case "kubernetes":
 				instance, configured, err = MakeKubernetesEndpoint(service.Name, config)
+			case "aws":
+				instance, configured, err = MakeAwsEndpoint(service.Name, config, secretsLoader)
 			default:
 				instance, configured, err = MakeGenericEndpoint(service.Type, service.Name, config, secretsLoader)
 			}

@@ -53,15 +53,9 @@ func (ep *GenericEndpoint) loadBase64Secrets() error {
 
 	switch ep.config.Credentials.Type {
 	case "none", "":
-		if token != "" || username != "" || password != "" {
-			return fmt.Errorf("username, password, or token set for credential type 'none'")
-		}
 		ep.config.Credentials.Type = "none"
 		return nil
 	case "basic":
-		if token != "" {
-			return fmt.Errorf("token set, but credential type set to 'basic'")
-		}
 		if username == "" || password == "" {
 			return fmt.Errorf("username or password missing for credential type 'basic'")
 		}
@@ -80,9 +74,6 @@ func (ep *GenericEndpoint) loadBase64Secrets() error {
 		if token == "" {
 			return fmt.Errorf("token missing for credential type '%s'", ep.config.Credentials.Type)
 		}
-		if username != "" || password != "" {
-			return fmt.Errorf("username or password set for credential type '%s'", ep.config.Credentials.Type)
-		}
 		rawToken, err := base64.StdEncoding.DecodeString(token)
 		if err != nil {
 			return err
@@ -92,6 +83,11 @@ func (ep *GenericEndpoint) loadBase64Secrets() error {
 	default:
 		return fmt.Errorf("unknown credential type %s", ep.config.Credentials.Type)
 	}
+}
+
+func getItem(m *map[string][]byte, key string) ([]byte, bool) {
+	s, found := (*m)[key]
+	return s, found && len(s) > 0
 }
 
 func (ep *GenericEndpoint) loadKubernetesSecrets(secretsLoader secrets.SecretLoader) error {
@@ -104,12 +100,9 @@ func (ep *GenericEndpoint) loadKubernetesSecrets(secretsLoader secrets.SecretLoa
 		return err
 	}
 
-	token, hasToken := (*secret)["token"]
-	hasToken = hasToken && len(token) > 0
-	username, hasUsername := (*secret)["username"]
-	hasUsername = hasUsername && len(username) > 0
-	password, hasPassword := (*secret)["password"]
-	hasPassword = hasPassword && len(password) > 0
+	token, hasToken := getItem(secret, "token")
+	username, hasUsername := getItem(secret, "username")
+	password, hasPassword := getItem(secret, "password")
 
 	switch ep.config.Credentials.Type {
 	case "basic":
@@ -119,20 +112,11 @@ func (ep *GenericEndpoint) loadKubernetesSecrets(secretsLoader secrets.SecretLoa
 		if !hasPassword {
 			return fmt.Errorf("basic: password missing in secret")
 		}
-		if hasToken {
-			return fmt.Errorf("basic: token should not be set in secret")
-		}
 		ep.config.Credentials.rawUsername = string(username)
 		ep.config.Credentials.rawPassword = string(password)
 		return nil
 	case "bearer", "token":
 		at := ep.config.Credentials.Type
-		if hasUsername {
-			return fmt.Errorf("%s: username should not be set in secret", at)
-		}
-		if hasPassword {
-			return fmt.Errorf("%s: password should not be set in secret", at)
-		}
 		if !hasToken {
 			return fmt.Errorf("%s: token missing in secret", at)
 		}
