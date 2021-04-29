@@ -109,6 +109,7 @@ func (a *AwsEndpoint) executeHTTPRequest(dataflow chan *tunnel.AgentToController
 	registerCancelFunction(req.Id, cancel)
 	defer unregisterCancelFunction(req.Id)
 
+	baseURL := fmt.Sprintf("https://%s:%s", host, port)
 	actualurl := fmt.Sprintf("https://%s:%s%s", host, port, req.URI)
 
 	httpRequest, err := http.NewRequestWithContext(ctx, req.Method, actualurl, bytes.NewBuffer(req.Body))
@@ -130,5 +131,5 @@ func (a *AwsEndpoint) executeHTTPRequest(dataflow chan *tunnel.AgentToController
 	bodyBuffer := bytes.NewReader(req.Body)
 	a.signer.Sign(httpRequest, bodyBuffer, signerService, signingRegion, ts)
 
-	runHTTPRequest(client, req, httpRequest, dataflow, actualurl)
+	runHTTPRequest(client, req, httpRequest, dataflow, baseURL)
 }
