@@ -34,7 +34,11 @@ import (
 )
 
 type AwsConfig struct {
-	secretName string
+	Credentials AwsCredentials `yaml:"credentials,omitempty"`
+}
+
+type AwsCredentials struct {
+	SecretName string `yaml:"secretName,omitempty"`
 }
 
 type AwsEndpoint struct {
@@ -64,11 +68,11 @@ func MakeAwsEndpoint(name string, configBytes []byte, secretsLoader secrets.Secr
 		return nil, false, err
 	}
 
-	if config.secretName == "" {
+	if config.Credentials.SecretName == "" {
 		return k, false, fmt.Errorf("aws: secretName is not set")
 	}
 
-	secret, err := secretsLoader.GetSecret(config.secretName)
+	secret, err := secretsLoader.GetSecret(config.Credentials.SecretName)
 	if err != nil {
 		return k, false, err
 	}
