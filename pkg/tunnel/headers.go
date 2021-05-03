@@ -1,5 +1,7 @@
 package tunnel
 
+import "strings"
+
 /*
  * Copyright 2021 OpsMx, Inc.
  *
@@ -18,7 +20,7 @@ package tunnel
 
 func (t *HttpRequest) GetHeaderValue(name string) string {
 	for _, header := range t.Headers {
-		if header.Name == name {
+		if strings.EqualFold(header.Name, name) {
 			return header.Values[0]
 		}
 	}
