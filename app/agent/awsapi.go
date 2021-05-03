@@ -23,7 +23,6 @@ import (
 	"log"
 	"net/http"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws/credentials"
@@ -39,11 +38,11 @@ type AwsConfig struct {
 }
 
 type AwsCredentials struct {
+	Type       string `yaml:"type,omitempty"`
 	SecretName string `yaml:"secretName,omitempty"`
 }
 
 type AwsEndpoint struct {
-	sync.RWMutex
 	creds  *credentials.Credentials
 	signer *v4.Signer
 }
@@ -69,26 +68,32 @@ func MakeAwsEndpoint(name string, configBytes []byte, secretsLoader secrets.Secr
 		return nil, false, err
 	}
 
-	if config.Credentials.SecretName == "" {
-		return k, false, fmt.Errorf("aws: secretName is not set")
+	switch config.Credentials.Type {
+	case "kubernetes-secret":
+		if config.Credentials.SecretName == "" {
+			return k, false, fmt.Errorf("aws: secretName is not set")
+		}
+
+		secret, err := secretsLoader.GetSecret(config.Credentials.SecretName)
+		if err != nil {
+			return k, false, err
+		}
+
+		awsAccessKey, hasAwsAccessKey := getItem(secret, "awsAccessKey")
+		awsSecretAccessKey, hasAwsSecretAccessKey := getItem(secret, "awsSecretAccessKey")
+
+		if !hasAwsAccessKey {
+			return k, false, fmt.Errorf("aws: secret does not have 'awsAccessKey")
+		}
+		if !hasAwsSecretAccessKey {
+			return k, false, fmt.Errorf("aws: secret does not have 'awsSecretAccessKey")
+		}
+
+		k.creds = credentials.NewStaticCredentials(string(awsAccessKey), string(awsSecretAccessKey), "")
+	default:
+		return k, false, fmt.Errorf("aws: unknown credential type '%s'", config.Credentials.Type)
 	}
 
-	secret, err := secretsLoader.GetSecret(config.Credentials.SecretName)
-	if err != nil {
-		return k, false, err
-	}
-
-	awsAccessKey, hasAwsAccessKey := getItem(secret, "awsAccessKey")
-	awsSecretAccessKey, hasAwsSecretAccessKey := getItem(secret, "awsSecretAccessKey")
-
-	if !hasAwsAccessKey {
-		return k, false, fmt.Errorf("aws: secret does not have 'awsAccessKey")
-	}
-	if !hasAwsSecretAccessKey {
-		return k, false, fmt.Errorf("aws: secret does not have 'awsSecretAccessKey")
-	}
-
-	k.creds = credentials.NewStaticCredentials(string(awsAccessKey), string(awsSecretAccessKey), "")
 	k.signer = v4.NewSigner(k.creds)
 
 	return k, true, nil
