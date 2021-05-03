@@ -117,7 +117,7 @@ func (a *AwsEndpoint) executeHTTPRequest(dataflow chan *tunnel.AgentToController
 
 	ts, err := time.Parse(awsTimeFormat, timestamp)
 	if err != nil {
-		panic(err)
+		ts = time.Now()
 	}
 
 	if len(host) == 0 || len(port) == 0 || len(signerService) == 0 || len(signingRegion) == 0 || len(timestamp) == 0 {
