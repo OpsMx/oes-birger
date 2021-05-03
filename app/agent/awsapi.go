@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -140,7 +141,8 @@ func (a *AwsEndpoint) executeHTTPRequest(dataflow chan *tunnel.AgentToController
 	}
 
 	for _, header := range req.Headers {
-		if skip, found := stripHeaders[header.Name]; found && skip {
+		targetName := strings.ToLower(header.Name)
+		if skip, found := stripHeaders[targetName]; found && skip {
 			continue
 		}
 		for _, value := range header.Values {
