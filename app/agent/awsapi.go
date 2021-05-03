@@ -26,6 +26,9 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/aws/credentials/ec2rolecreds"
+	"github.com/aws/aws-sdk-go/aws/ec2metadata"
+	"github.com/aws/aws-sdk-go/aws/session"
 	v4 "github.com/aws/aws-sdk-go/aws/signer/v4"
 	"github.com/opsmx/oes-birger/pkg/secrets"
 	"github.com/opsmx/oes-birger/pkg/tunnel"
@@ -90,6 +93,12 @@ func MakeAwsEndpoint(name string, configBytes []byte, secretsLoader secrets.Secr
 		}
 
 		k.creds = credentials.NewStaticCredentials(string(awsAccessKey), string(awsSecretAccessKey), "")
+	case "iam":
+		sess, err := session.NewSession()
+		if err != nil {
+			return k, false, err
+		}
+		k.creds = credentials.NewCredentials(&ec2rolecreds.EC2RoleProvider{Client: ec2metadata.New(sess)})
 	default:
 		return k, false, fmt.Errorf("aws: unknown credential type '%s'", config.Credentials.Type)
 	}
