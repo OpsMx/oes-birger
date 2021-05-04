@@ -226,10 +226,27 @@ func cncGenerateServiceCredentials(w http.ResponseWriter, r *http.Request) {
 		AgentName: req.AgentName,
 		Name:      req.Name,
 		Type:      req.Type,
-		Username:  fmt.Sprintf("%s.%s", req.Name, req.AgentName),
-		Password:  token,
 		URL:       config.getServiceURL(),
 		CACert:    authority.GetCACert(),
+	}
+
+	username := fmt.Sprintf("%s.%s", req.Name, req.AgentName)
+
+	switch req.Type {
+	case "aws":
+		ret.CredentialType = "aws"
+		ret.Credential = fwdapi.AwsCredentialResponse{
+			AwsAccessKey:       username,
+			AwsSecretAccessKey: token,
+		}
+	default:
+		ret.Username = username // deprecated
+		ret.Password = token    // deprecated
+		ret.CredentialType = "basic"
+		ret.Credential = fwdapi.BasicCredentialResponse{
+			Username: username,
+			Password: token,
+		}
 	}
 	json, err := json.Marshal(ret)
 	if err != nil {

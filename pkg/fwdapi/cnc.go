@@ -28,33 +28,33 @@ const (
 /// KUBECONFIG_ENDPOINT
 ///
 type KubeConfigRequest struct {
-	AgentName string `json:"agentName"`
-	Name      string `json:"name"`
+	AgentName string `json:"agentName,omitempty"`
+	Name      string `json:"name,omitempty"`
 }
 
 type KubeConfigResponse struct {
-	AgentName       string `json:"agentName"`
-	Name            string `json:"name"`
-	ServerURL       string `json:"serverUrl"`
-	UserCertificate string `json:"userCertificate"`
-	UserKey         string `json:"userKey"`
-	CACert          string `json:"caCert"`
+	AgentName       string `json:"agentName,omitempty"`
+	Name            string `json:"name,omitempty"`
+	ServerURL       string `json:"serverUrl,omitempty"`
+	UserCertificate string `json:"userCertificate,omitempty"`
+	UserKey         string `json:"userKey,omitempty"`
+	CACert          string `json:"caCert,omitempty"`
 }
 
 ///
 /// MANIFEST_ENDPOINT
 ///
 type ManifestRequest struct {
-	AgentName string `json:"agentName"`
+	AgentName string `json:"agentName,omitempty"`
 }
 
 type ManifestResponse struct {
-	AgentName        string `json:"agentName"`
-	ServerHostname   string `json:"serverHostname"`
-	ServerPort       uint16 `json:"serverPort"`
-	AgentCertificate string `json:"agentCertificate"`
-	AgentKey         string `json:"agentKey"`
-	CACert           string `json:"caCert"`
+	AgentName        string `json:"agentName,omitempty"`
+	ServerHostname   string `json:"serverHostname,omitempty"`
+	ServerPort       uint16 `json:"serverPort,omitempty"`
+	AgentCertificate string `json:"agentCertificate,omitempty"`
+	AgentKey         string `json:"agentKey,omitempty"`
+	CACert           string `json:"caCert,omitempty"`
 }
 
 ///
@@ -76,13 +76,25 @@ type ServiceCredentialRequest struct {
 }
 
 type ServiceCredentialResponse struct {
-	AgentName string `json:"agentName,omitempty"`
-	Name      string `json:"name,omitempty"`
-	Type      string `json:"type,omitempty"`
-	Username  string `json:"username,omitempty"`
-	Password  string `json:"password,omitempty"`
-	URL       string `json:"url,omitempty"`
-	CACert    string `json:"caCert"`
+	AgentName      string      `json:"agentName,omitempty"`
+	Name           string      `json:"name,omitempty"`
+	Type           string      `json:"type,omitempty"`
+	Username       string      `json:"username,omitempty"`
+	Password       string      `json:"password,omitempty"`
+	CredentialType string      `json:"credentialType,omitempty"`
+	Credential     interface{} `json:"credential,omitempty"`
+	URL            string      `json:"url,omitempty"`
+	CACert         string      `json:"caCert,omitempty"`
+}
+
+type BasicCredentialResponse struct {
+	Username string `json:"username,omitempty"`
+	Password string `json:"password,omitempty"`
+}
+
+type AwsCredentialResponse struct {
+	AwsAccessKey       string `json:"awsAccessKey,omitempty"`
+	AwsSecretAccessKey string `json:"awsSecretAccessKey,omitempty"`
 }
 
 ///
