@@ -3,7 +3,7 @@ module github.com/opsmx/oes-birger
 go 1.16
 
 require (
-	github.com/aws/aws-sdk-go v1.38.28 // indirect
+	github.com/aws/aws-sdk-go v1.38.28
 	github.com/go-resty/resty/v2 v2.6.0
 	github.com/goccy/go-json v0.4.11 // indirect
 	github.com/golang/protobuf v1.5.2
