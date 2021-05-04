@@ -130,16 +130,27 @@ func (c *ControllerConfig) addIfMissing(target *string, reason string) {
 func (c *ControllerConfig) addAllHostnames() {
 	c.addIfMissing(c.AgentHostname, "agentHostname")
 	c.addIfMissing(c.ControlHostname, "commandHostname")
-	c.addIfMissing(c.ServiceHostname, "ServiceBaseHostname")
+	c.addIfMissing(c.ServiceHostname, "serviceHostname")
 	c.addIfMissing(c.RemoteCommandHostname, "cmdToolHostname")
 }
 
-func (c *ControllerConfig) getServiceURL() string {
+func (c *ControllerConfig) GetServiceURL() string {
 	return fmt.Sprintf("https://%s:%d", *c.ServiceHostname, c.ServiceListenPort)
 }
 
-func (c *ControllerConfig) getControlURL() string {
+func (c *ControllerConfig) GetControlURL() string {
 	return fmt.Sprintf("https://%s:%d", *c.ControlHostname, c.ControlListenPort)
+}
+
+func (c *ControllerConfig) GetAgentAdvertisePort() uint16 {
+	return c.AgentAdvertisePort
+}
+
+func (c *ControllerConfig) GetAgentHostname() string {
+	return *c.AgentHostname
+}
+func (c *ControllerConfig) GetControlListenPort() uint16 {
+	return c.ControlListenPort
 }
 
 //
@@ -154,7 +165,7 @@ func (c *ControllerConfig) Dump() {
 	log.Printf("Service hostname: %s, port: %d",
 		*c.ServiceHostname, c.ServiceListenPort)
 	log.Printf("URL returned for kubectl components: %s",
-		c.getServiceURL())
+		c.GetServiceURL())
 	log.Printf("Agent hostname: %s, port %d (advertised %d)",
 		*c.AgentHostname, c.AgentListenPort, c.AgentAdvertisePort)
 	log.Printf("Control hostname: %s, port %d",

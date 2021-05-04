@@ -30,7 +30,23 @@ import (
 	"github.com/opsmx/oes-birger/pkg/fwdapi"
 )
 
-type CNCServer struct{}
+type CNCConfig interface {
+	GetAgentHostname() string
+	GetAgentAdvertisePort() uint16
+	GetServiceURL() string
+	GetControlURL() string
+	GetControlListenPort() uint16
+}
+
+type CNCServer struct {
+	cfg CNCConfig
+}
+
+func MakeCNCServer(config CNCConfig) *CNCServer {
+	return &CNCServer{
+		cfg: config,
+	}
+}
 
 func (c *CNCServer) authenticate(method string, h http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -94,7 +110,7 @@ func (s *CNCServer) generateKubectlComponents() http.HandlerFunc {
 		ret := fwdapi.KubeConfigResponse{
 			AgentName:       req.AgentName,
 			Name:            req.Name,
-			ServerURL:       config.getServiceURL(),
+			ServerURL:       s.cfg.GetServiceURL(),
 			UserCertificate: user64,
 			UserKey:         key64,
 			CACert:          ca64,
@@ -136,8 +152,8 @@ func (s *CNCServer) generateAgentManifestComponents() http.HandlerFunc {
 		}
 		ret := fwdapi.ManifestResponse{
 			AgentName:        req.AgentName,
-			ServerHostname:   *config.AgentHostname,
-			ServerPort:       config.AgentAdvertisePort,
+			ServerHostname:   s.cfg.GetAgentHostname(),
+			ServerPort:       s.cfg.GetAgentAdvertisePort(),
 			AgentCertificate: user64,
 			AgentKey:         key64,
 			CACert:           ca64,
@@ -204,7 +220,7 @@ func (s *CNCServer) generateServiceCredentials() http.HandlerFunc {
 			AgentName: req.AgentName,
 			Name:      req.Name,
 			Type:      req.Type,
-			URL:       config.getServiceURL(),
+			URL:       s.cfg.GetServiceURL(),
 			CACert:    authority.GetCACert(),
 		}
 
@@ -257,7 +273,7 @@ func (s *CNCServer) generateControlCredentials() http.HandlerFunc {
 		}
 		ret := fwdapi.ControlCredentialsResponse{
 			Name:        req.Name,
-			URL:         config.getControlURL(),
+			URL:         s.cfg.GetControlURL(),
 			Certificate: user64,
 			Key:         key64,
 			CACert:      ca64,
@@ -289,8 +305,9 @@ func (s *CNCServer) routes(mux *http.ServeMux) {
 
 }
 
-func (s *CNCServer) runCommandHTTPServer(port uint16, serverCert tls.Certificate) {
-	log.Printf("Running Command and Control API HTTPS listener on port %d", port)
+func (s *CNCServer) runCommandHTTPServer(serverCert tls.Certificate) {
+	log.Printf("Running Command and Control API HTTPS listener on port %d",
+		s.cfg.GetControlListenPort())
 
 	certPool, err := authority.MakeCertPool()
 	if err != nil {
@@ -309,7 +326,7 @@ func (s *CNCServer) runCommandHTTPServer(port uint16, serverCert tls.Certificate
 	s.routes(mux)
 
 	srv := &http.Server{
-		Addr:      fmt.Sprintf(":%d", port),
+		Addr:      fmt.Sprintf(":%d", s.cfg.GetControlListenPort()),
 		TLSConfig: tlsConfig,
 		Handler:   mux,
 	}
