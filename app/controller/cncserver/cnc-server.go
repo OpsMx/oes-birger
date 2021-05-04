@@ -51,7 +51,7 @@ type cncAgentStatsReporter interface {
 
 type cncServer struct {
 	cfg           cncConfig
-	ca            cncCertificateAuthority
+	authority     cncCertificateAuthority
 	agentReporter cncAgentStatsReporter
 	jwkKeyset     jwk.Set
 	jwtCurrentKey string
@@ -66,10 +66,9 @@ func MakeCNCServer(
 	currentKey string,
 	vers string,
 ) *cncServer {
-
 	return &cncServer{
 		cfg:           config,
-		ca:            authority,
+		authority:     authority,
 		agentReporter: agents,
 		jwkKeyset:     jwkset,
 		jwtCurrentKey: currentKey,
@@ -131,7 +130,7 @@ func (s *cncServer) generateKubectlComponents() http.HandlerFunc {
 			Agent:   req.AgentName,
 			Purpose: ca.CertificatePurposeService,
 		}
-		ca64, user64, key64, err := s.ca.GenerateCertificate(name)
+		ca64, user64, key64, err := s.authority.GenerateCertificate(name)
 		if err != nil {
 			util.FailRequest(w, err, http.StatusBadRequest)
 			return
@@ -174,7 +173,7 @@ func (s *cncServer) generateAgentManifestComponents() http.HandlerFunc {
 			Agent:   req.AgentName,
 			Purpose: ca.CertificatePurposeAgent,
 		}
-		ca64, user64, key64, err := s.ca.GenerateCertificate(name)
+		ca64, user64, key64, err := s.authority.GenerateCertificate(name)
 		if err != nil {
 			util.FailRequest(w, err, http.StatusBadRequest)
 			return
@@ -250,7 +249,7 @@ func (s *cncServer) generateServiceCredentials() http.HandlerFunc {
 			Name:      req.Name,
 			Type:      req.Type,
 			URL:       s.cfg.GetServiceURL(),
-			CACert:    s.ca.GetCACert(),
+			CACert:    s.authority.GetCACert(),
 		}
 
 		username := fmt.Sprintf("%s.%s", req.Name, req.AgentName)
@@ -295,7 +294,7 @@ func (s *cncServer) generateControlCredentials() http.HandlerFunc {
 			Name:    req.Name,
 			Purpose: ca.CertificatePurposeAgent,
 		}
-		ca64, user64, key64, err := s.ca.GenerateCertificate(name)
+		ca64, user64, key64, err := s.authority.GenerateCertificate(name)
 		if err != nil {
 			util.FailRequest(w, err, http.StatusBadRequest)
 			return
@@ -338,7 +337,7 @@ func (s *cncServer) RunServer(serverCert tls.Certificate) {
 	log.Printf("Running Command and Control API HTTPS listener on port %d",
 		s.cfg.GetControlListenPort())
 
-	certPool, err := s.ca.MakeCertPool()
+	certPool, err := s.authority.MakeCertPool()
 	if err != nil {
 		log.Fatalf("While making certpool: %v", err)
 	}
