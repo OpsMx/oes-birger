@@ -1,4 +1,4 @@
-package main
+package cncserver
 
 import (
 	"crypto/x509"
@@ -60,7 +60,7 @@ func TestCNCServer_authenticate(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c := MakeCNCServer(nil, nil)
+			c := MakeCNCServer(nil, nil, nil, nil, "", "")
 			h := handlerTracker{}
 			r := httptest.NewRequest("GET", "https://localhost/statistics", nil)
 			r.TLS.PeerCertificates = []*x509.Certificate{tt.cert}

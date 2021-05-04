@@ -1,4 +1,4 @@
-package main
+package cncserver
 
 /*
  * Copyright 2021 OpsMx, Inc.
@@ -28,6 +28,8 @@ import (
 	"github.com/oklog/ulid/v2"
 	"github.com/opsmx/oes-birger/pkg/ca"
 	"github.com/opsmx/oes-birger/pkg/fwdapi"
+	"github.com/opsmx/oes-birger/pkg/jwtutil"
+	"github.com/opsmx/oes-birger/pkg/util"
 )
 
 type cncCertificateAuthority interface {
@@ -43,15 +45,35 @@ type cncConfig interface {
 	GetControlListenPort() uint16
 }
 
-type cncServer struct {
-	cfg cncConfig
-	ca  cncCertificateAuthority
+type cncAgentStatsReporter interface {
+	GetStatistics() interface{}
 }
 
-func MakeCNCServer(config cncConfig, authority cncCertificateAuthority) *cncServer {
+type cncServer struct {
+	cfg           cncConfig
+	ca            cncCertificateAuthority
+	agentReporter cncAgentStatsReporter
+	jwkKeyset     jwk.Set
+	jwtCurrentKey string
+	version       string
+}
+
+func MakeCNCServer(
+	config cncConfig,
+	authority cncCertificateAuthority,
+	agents cncAgentStatsReporter,
+	jwkset jwk.Set,
+	currentKey string,
+	vers string,
+) *cncServer {
+
 	return &cncServer{
-		cfg: config,
-		ca:  authority,
+		cfg:           config,
+		ca:            authority,
+		agentReporter: agents,
+		jwkKeyset:     jwkset,
+		jwtCurrentKey: currentKey,
+		version:       vers,
 	}
 }
 
@@ -59,18 +81,18 @@ func (c *cncServer) authenticate(method string, h http.HandlerFunc) http.Handler
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != method {
 			err := fmt.Errorf("only '%s' is accepted (not '%s')", method, r.Method)
-			failrequest(w, err, http.StatusMethodNotAllowed)
+			util.FailRequest(w, err, http.StatusMethodNotAllowed)
 			return
 		}
 
 		names, err := ca.GetCertificateNameFromCert(r.TLS.PeerCertificates[0])
 		if err != nil {
-			failrequest(w, err, http.StatusForbidden)
+			util.FailRequest(w, err, http.StatusForbidden)
 			return
 		}
 		if names.Purpose != ca.CertificatePurposeControl {
 			err := fmt.Errorf("certificate is not authorized for 'control': %s", names.Purpose)
-			failrequest(w, err, http.StatusForbidden)
+			util.FailRequest(w, err, http.StatusForbidden)
 			return
 		}
 
@@ -99,7 +121,7 @@ func (s *cncServer) generateKubectlComponents() http.HandlerFunc {
 
 		req, err := s.decodeKubectlRequest(r.Body)
 		if err != nil {
-			failrequest(w, err, http.StatusBadRequest)
+			util.FailRequest(w, err, http.StatusBadRequest)
 			return
 		}
 
@@ -111,7 +133,7 @@ func (s *cncServer) generateKubectlComponents() http.HandlerFunc {
 		}
 		ca64, user64, key64, err := s.ca.GenerateCertificate(name)
 		if err != nil {
-			failrequest(w, err, http.StatusBadRequest)
+			util.FailRequest(w, err, http.StatusBadRequest)
 			return
 		}
 		ret := fwdapi.KubeConfigResponse{
@@ -124,7 +146,7 @@ func (s *cncServer) generateKubectlComponents() http.HandlerFunc {
 		}
 		json, err := json.Marshal(ret)
 		if err != nil {
-			failrequest(w, err, http.StatusBadRequest)
+			util.FailRequest(w, err, http.StatusBadRequest)
 			return
 		}
 		w.Write(json)
@@ -138,13 +160,13 @@ func (s *cncServer) generateAgentManifestComponents() http.HandlerFunc {
 		var req fwdapi.ManifestRequest
 		err := json.NewDecoder(r.Body).Decode(&req)
 		if err != nil {
-			failrequest(w, err, http.StatusBadRequest)
+			util.FailRequest(w, err, http.StatusBadRequest)
 			return
 		}
 
 		err = req.Validate()
 		if err != nil {
-			failrequest(w, err, http.StatusBadRequest)
+			util.FailRequest(w, err, http.StatusBadRequest)
 			return
 		}
 
@@ -154,7 +176,7 @@ func (s *cncServer) generateAgentManifestComponents() http.HandlerFunc {
 		}
 		ca64, user64, key64, err := s.ca.GenerateCertificate(name)
 		if err != nil {
-			failrequest(w, err, http.StatusBadRequest)
+			util.FailRequest(w, err, http.StatusBadRequest)
 			return
 		}
 		ret := fwdapi.ManifestResponse{
@@ -167,7 +189,7 @@ func (s *cncServer) generateAgentManifestComponents() http.HandlerFunc {
 		}
 		json, err := json.Marshal(ret)
 		if err != nil {
-			failrequest(w, err, http.StatusBadRequest)
+			util.FailRequest(w, err, http.StatusBadRequest)
 			return
 		}
 		w.Write(json)
@@ -180,12 +202,12 @@ func (s *cncServer) getStatistics() http.HandlerFunc {
 
 		ret := fwdapi.StatisticsResponse{
 			ServerTime:      ulid.Now(),
-			Version:         version.String(),
-			ConnectedAgents: agents.GetStatistics(),
+			Version:         s.version,
+			ConnectedAgents: s.agentReporter.GetStatistics(),
 		}
 		json, err := json.Marshal(ret)
 		if err != nil {
-			failrequest(w, err, http.StatusBadRequest)
+			util.FailRequest(w, err, http.StatusBadRequest)
 			return
 		}
 		w.Write(json)
@@ -199,27 +221,27 @@ func (s *cncServer) generateServiceCredentials() http.HandlerFunc {
 		var req fwdapi.ServiceCredentialRequest
 		err := json.NewDecoder(r.Body).Decode(&req)
 		if err != nil {
-			failrequest(w, err, http.StatusBadRequest)
+			util.FailRequest(w, err, http.StatusBadRequest)
 			return
 		}
 
 		err = req.Validate()
 		if err != nil {
-			failrequest(w, err, http.StatusBadRequest)
+			util.FailRequest(w, err, http.StatusBadRequest)
 			return
 		}
 
 		var key jwk.Key
 		var ok bool
-		if key, ok = jwtKeyset.LookupKeyID(jwtCurrentKey); !ok {
-			err := fmt.Errorf("unable to find service key '%s'", jwtCurrentKey)
-			failrequest(w, err, http.StatusBadRequest)
+		if key, ok = s.jwkKeyset.LookupKeyID(s.jwtCurrentKey); !ok {
+			err := fmt.Errorf("unable to find service key '%s'", s.jwtCurrentKey)
+			util.FailRequest(w, err, http.StatusBadRequest)
 			return
 		}
 
-		token, err := MakeJWT(key, req.Type, req.Name, req.AgentName)
+		token, err := jwtutil.MakeJWT(key, req.Type, req.Name, req.AgentName)
 		if err != nil {
-			failrequest(w, err, http.StatusBadRequest)
+			util.FailRequest(w, err, http.StatusBadRequest)
 			return
 		}
 
@@ -251,7 +273,7 @@ func (s *cncServer) generateServiceCredentials() http.HandlerFunc {
 		}
 		json, err := json.Marshal(ret)
 		if err != nil {
-			failrequest(w, err, http.StatusBadRequest)
+			util.FailRequest(w, err, http.StatusBadRequest)
 			return
 		}
 		w.Write(json)
@@ -265,7 +287,7 @@ func (s *cncServer) generateControlCredentials() http.HandlerFunc {
 		var req fwdapi.ControlCredentialsRequest
 		err := json.NewDecoder(r.Body).Decode(&req)
 		if err != nil {
-			failrequest(w, err, http.StatusBadRequest)
+			util.FailRequest(w, err, http.StatusBadRequest)
 			return
 		}
 
@@ -275,7 +297,7 @@ func (s *cncServer) generateControlCredentials() http.HandlerFunc {
 		}
 		ca64, user64, key64, err := s.ca.GenerateCertificate(name)
 		if err != nil {
-			failrequest(w, err, http.StatusBadRequest)
+			util.FailRequest(w, err, http.StatusBadRequest)
 			return
 		}
 		ret := fwdapi.ControlCredentialsResponse{
@@ -287,7 +309,7 @@ func (s *cncServer) generateControlCredentials() http.HandlerFunc {
 		}
 		json, err := json.Marshal(ret)
 		if err != nil {
-			failrequest(w, err, http.StatusBadRequest)
+			util.FailRequest(w, err, http.StatusBadRequest)
 			return
 		}
 		w.Write(json)
@@ -312,11 +334,11 @@ func (s *cncServer) routes(mux *http.ServeMux) {
 
 }
 
-func (s *cncServer) runCommandHTTPServer(serverCert tls.Certificate) {
+func (s *cncServer) RunServer(serverCert tls.Certificate) {
 	log.Printf("Running Command and Control API HTTPS listener on port %d",
 		s.cfg.GetControlListenPort())
 
-	certPool, err := authority.MakeCertPool()
+	certPool, err := s.ca.MakeCertPool()
 	if err != nil {
 		log.Fatalf("While making certpool: %v", err)
 	}

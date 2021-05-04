@@ -34,6 +34,7 @@ import (
 
 	"github.com/lestrrat-go/jwx/jwk"
 	"github.com/opsmx/oes-birger/app/controller/agent"
+	"github.com/opsmx/oes-birger/app/controller/cncserver"
 	"github.com/opsmx/oes-birger/pkg/ca"
 	"github.com/opsmx/oes-birger/pkg/tunnel"
 	"github.com/opsmx/oes-birger/pkg/ulid"
@@ -244,7 +245,8 @@ func main() {
 
 	go runHTTPSServer(*serverCert)
 
-	go MakeCNCServer(config, authority).runCommandHTTPServer(*serverCert)
+	cnc := cncserver.MakeCNCServer(config, authority, agents, jwtKeyset, jwtCurrentKey, version.String())
+	go cnc.RunServer(*serverCert)
 
 	go runCmdToolGRPCServer(*serverCert)
 

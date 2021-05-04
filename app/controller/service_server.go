@@ -25,7 +25,9 @@ import (
 
 	"github.com/opsmx/oes-birger/app/controller/agent"
 	"github.com/opsmx/oes-birger/pkg/ca"
+	"github.com/opsmx/oes-birger/pkg/jwtutil"
 	"github.com/opsmx/oes-birger/pkg/tunnel"
+	"github.com/opsmx/oes-birger/pkg/util"
 )
 
 func runHTTPSServer(serverCert tls.Certificate) {
@@ -85,7 +87,7 @@ func extractEndpointFromJWT(r *http.Request) (agentIdentity string, endpointType
 		}
 	}
 
-	endpointType, endpointName, agentIdentity, err := ValidateJWT(jwtKeyset, authPassword)
+	endpointType, endpointName, agentIdentity, err := jwtutil.ValidateJWT(jwtKeyset, authPassword)
 	if err != nil {
 		log.Printf("%v", err)
 		return "", "", "", false
@@ -111,7 +113,7 @@ func extractEndpoint(r *http.Request) (agentIdentity string, endpointType string
 func serviceAPIHandler(w http.ResponseWriter, r *http.Request) {
 	agentIdentity, endpointType, endpointName, err := extractEndpoint(r)
 	if err != nil {
-		w.Write(httpError(err))
+		w.Write(util.HTTPError(err))
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}

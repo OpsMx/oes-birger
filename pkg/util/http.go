@@ -1,4 +1,4 @@
-package main
+package util
 
 /*
  * Copyright 2021 OpsMx, Inc.
@@ -24,7 +24,7 @@ import (
 	"github.com/opsmx/oes-birger/pkg/fwdapi"
 )
 
-func httpError(err error) []byte {
+func HTTPError(err error) []byte {
 	ret := &fwdapi.HttpErrorResponse{
 		Error: &fwdapi.HttpErrorMessage{
 			Message: fmt.Sprintf("Unable to process request: %v", err),
@@ -37,7 +37,7 @@ func httpError(err error) []byte {
 	return json
 }
 
-func failrequest(w http.ResponseWriter, err error, code int) {
-	w.Write(httpError(err))
+func FailRequest(w http.ResponseWriter, err error, code int) {
+	w.Write(HTTPError(err))
 	w.WriteHeader(code)
 }

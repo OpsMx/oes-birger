@@ -1,4 +1,4 @@
-package main
+package jwtutil
 
 /*
  * Copyright 2021 OpsMx.
