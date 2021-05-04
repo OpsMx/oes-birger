@@ -243,8 +243,13 @@ func main() {
 	}
 
 	go runHTTPSServer(*serverCert)
-	go runCommandHTTPServer(*serverCert)
+
+	cncserver := &CNCServer{}
+	go cncserver.runCommandHTTPServer(config.ControlListenPort, *serverCert)
+
 	go runCmdToolGRPCServer(*serverCert)
+
 	go runAgentGRPCServer(*serverCert)
+
 	runPrometheusHTTPServer(config.PrometheusListenPort)
 }

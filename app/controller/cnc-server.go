@@ -30,34 +30,32 @@ import (
 	"github.com/opsmx/oes-birger/pkg/fwdapi"
 )
 
-func authenticate(r *http.Request, method string) (int, error) {
-	names, err := ca.GetCertificateNameFromCert(r.TLS.PeerCertificates[0])
-	if err != nil {
-		return http.StatusForbidden, err
+type CNCServer struct{}
+
+func (c *CNCServer) authenticate(method string, h http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != method {
+			err := fmt.Errorf("only '%s' is accepted (not '%s')", method, r.Method)
+			failrequest(w, err, http.StatusMethodNotAllowed)
+			return
+		}
+
+		names, err := ca.GetCertificateNameFromCert(r.TLS.PeerCertificates[0])
+		if err != nil {
+			failrequest(w, err, http.StatusForbidden)
+			return
+		}
+		if names.Purpose != ca.CertificatePurposeControl {
+			err := fmt.Errorf("certificate is not authorized for 'control': %v", names)
+			failrequest(w, err, http.StatusForbidden)
+			return
+		}
+
+		h(w, r)
 	}
-	if names.Purpose != ca.CertificatePurposeControl {
-		return http.StatusForbidden, fmt.Errorf("certificate is not authorized for 'control': %v", names)
-	}
-	if r.Method != method {
-		return http.StatusMethodNotAllowed, fmt.Errorf("only '%s' is accepted (not '%s')", method, r.Method)
-	}
-	return -1, nil
 }
 
-func httpError(err error) []byte {
-	ret := &fwdapi.HttpErrorResponse{
-		Error: &fwdapi.HttpErrorMessage{
-			Message: fmt.Sprintf("Unable to process request: %v", err),
-		},
-	}
-	json, err := json.Marshal(ret)
-	if err != nil {
-		return []byte(`{"error":{"message":"Unknown Error"}}`)
-	}
-	return json
-}
-
-func cncDecodeKubectlRequest(j io.Reader) (*fwdapi.KubeConfigRequest, error) {
+func (s *CNCServer) decodeKubectlRequest(j io.Reader) (*fwdapi.KubeConfigRequest, error) {
 	var req fwdapi.KubeConfigRequest
 	err := json.NewDecoder(j).Decode(&req)
 	if err != nil {
@@ -72,230 +70,227 @@ func cncDecodeKubectlRequest(j io.Reader) (*fwdapi.KubeConfigRequest, error) {
 	return &req, nil
 }
 
-func failrequest(w http.ResponseWriter, err error, code int) {
-	w.Write(httpError(err))
-	w.WriteHeader(code)
-}
+func (s *CNCServer) generateKubectlComponents() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("content-type", "application/json")
 
-func cncGenerateKubectlComponents(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("content-type", "application/json")
-	statusCode, err := authenticate(r, "POST")
-	if err != nil {
-		failrequest(w, err, statusCode)
-		return
-	}
-
-	req, err := cncDecodeKubectlRequest(r.Body)
-	if err != nil {
-		failrequest(w, err, http.StatusBadRequest)
-		return
-	}
-
-	name := ca.CertificateName{
-		Name:    req.Name,
-		Type:    "kubernetes",
-		Agent:   req.AgentName,
-		Purpose: ca.CertificatePurposeService,
-	}
-	ca64, user64, key64, err := authority.GenerateCertificate(name)
-	if err != nil {
-		failrequest(w, err, http.StatusBadRequest)
-		return
-	}
-	ret := fwdapi.KubeConfigResponse{
-		AgentName:       req.AgentName,
-		Name:            req.Name,
-		ServerURL:       config.getServiceURL(),
-		UserCertificate: user64,
-		UserKey:         key64,
-		CACert:          ca64,
-	}
-	json, err := json.Marshal(ret)
-	if err != nil {
-		failrequest(w, err, http.StatusBadRequest)
-		return
-	}
-	w.Write(json)
-}
-
-func cncGenerateAgentManifestComponents(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("content-type", "application/json")
-	statusCode, err := authenticate(r, "POST")
-	if err != nil {
-		failrequest(w, err, statusCode)
-		return
-	}
-
-	var req fwdapi.ManifestRequest
-	err = json.NewDecoder(r.Body).Decode(&req)
-	if err != nil {
-		failrequest(w, err, http.StatusBadRequest)
-		return
-	}
-
-	err = req.Validate()
-	if err != nil {
-		failrequest(w, err, http.StatusBadRequest)
-		return
-	}
-
-	name := ca.CertificateName{
-		Agent:   req.AgentName,
-		Purpose: ca.CertificatePurposeAgent,
-	}
-	ca64, user64, key64, err := authority.GenerateCertificate(name)
-	if err != nil {
-		failrequest(w, err, http.StatusBadRequest)
-		return
-	}
-	ret := fwdapi.ManifestResponse{
-		AgentName:        req.AgentName,
-		ServerHostname:   *config.AgentHostname,
-		ServerPort:       config.AgentAdvertisePort,
-		AgentCertificate: user64,
-		AgentKey:         key64,
-		CACert:           ca64,
-	}
-	json, err := json.Marshal(ret)
-	if err != nil {
-		failrequest(w, err, http.StatusBadRequest)
-		return
-	}
-	w.Write(json)
-}
-
-func cncGetStatistics(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("content-type", "application/json")
-	statusCode, err := authenticate(r, "GET")
-	if err != nil {
-		failrequest(w, err, statusCode)
-		return
-	}
-
-	ret := fwdapi.StatisticsResponse{
-		ServerTime:      ulid.Now(),
-		Version:         version.String(),
-		ConnectedAgents: agents.GetStatistics(),
-	}
-	json, err := json.Marshal(ret)
-	if err != nil {
-		failrequest(w, err, http.StatusBadRequest)
-		return
-	}
-	w.Write(json)
-}
-
-func cncGenerateServiceCredentials(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("content-type", "application/json")
-	statusCode, err := authenticate(r, "POST")
-	if err != nil {
-		failrequest(w, err, statusCode)
-		return
-	}
-
-	var req fwdapi.ServiceCredentialRequest
-	err = json.NewDecoder(r.Body).Decode(&req)
-	if err != nil {
-		failrequest(w, err, http.StatusBadRequest)
-		return
-	}
-
-	err = req.Validate()
-	if err != nil {
-		failrequest(w, err, http.StatusBadRequest)
-		return
-	}
-
-	var key jwk.Key
-	var ok bool
-	if key, ok = jwtKeyset.LookupKeyID(jwtCurrentKey); !ok {
-		err := fmt.Errorf("unable to find service key '%s'", jwtCurrentKey)
-		failrequest(w, err, http.StatusBadRequest)
-		return
-	}
-
-	token, err := MakeJWT(key, req.Type, req.Name, req.AgentName)
-	if err != nil {
-		failrequest(w, err, statusCode)
-		return
-	}
-
-	ret := fwdapi.ServiceCredentialResponse{
-		AgentName: req.AgentName,
-		Name:      req.Name,
-		Type:      req.Type,
-		URL:       config.getServiceURL(),
-		CACert:    authority.GetCACert(),
-	}
-
-	username := fmt.Sprintf("%s.%s", req.Name, req.AgentName)
-
-	switch req.Type {
-	case "aws":
-		ret.CredentialType = "aws"
-		ret.Credential = fwdapi.AwsCredentialResponse{
-			AwsAccessKey:       username,
-			AwsSecretAccessKey: token,
+		req, err := s.decodeKubectlRequest(r.Body)
+		if err != nil {
+			failrequest(w, err, http.StatusBadRequest)
+			return
 		}
-	default:
-		ret.Username = username // deprecated
-		ret.Password = token    // deprecated
-		ret.CredentialType = "basic"
-		ret.Credential = fwdapi.BasicCredentialResponse{
-			Username: username,
-			Password: token,
+
+		name := ca.CertificateName{
+			Name:    req.Name,
+			Type:    "kubernetes",
+			Agent:   req.AgentName,
+			Purpose: ca.CertificatePurposeService,
 		}
+		ca64, user64, key64, err := authority.GenerateCertificate(name)
+		if err != nil {
+			failrequest(w, err, http.StatusBadRequest)
+			return
+		}
+		ret := fwdapi.KubeConfigResponse{
+			AgentName:       req.AgentName,
+			Name:            req.Name,
+			ServerURL:       config.getServiceURL(),
+			UserCertificate: user64,
+			UserKey:         key64,
+			CACert:          ca64,
+		}
+		json, err := json.Marshal(ret)
+		if err != nil {
+			failrequest(w, err, http.StatusBadRequest)
+			return
+		}
+		w.Write(json)
 	}
-	json, err := json.Marshal(ret)
-	if err != nil {
-		failrequest(w, err, http.StatusBadRequest)
-		return
-	}
-	w.Write(json)
 }
 
-func cncGenerateControlCredentials(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("content-type", "application/json")
-	statusCode, err := authenticate(r, "POST")
-	if err != nil {
-		failrequest(w, err, statusCode)
-		return
-	}
+func (s *CNCServer) generateAgentManifestComponents() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("content-type", "application/json")
 
-	var req fwdapi.ControlCredentialsRequest
-	err = json.NewDecoder(r.Body).Decode(&req)
-	if err != nil {
-		failrequest(w, err, http.StatusBadRequest)
-		return
-	}
+		var req fwdapi.ManifestRequest
+		err := json.NewDecoder(r.Body).Decode(&req)
+		if err != nil {
+			failrequest(w, err, http.StatusBadRequest)
+			return
+		}
 
-	name := ca.CertificateName{
-		Name:    req.Name,
-		Purpose: ca.CertificatePurposeAgent,
+		err = req.Validate()
+		if err != nil {
+			failrequest(w, err, http.StatusBadRequest)
+			return
+		}
+
+		name := ca.CertificateName{
+			Agent:   req.AgentName,
+			Purpose: ca.CertificatePurposeAgent,
+		}
+		ca64, user64, key64, err := authority.GenerateCertificate(name)
+		if err != nil {
+			failrequest(w, err, http.StatusBadRequest)
+			return
+		}
+		ret := fwdapi.ManifestResponse{
+			AgentName:        req.AgentName,
+			ServerHostname:   *config.AgentHostname,
+			ServerPort:       config.AgentAdvertisePort,
+			AgentCertificate: user64,
+			AgentKey:         key64,
+			CACert:           ca64,
+		}
+		json, err := json.Marshal(ret)
+		if err != nil {
+			failrequest(w, err, http.StatusBadRequest)
+			return
+		}
+		w.Write(json)
 	}
-	ca64, user64, key64, err := authority.GenerateCertificate(name)
-	if err != nil {
-		failrequest(w, err, http.StatusBadRequest)
-		return
-	}
-	ret := fwdapi.ControlCredentialsResponse{
-		Name:        req.Name,
-		URL:         config.getControlURL(),
-		Certificate: user64,
-		Key:         key64,
-		CACert:      ca64,
-	}
-	json, err := json.Marshal(ret)
-	if err != nil {
-		failrequest(w, err, http.StatusBadRequest)
-		return
-	}
-	w.Write(json)
 }
 
-func runCommandHTTPServer(serverCert tls.Certificate) {
-	log.Printf("Running Command and Control API HTTPS listener on port %d",
-		config.ControlListenPort)
+func (s *CNCServer) getStatistics() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("content-type", "application/json")
+
+		ret := fwdapi.StatisticsResponse{
+			ServerTime:      ulid.Now(),
+			Version:         version.String(),
+			ConnectedAgents: agents.GetStatistics(),
+		}
+		json, err := json.Marshal(ret)
+		if err != nil {
+			failrequest(w, err, http.StatusBadRequest)
+			return
+		}
+		w.Write(json)
+	}
+}
+
+func (s *CNCServer) generateServiceCredentials() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("content-type", "application/json")
+
+		var req fwdapi.ServiceCredentialRequest
+		err := json.NewDecoder(r.Body).Decode(&req)
+		if err != nil {
+			failrequest(w, err, http.StatusBadRequest)
+			return
+		}
+
+		err = req.Validate()
+		if err != nil {
+			failrequest(w, err, http.StatusBadRequest)
+			return
+		}
+
+		var key jwk.Key
+		var ok bool
+		if key, ok = jwtKeyset.LookupKeyID(jwtCurrentKey); !ok {
+			err := fmt.Errorf("unable to find service key '%s'", jwtCurrentKey)
+			failrequest(w, err, http.StatusBadRequest)
+			return
+		}
+
+		token, err := MakeJWT(key, req.Type, req.Name, req.AgentName)
+		if err != nil {
+			failrequest(w, err, http.StatusBadRequest)
+			return
+		}
+
+		ret := fwdapi.ServiceCredentialResponse{
+			AgentName: req.AgentName,
+			Name:      req.Name,
+			Type:      req.Type,
+			URL:       config.getServiceURL(),
+			CACert:    authority.GetCACert(),
+		}
+
+		username := fmt.Sprintf("%s.%s", req.Name, req.AgentName)
+
+		switch req.Type {
+		case "aws":
+			ret.CredentialType = "aws"
+			ret.Credential = fwdapi.AwsCredentialResponse{
+				AwsAccessKey:       username,
+				AwsSecretAccessKey: token,
+			}
+		default:
+			ret.Username = username // deprecated
+			ret.Password = token    // deprecated
+			ret.CredentialType = "basic"
+			ret.Credential = fwdapi.BasicCredentialResponse{
+				Username: username,
+				Password: token,
+			}
+		}
+		json, err := json.Marshal(ret)
+		if err != nil {
+			failrequest(w, err, http.StatusBadRequest)
+			return
+		}
+		w.Write(json)
+	}
+}
+
+func (s *CNCServer) generateControlCredentials() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("content-type", "application/json")
+
+		var req fwdapi.ControlCredentialsRequest
+		err := json.NewDecoder(r.Body).Decode(&req)
+		if err != nil {
+			failrequest(w, err, http.StatusBadRequest)
+			return
+		}
+
+		name := ca.CertificateName{
+			Name:    req.Name,
+			Purpose: ca.CertificatePurposeAgent,
+		}
+		ca64, user64, key64, err := authority.GenerateCertificate(name)
+		if err != nil {
+			failrequest(w, err, http.StatusBadRequest)
+			return
+		}
+		ret := fwdapi.ControlCredentialsResponse{
+			Name:        req.Name,
+			URL:         config.getControlURL(),
+			Certificate: user64,
+			Key:         key64,
+			CACert:      ca64,
+		}
+		json, err := json.Marshal(ret)
+		if err != nil {
+			failrequest(w, err, http.StatusBadRequest)
+			return
+		}
+		w.Write(json)
+	}
+}
+
+func (s *CNCServer) routes(mux *http.ServeMux) {
+	mux.HandleFunc(fwdapi.KUBECONFIG_ENDPOINT,
+		s.authenticate("POST", s.generateKubectlComponents()))
+
+	mux.HandleFunc(fwdapi.MANIFEST_ENDPOINT,
+		s.authenticate("POST", s.generateAgentManifestComponents()))
+
+	mux.HandleFunc(fwdapi.SERVICE_ENDPOINT,
+		s.authenticate("POST", s.generateServiceCredentials()))
+
+	mux.HandleFunc(fwdapi.CONTROL_ENDPOINT,
+		s.authenticate("POST", s.generateControlCredentials()))
+
+	mux.HandleFunc(fwdapi.STATISTICS_ENDPOINT,
+		s.authenticate("GET", s.getStatistics()))
+
+}
+
+func (s *CNCServer) runCommandHTTPServer(port uint16, serverCert tls.Certificate) {
+	log.Printf("Running Command and Control API HTTPS listener on port %d", port)
 
 	certPool, err := authority.MakeCertPool()
 	if err != nil {
@@ -311,17 +306,13 @@ func runCommandHTTPServer(serverCert tls.Certificate) {
 
 	mux := http.NewServeMux()
 
-	mux.HandleFunc(fwdapi.KUBECONFIG_ENDPOINT, cncGenerateKubectlComponents)
-	mux.HandleFunc(fwdapi.MANIFEST_ENDPOINT, cncGenerateAgentManifestComponents)
-	mux.HandleFunc(fwdapi.SERVICE_ENDPOINT, cncGenerateServiceCredentials)
-	mux.HandleFunc(fwdapi.CONTROL_ENDPOINT, cncGenerateControlCredentials)
-	mux.HandleFunc(fwdapi.STATISTICS_ENDPOINT, cncGetStatistics)
+	s.routes(mux)
 
-	server := &http.Server{
-		Addr:      fmt.Sprintf(":%d", config.ControlListenPort),
+	srv := &http.Server{
+		Addr:      fmt.Sprintf(":%d", port),
 		TLSConfig: tlsConfig,
 		Handler:   mux,
 	}
 
-	log.Fatal(server.ListenAndServeTLS("", ""))
+	log.Fatal(srv.ListenAndServeTLS("", ""))
 }
