@@ -53,7 +53,7 @@ func runHTTPSServer(serverCert tls.Certificate) {
 		Handler:   mux,
 	}
 
-	server.ListenAndServeTLS("", "")
+	log.Fatal(server.ListenAndServeTLS("", ""))
 }
 
 func extractEndpointFromCert(r *http.Request) (agentIdentity string, endpointType string, endpointName string, validated bool) {

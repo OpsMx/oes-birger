@@ -20,6 +20,7 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 
@@ -28,72 +29,6 @@ import (
 	"github.com/opsmx/oes-birger/pkg/ca"
 	"github.com/opsmx/oes-birger/pkg/fwdapi"
 )
-
-func httpError(err error) []byte {
-	ret := &fwdapi.HttpErrorResponse{
-		Error: &fwdapi.HttpErrorMessage{
-			Message: fmt.Sprintf("Unable to process request: %v", err),
-		},
-	}
-	json, err := json.Marshal(ret)
-	if err != nil {
-		return []byte(`{"error":{"message":"Unknown Error"}}`)
-	}
-	return json
-}
-
-func cncGenerateKubectlComponents(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("content-type", "application/json")
-	statusCode, err := authenticate(r, "POST")
-	if err != nil {
-		w.Write(httpError(err))
-		w.WriteHeader(statusCode)
-		return
-	}
-
-	var req fwdapi.KubeConfigRequest
-	err = json.NewDecoder(r.Body).Decode(&req)
-	if err != nil {
-		w.Write(httpError(err))
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
-	err = req.Validate()
-	if err != nil {
-		w.Write(httpError(err))
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
-	name := ca.CertificateName{
-		Name:    req.Name,
-		Type:    "kubernetes",
-		Agent:   req.AgentName,
-		Purpose: ca.CertificatePurposeService,
-	}
-	ca64, user64, key64, err := authority.GenerateCertificate(name)
-	if err != nil {
-		w.Write(httpError(err))
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-	ret := fwdapi.KubeConfigResponse{
-		AgentName:       req.AgentName,
-		Name:            req.Name,
-		ServerURL:       config.getServiceURL(),
-		UserCertificate: user64,
-		UserKey:         key64,
-		CACert:          ca64,
-	}
-	json, err := json.Marshal(ret)
-	if err != nil {
-		w.Write(httpError(err))
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-	w.Write(json)
-}
 
 func authenticate(r *http.Request, method string) (int, error) {
 	names, err := ca.GetCertificateNameFromCert(r.TLS.PeerCertificates[0])
@@ -109,27 +44,98 @@ func authenticate(r *http.Request, method string) (int, error) {
 	return -1, nil
 }
 
+func httpError(err error) []byte {
+	ret := &fwdapi.HttpErrorResponse{
+		Error: &fwdapi.HttpErrorMessage{
+			Message: fmt.Sprintf("Unable to process request: %v", err),
+		},
+	}
+	json, err := json.Marshal(ret)
+	if err != nil {
+		return []byte(`{"error":{"message":"Unknown Error"}}`)
+	}
+	return json
+}
+
+func cncDecodeKubectlRequest(j io.Reader) (*fwdapi.KubeConfigRequest, error) {
+	var req fwdapi.KubeConfigRequest
+	err := json.NewDecoder(j).Decode(&req)
+	if err != nil {
+		return nil, err
+	}
+
+	err = req.Validate()
+	if err != nil {
+		return nil, err
+	}
+
+	return &req, nil
+}
+
+func failrequest(w http.ResponseWriter, err error, code int) {
+	w.Write(httpError(err))
+	w.WriteHeader(code)
+}
+
+func cncGenerateKubectlComponents(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("content-type", "application/json")
+	statusCode, err := authenticate(r, "POST")
+	if err != nil {
+		failrequest(w, err, statusCode)
+		return
+	}
+
+	req, err := cncDecodeKubectlRequest(r.Body)
+	if err != nil {
+		failrequest(w, err, http.StatusBadRequest)
+		return
+	}
+
+	name := ca.CertificateName{
+		Name:    req.Name,
+		Type:    "kubernetes",
+		Agent:   req.AgentName,
+		Purpose: ca.CertificatePurposeService,
+	}
+	ca64, user64, key64, err := authority.GenerateCertificate(name)
+	if err != nil {
+		failrequest(w, err, http.StatusBadRequest)
+		return
+	}
+	ret := fwdapi.KubeConfigResponse{
+		AgentName:       req.AgentName,
+		Name:            req.Name,
+		ServerURL:       config.getServiceURL(),
+		UserCertificate: user64,
+		UserKey:         key64,
+		CACert:          ca64,
+	}
+	json, err := json.Marshal(ret)
+	if err != nil {
+		failrequest(w, err, http.StatusBadRequest)
+		return
+	}
+	w.Write(json)
+}
+
 func cncGenerateAgentManifestComponents(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("content-type", "application/json")
 	statusCode, err := authenticate(r, "POST")
 	if err != nil {
-		w.Write(httpError(err))
-		w.WriteHeader(statusCode)
+		failrequest(w, err, statusCode)
 		return
 	}
 
 	var req fwdapi.ManifestRequest
 	err = json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
-		w.Write(httpError(err))
-		w.WriteHeader(http.StatusBadRequest)
+		failrequest(w, err, http.StatusBadRequest)
 		return
 	}
 
 	err = req.Validate()
 	if err != nil {
-		w.Write(httpError(err))
-		w.WriteHeader(http.StatusBadRequest)
+		failrequest(w, err, http.StatusBadRequest)
 		return
 	}
 
@@ -139,8 +145,7 @@ func cncGenerateAgentManifestComponents(w http.ResponseWriter, r *http.Request) 
 	}
 	ca64, user64, key64, err := authority.GenerateCertificate(name)
 	if err != nil {
-		w.Write(httpError(err))
-		w.WriteHeader(http.StatusBadRequest)
+		failrequest(w, err, http.StatusBadRequest)
 		return
 	}
 	ret := fwdapi.ManifestResponse{
@@ -153,8 +158,7 @@ func cncGenerateAgentManifestComponents(w http.ResponseWriter, r *http.Request) 
 	}
 	json, err := json.Marshal(ret)
 	if err != nil {
-		w.Write(httpError(err))
-		w.WriteHeader(http.StatusBadRequest)
+		failrequest(w, err, http.StatusBadRequest)
 		return
 	}
 	w.Write(json)
@@ -164,8 +168,7 @@ func cncGetStatistics(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("content-type", "application/json")
 	statusCode, err := authenticate(r, "GET")
 	if err != nil {
-		w.Write(httpError(err))
-		w.WriteHeader(statusCode)
+		failrequest(w, err, statusCode)
 		return
 	}
 
@@ -176,8 +179,7 @@ func cncGetStatistics(w http.ResponseWriter, r *http.Request) {
 	}
 	json, err := json.Marshal(ret)
 	if err != nil {
-		w.Write(httpError(err))
-		w.WriteHeader(http.StatusBadRequest)
+		failrequest(w, err, http.StatusBadRequest)
 		return
 	}
 	w.Write(json)
@@ -187,38 +189,34 @@ func cncGenerateServiceCredentials(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("content-type", "application/json")
 	statusCode, err := authenticate(r, "POST")
 	if err != nil {
-		w.Write(httpError(err))
-		w.WriteHeader(statusCode)
+		failrequest(w, err, statusCode)
 		return
 	}
 
 	var req fwdapi.ServiceCredentialRequest
 	err = json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
-		w.Write(httpError(err))
-		w.WriteHeader(http.StatusBadRequest)
+		failrequest(w, err, http.StatusBadRequest)
 		return
 	}
 
 	err = req.Validate()
 	if err != nil {
-		w.Write(httpError(err))
-		w.WriteHeader(http.StatusBadRequest)
+		failrequest(w, err, http.StatusBadRequest)
 		return
 	}
 
 	var key jwk.Key
 	var ok bool
 	if key, ok = jwtKeyset.LookupKeyID(jwtCurrentKey); !ok {
-		w.Write(httpError(fmt.Errorf("unable to find service key '%s'", jwtCurrentKey)))
-		w.WriteHeader(http.StatusBadRequest)
+		err := fmt.Errorf("unable to find service key '%s'", jwtCurrentKey)
+		failrequest(w, err, http.StatusBadRequest)
 		return
 	}
 
 	token, err := MakeJWT(key, req.Type, req.Name, req.AgentName)
 	if err != nil {
-		w.Write(httpError(err))
-		w.WriteHeader(statusCode)
+		failrequest(w, err, statusCode)
 		return
 	}
 
@@ -250,8 +248,7 @@ func cncGenerateServiceCredentials(w http.ResponseWriter, r *http.Request) {
 	}
 	json, err := json.Marshal(ret)
 	if err != nil {
-		w.Write(httpError(err))
-		w.WriteHeader(http.StatusBadRequest)
+		failrequest(w, err, http.StatusBadRequest)
 		return
 	}
 	w.Write(json)
@@ -261,16 +258,14 @@ func cncGenerateControlCredentials(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("content-type", "application/json")
 	statusCode, err := authenticate(r, "POST")
 	if err != nil {
-		w.Write(httpError(err))
-		w.WriteHeader(statusCode)
+		failrequest(w, err, statusCode)
 		return
 	}
 
 	var req fwdapi.ControlCredentialsRequest
 	err = json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
-		w.Write(httpError(err))
-		w.WriteHeader(http.StatusBadRequest)
+		failrequest(w, err, http.StatusBadRequest)
 		return
 	}
 
@@ -280,8 +275,7 @@ func cncGenerateControlCredentials(w http.ResponseWriter, r *http.Request) {
 	}
 	ca64, user64, key64, err := authority.GenerateCertificate(name)
 	if err != nil {
-		w.Write(httpError(err))
-		w.WriteHeader(http.StatusBadRequest)
+		failrequest(w, err, http.StatusBadRequest)
 		return
 	}
 	ret := fwdapi.ControlCredentialsResponse{
@@ -293,8 +287,7 @@ func cncGenerateControlCredentials(w http.ResponseWriter, r *http.Request) {
 	}
 	json, err := json.Marshal(ret)
 	if err != nil {
-		w.Write(httpError(err))
-		w.WriteHeader(http.StatusBadRequest)
+		failrequest(w, err, http.StatusBadRequest)
 		return
 	}
 	w.Write(json)
@@ -329,5 +322,5 @@ func runCommandHTTPServer(serverCert tls.Certificate) {
 		Handler:   mux,
 	}
 
-	server.ListenAndServeTLS("", "")
+	log.Fatal(server.ListenAndServeTLS("", ""))
 }
