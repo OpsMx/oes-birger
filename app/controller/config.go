@@ -31,20 +31,21 @@ import (
 // configuration file is loaded from disk first, and then any
 // environment variables are applied.
 type ControllerConfig struct {
-	Agents                map[string]*agentConfig `yaml:"agents,omitempty"`
-	ServiceAuth           serviceAuthConfig       `yaml:"serviceAuth,omitempty"`
-	Webhook               string                  `yaml:"webhook,omitempty"`
-	ServerNames           []string                `yaml:"serverNames,omitempty"`
-	CAConfig              ca.Config               `yaml:"caConfig,omitempty"`
-	PrometheusPort        uint16                  `yaml:"prometheusPort"`
-	ServiceHostname       *string                 `yaml:"serviceHostname"`
-	ServicePort           uint16                  `yaml:"servicePort"`
-	ControlHostname       *string                 `yaml:"controlHostname"`
-	ControlPort           uint16                  `yaml:"controlPort"`
-	AgentHostname         *string                 `yaml:"agentHostname"`
-	AgentPort             uint16                  `yaml:"agentPort"`
-	RemoteCommandHostname *string                 `yaml:"remoteCommandHostname"`
-	RemoteCommandPort     uint16                  `yaml:"remoteCommandPort"`
+	Agents                  map[string]*agentConfig `yaml:"agents,omitempty"`
+	ServiceAuth             serviceAuthConfig       `yaml:"serviceAuth,omitempty"`
+	Webhook                 string                  `yaml:"webhook,omitempty"`
+	ServerNames             []string                `yaml:"serverNames,omitempty"`
+	CAConfig                ca.Config               `yaml:"caConfig,omitempty"`
+	PrometheusListenPort    uint16                  `yaml:"prometheusListenPort"`
+	ServiceHostname         *string                 `yaml:"serviceHostname"`
+	ServiceListenPort       uint16                  `yaml:"serviceListenPort"`
+	ControlHostname         *string                 `yaml:"controlHostname"`
+	ControlListenPort       uint16                  `yaml:"controlListenPort"`
+	AgentHostname           *string                 `yaml:"agentHostname"`
+	AgentListenPort         uint16                  `yaml:"agentListenPort"`
+	AgentAdvertisePort      uint16                  `yaml:"agentAdvertisePort"`
+	RemoteCommandHostname   *string                 `yaml:"remoteCommandHostname"`
+	RemoteCommandListenPort uint16                  `yaml:"remoteCommandListenPort"`
 }
 
 type agentConfig struct {
@@ -70,36 +71,39 @@ func LoadConfig(f io.Reader) (*ControllerConfig, error) {
 		return nil, err
 	}
 
-	if config.AgentPort == 0 {
-		config.AgentPort = 9001
+	if config.AgentListenPort == 0 {
+		config.AgentListenPort = 9001
+	}
+	if config.AgentAdvertisePort == 0 {
+		config.AgentAdvertisePort = config.AgentListenPort
 	}
 	if config.AgentHostname == nil {
 		return nil, fmt.Errorf("agentHostname not set")
 	}
 
-	if config.ServicePort == 0 {
-		config.ServicePort = 9002
+	if config.ServiceListenPort == 0 {
+		config.ServiceListenPort = 9002
 	}
 	if config.ServiceHostname == nil {
 		return nil, fmt.Errorf("serviceHostname not set")
 	}
 
-	if config.ControlPort == 0 {
-		config.ControlPort = 9003
+	if config.ControlListenPort == 0 {
+		config.ControlListenPort = 9003
 	}
 	if config.ControlHostname == nil {
 		return nil, fmt.Errorf("controlHostname not set")
 	}
 
-	if config.RemoteCommandPort == 0 {
-		config.RemoteCommandPort = 9004
+	if config.RemoteCommandListenPort == 0 {
+		config.RemoteCommandListenPort = 9004
 	}
 	if config.RemoteCommandHostname == nil {
 		return nil, fmt.Errorf("remoteCommandHostname not set")
 	}
 
-	if config.PrometheusPort == 0 {
-		config.PrometheusPort = 9102
+	if config.PrometheusListenPort == 0 {
+		config.PrometheusListenPort = 9102
 	}
 
 	config.addAllHostnames()
@@ -131,11 +135,11 @@ func (c *ControllerConfig) addAllHostnames() {
 }
 
 func (c *ControllerConfig) getServiceURL() string {
-	return fmt.Sprintf("https://%s:%d", *c.ServiceHostname, c.ServicePort)
+	return fmt.Sprintf("https://%s:%d", *c.ServiceHostname, c.ServiceListenPort)
 }
 
 func (c *ControllerConfig) getControlURL() string {
-	return fmt.Sprintf("https://%s:%d", *c.ControlHostname, c.ControlPort)
+	return fmt.Sprintf("https://%s:%d", *c.ControlHostname, c.ControlListenPort)
 }
 
 //
@@ -147,9 +151,14 @@ func (c *ControllerConfig) Dump() {
 	for _, n := range config.ServerNames {
 		log.Printf("  %s", n)
 	}
-	log.Printf("Service hostname: %s, port: %d", *c.ServiceHostname, c.ServicePort)
-	log.Printf("URL returned for kubectl components: %s", c.getServiceURL())
-	log.Printf("Agent hostname: %s, port %d", *c.AgentHostname, c.AgentPort)
-	log.Printf("Control hostname: %s, port %d", *c.ControlHostname, c.ControlPort)
-	log.Printf("RemoteCommand hostname: %s, port %d", *c.RemoteCommandHostname, c.RemoteCommandPort)
+	log.Printf("Service hostname: %s, port: %d",
+		*c.ServiceHostname, c.ServiceListenPort)
+	log.Printf("URL returned for kubectl components: %s",
+		c.getServiceURL())
+	log.Printf("Agent hostname: %s, port %d (advertised %d)",
+		*c.AgentHostname, c.AgentListenPort, c.AgentAdvertisePort)
+	log.Printf("Control hostname: %s, port %d",
+		*c.ControlHostname, c.ControlListenPort)
+	log.Printf("RemoteCommand hostname: %s, port %d",
+		*c.RemoteCommandHostname, c.RemoteCommandListenPort)
 }

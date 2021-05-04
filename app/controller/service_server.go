@@ -29,7 +29,7 @@ import (
 )
 
 func runHTTPSServer(serverCert tls.Certificate) {
-	log.Printf("Running service HTTPS listener on port %d", config.ServicePort)
+	log.Printf("Running service HTTPS listener on port %d", config.ServiceListenPort)
 
 	certPool, err := authority.MakeCertPool()
 	if err != nil {
@@ -48,7 +48,7 @@ func runHTTPSServer(serverCert tls.Certificate) {
 	mux.HandleFunc("/", serviceAPIHandler)
 
 	server := &http.Server{
-		Addr:      fmt.Sprintf(":%d", config.ServicePort),
+		Addr:      fmt.Sprintf(":%d", config.ServiceListenPort),
 		TLSConfig: tlsConfig,
 		Handler:   mux,
 	}

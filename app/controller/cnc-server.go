@@ -151,7 +151,7 @@ func cncGenerateAgentManifestComponents(w http.ResponseWriter, r *http.Request) 
 	ret := fwdapi.ManifestResponse{
 		AgentName:        req.AgentName,
 		ServerHostname:   *config.AgentHostname,
-		ServerPort:       config.AgentPort,
+		ServerPort:       config.AgentAdvertisePort,
 		AgentCertificate: user64,
 		AgentKey:         key64,
 		CACert:           ca64,
@@ -294,7 +294,8 @@ func cncGenerateControlCredentials(w http.ResponseWriter, r *http.Request) {
 }
 
 func runCommandHTTPServer(serverCert tls.Certificate) {
-	log.Printf("Running Command and Control API HTTPS listener on port %d", config.ControlPort)
+	log.Printf("Running Command and Control API HTTPS listener on port %d",
+		config.ControlListenPort)
 
 	certPool, err := authority.MakeCertPool()
 	if err != nil {
@@ -317,7 +318,7 @@ func runCommandHTTPServer(serverCert tls.Certificate) {
 	mux.HandleFunc(fwdapi.STATISTICS_ENDPOINT, cncGetStatistics)
 
 	server := &http.Server{
-		Addr:      fmt.Sprintf(":%d", config.ControlPort),
+		Addr:      fmt.Sprintf(":%d", config.ControlListenPort),
 		TLSConfig: tlsConfig,
 		Handler:   mux,
 	}

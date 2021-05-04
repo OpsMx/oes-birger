@@ -271,8 +271,8 @@ func runAgentGRPCServer(serverCert tls.Certificate) {
 	//
 	// Set up GRPC server
 	//
-	log.Printf("Starting Agent GRPC server on port %d...", config.AgentPort)
-	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", config.AgentPort))
+	log.Printf("Starting Agent GRPC server on port %d...", config.AgentListenPort)
+	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", config.AgentListenPort))
 	if err != nil {
 		log.Fatalf("Failed to listen: %v", err)
 	}
@@ -407,8 +407,8 @@ func runCmdToolGRPCServer(serverCert tls.Certificate) {
 	//
 	// Set up GRPC server
 	//
-	log.Printf("Starting CmdTool GRPC server on port %d...", config.RemoteCommandPort)
-	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", config.RemoteCommandPort))
+	log.Printf("Starting CmdTool GRPC server on port %d...", config.RemoteCommandListenPort)
+	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", config.RemoteCommandListenPort))
 	if err != nil {
 		log.Fatalf("Failed to listen: %v", err)
 	}
