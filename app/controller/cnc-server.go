@@ -30,7 +30,12 @@ import (
 	"github.com/opsmx/oes-birger/pkg/fwdapi"
 )
 
-type CNCConfig interface {
+type cncCertificateAuthority interface {
+	ca.CertificateIssuer
+	ca.CertPoolGenerator
+}
+
+type cncConfig interface {
 	GetAgentHostname() string
 	GetAgentAdvertisePort() uint16
 	GetServiceURL() string
@@ -38,17 +43,19 @@ type CNCConfig interface {
 	GetControlListenPort() uint16
 }
 
-type CNCServer struct {
-	cfg CNCConfig
+type cncServer struct {
+	cfg cncConfig
+	ca  cncCertificateAuthority
 }
 
-func MakeCNCServer(config CNCConfig) *CNCServer {
-	return &CNCServer{
+func MakeCNCServer(config cncConfig, authority cncCertificateAuthority) *cncServer {
+	return &cncServer{
 		cfg: config,
+		ca:  authority,
 	}
 }
 
-func (c *CNCServer) authenticate(method string, h http.HandlerFunc) http.HandlerFunc {
+func (c *cncServer) authenticate(method string, h http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != method {
 			err := fmt.Errorf("only '%s' is accepted (not '%s')", method, r.Method)
@@ -71,7 +78,7 @@ func (c *CNCServer) authenticate(method string, h http.HandlerFunc) http.Handler
 	}
 }
 
-func (s *CNCServer) decodeKubectlRequest(j io.Reader) (*fwdapi.KubeConfigRequest, error) {
+func (s *cncServer) decodeKubectlRequest(j io.Reader) (*fwdapi.KubeConfigRequest, error) {
 	var req fwdapi.KubeConfigRequest
 	err := json.NewDecoder(j).Decode(&req)
 	if err != nil {
@@ -86,7 +93,7 @@ func (s *CNCServer) decodeKubectlRequest(j io.Reader) (*fwdapi.KubeConfigRequest
 	return &req, nil
 }
 
-func (s *CNCServer) generateKubectlComponents() http.HandlerFunc {
+func (s *cncServer) generateKubectlComponents() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("content-type", "application/json")
 
@@ -102,7 +109,7 @@ func (s *CNCServer) generateKubectlComponents() http.HandlerFunc {
 			Agent:   req.AgentName,
 			Purpose: ca.CertificatePurposeService,
 		}
-		ca64, user64, key64, err := authority.GenerateCertificate(name)
+		ca64, user64, key64, err := s.ca.GenerateCertificate(name)
 		if err != nil {
 			failrequest(w, err, http.StatusBadRequest)
 			return
@@ -124,7 +131,7 @@ func (s *CNCServer) generateKubectlComponents() http.HandlerFunc {
 	}
 }
 
-func (s *CNCServer) generateAgentManifestComponents() http.HandlerFunc {
+func (s *cncServer) generateAgentManifestComponents() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("content-type", "application/json")
 
@@ -145,7 +152,7 @@ func (s *CNCServer) generateAgentManifestComponents() http.HandlerFunc {
 			Agent:   req.AgentName,
 			Purpose: ca.CertificatePurposeAgent,
 		}
-		ca64, user64, key64, err := authority.GenerateCertificate(name)
+		ca64, user64, key64, err := s.ca.GenerateCertificate(name)
 		if err != nil {
 			failrequest(w, err, http.StatusBadRequest)
 			return
@@ -167,7 +174,7 @@ func (s *CNCServer) generateAgentManifestComponents() http.HandlerFunc {
 	}
 }
 
-func (s *CNCServer) getStatistics() http.HandlerFunc {
+func (s *cncServer) getStatistics() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("content-type", "application/json")
 
@@ -185,7 +192,7 @@ func (s *CNCServer) getStatistics() http.HandlerFunc {
 	}
 }
 
-func (s *CNCServer) generateServiceCredentials() http.HandlerFunc {
+func (s *cncServer) generateServiceCredentials() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("content-type", "application/json")
 
@@ -221,7 +228,7 @@ func (s *CNCServer) generateServiceCredentials() http.HandlerFunc {
 			Name:      req.Name,
 			Type:      req.Type,
 			URL:       s.cfg.GetServiceURL(),
-			CACert:    authority.GetCACert(),
+			CACert:    s.ca.GetCACert(),
 		}
 
 		username := fmt.Sprintf("%s.%s", req.Name, req.AgentName)
@@ -251,7 +258,7 @@ func (s *CNCServer) generateServiceCredentials() http.HandlerFunc {
 	}
 }
 
-func (s *CNCServer) generateControlCredentials() http.HandlerFunc {
+func (s *cncServer) generateControlCredentials() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("content-type", "application/json")
 
@@ -266,7 +273,7 @@ func (s *CNCServer) generateControlCredentials() http.HandlerFunc {
 			Name:    req.Name,
 			Purpose: ca.CertificatePurposeAgent,
 		}
-		ca64, user64, key64, err := authority.GenerateCertificate(name)
+		ca64, user64, key64, err := s.ca.GenerateCertificate(name)
 		if err != nil {
 			failrequest(w, err, http.StatusBadRequest)
 			return
@@ -287,7 +294,7 @@ func (s *CNCServer) generateControlCredentials() http.HandlerFunc {
 	}
 }
 
-func (s *CNCServer) routes(mux *http.ServeMux) {
+func (s *cncServer) routes(mux *http.ServeMux) {
 	mux.HandleFunc(fwdapi.KUBECONFIG_ENDPOINT,
 		s.authenticate("POST", s.generateKubectlComponents()))
 
@@ -305,7 +312,7 @@ func (s *CNCServer) routes(mux *http.ServeMux) {
 
 }
 
-func (s *CNCServer) runCommandHTTPServer(serverCert tls.Certificate) {
+func (s *cncServer) runCommandHTTPServer(serverCert tls.Certificate) {
 	log.Printf("Running Command and Control API HTTPS listener on port %d",
 		s.cfg.GetControlListenPort())
 

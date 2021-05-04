@@ -38,6 +38,15 @@ const (
 	OPSMX_OID_VALUE = 0x6f706d78 // 31-bit max
 )
 
+type CertificateIssuer interface {
+	GenerateCertificate(CertificateName) (string, string, string, error)
+	GetCACert() string
+}
+
+type CertPoolGenerator interface {
+	MakeCertPool() (*x509.CertPool, error)
+}
+
 //
 // CA holds the state for the certificate authority.
 //

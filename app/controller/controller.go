@@ -244,8 +244,7 @@ func main() {
 
 	go runHTTPSServer(*serverCert)
 
-	cncserver := MakeCNCServer(config)
-	go cncserver.runCommandHTTPServer(*serverCert)
+	go MakeCNCServer(config, authority).runCommandHTTPServer(*serverCert)
 
 	go runCmdToolGRPCServer(*serverCert)
 

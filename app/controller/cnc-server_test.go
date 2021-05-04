@@ -60,7 +60,7 @@ func TestCNCServer_authenticate(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c := &CNCServer{}
+			c := MakeCNCServer(nil, nil)
 			h := handlerTracker{}
 			r := httptest.NewRequest("GET", "https://localhost/statistics", nil)
 			r.TLS.PeerCertificates = []*x509.Certificate{tt.cert}
