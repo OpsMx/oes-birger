@@ -46,7 +46,7 @@ func (c *CNCServer) authenticate(method string, h http.HandlerFunc) http.Handler
 			return
 		}
 		if names.Purpose != ca.CertificatePurposeControl {
-			err := fmt.Errorf("certificate is not authorized for 'control': %v", names)
+			err := fmt.Errorf("certificate is not authorized for 'control': %s", names.Purpose)
 			failrequest(w, err, http.StatusForbidden)
 			return
 		}
