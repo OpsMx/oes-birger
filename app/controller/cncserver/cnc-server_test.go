@@ -307,6 +307,9 @@ func TestCNCServer_generateServiceCredentials(t *testing.T) {
 		stringEquals(t, "CACert", response.CACert, "base64-cacert")
 		stringEquals(t, "CredentialType", response.CredentialType, "basic")
 		creds := response.Credential.(map[string]interface{})
+		if len(creds) != 2 {
+			t.Errorf("Unexpected keys: %#v", creds)
+		}
 		if _, found := creds["username"]; !found {
 			t.Errorf("Credential does not have key 'username': %#v", creds)
 		}
@@ -328,6 +331,9 @@ func TestCNCServer_generateServiceCredentials(t *testing.T) {
 		stringEquals(t, "CACert", response.CACert, "base64-cacert")
 		stringEquals(t, "CredentialType", response.CredentialType, "aws")
 		creds := response.Credential.(map[string]interface{})
+		if len(creds) != 2 {
+			t.Errorf("Unexpected keys: %#v", creds)
+		}
 		if _, found := creds["awsAccessKey"]; !found {
 			t.Errorf("Credential does not have key 'awsAccessKey': %#v", creds)
 		}
