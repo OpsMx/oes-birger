@@ -263,6 +263,12 @@ func (s *cncServer) generateControlCredentials() http.HandlerFunc {
 			return
 		}
 
+		err = req.Validate()
+		if err != nil {
+			util.FailRequest(w, err, http.StatusBadRequest)
+			return
+		}
+
 		name := ca.CertificateName{
 			Name:    req.Name,
 			Purpose: ca.CertificatePurposeAgent,

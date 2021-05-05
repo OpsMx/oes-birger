@@ -439,3 +439,77 @@ func TestCNCServer_generateServiceCredentials(t *testing.T) {
 		})
 	}
 }
+
+func TestCNCServer_generateControlCredentials(t *testing.T) {
+	checkFunc := func(t *testing.T, body []byte) {
+		var response fwdapi.ControlCredentialsResponse
+		err := json.Unmarshal(body, &response)
+		if err != nil {
+			panic(err)
+		}
+		stringEquals(t, "Name", response.Name, "contra smith")
+		stringEquals(t, "URL", response.URL, "https://control.local")
+		stringEquals(t, "Certificate", response.Certificate, "b")
+		stringEquals(t, "Key", response.Key, "c")
+		stringEquals(t, "CACert", response.CACert, "a")
+	}
+
+	tests := []struct {
+		name         string
+		request      interface{}
+		validateBody verifierFunc
+		wantStatus   int
+	}{
+		{
+			"badJSON",
+			"badjson",
+			requireError("json: cannot unmarshal"),
+			http.StatusBadRequest,
+		},
+		{
+			"missingName",
+			fwdapi.ControlCredentialsRequest{},
+			requireError("'name' is invalid"),
+			http.StatusBadRequest,
+		},
+		{
+			"working",
+			fwdapi.ControlCredentialsRequest{Name: "contra smith"},
+			checkFunc,
+			http.StatusOK,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mc := &mockConfig{}
+			auth := &mockAuthority{}
+			c := MakeCNCServer(mc, auth, nil, nil, "", "")
+
+			body, err := json.Marshal(tt.request)
+			if err != nil {
+				panic(err)
+			}
+
+			r := httptest.NewRequest("POST", "https://localhost/foo", bytes.NewReader(body))
+			w := httptest.NewRecorder()
+			h := c.generateControlCredentials()
+			h.ServeHTTP(w, r)
+
+			if w.Result().StatusCode != tt.wantStatus {
+				t.Errorf("Expected status code %d, got %d", tt.wantStatus, w.Code)
+			}
+
+			ct := w.Result().Header.Get("content-type")
+			if ct != "application/json" {
+				t.Errorf("Expected content-type to be application/json, not %s", ct)
+			}
+
+			resultBody, err := ioutil.ReadAll(w.Result().Body)
+			if err != nil {
+				panic(err)
+			}
+
+			tt.validateBody(t, resultBody)
+		})
+	}
+}

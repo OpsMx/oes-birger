@@ -73,3 +73,11 @@ func (req *ManifestRequest) Validate() error {
 
 	return nil
 }
+
+func (req *ControlCredentialsRequest) Validate() error {
+	if !namePresent(req.Name) {
+		return fmt.Errorf("'name' is invalid")
+	}
+
+	return nil
+}
