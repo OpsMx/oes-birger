@@ -345,18 +345,21 @@ func TestCNCServer_generateServiceCredentials(t *testing.T) {
 	tests := []struct {
 		name         string
 		request      interface{}
+		jwkKey       string
 		validateBody verifierFunc
 		wantStatus   int
 	}{
 		{
 			"badJSON",
 			"badjson",
+			"key1",
 			requireError("json: cannot unmarshal"),
 			http.StatusBadRequest,
 		},
 		{
 			"missingName",
 			fwdapi.ServiceCredentialRequest{},
+			"key1",
 			requireError("is invalid"),
 			http.StatusBadRequest,
 		},
@@ -367,8 +370,20 @@ func TestCNCServer_generateServiceCredentials(t *testing.T) {
 				Type:      "jenkins",
 				Name:      "service smith",
 			},
+			"key1",
 			checkFunc,
 			http.StatusOK,
+		},
+		{
+			"bad-jwt-key",
+			fwdapi.ServiceCredentialRequest{
+				AgentName: "agent smith",
+				Type:      "jenkins",
+				Name:      "service smith",
+			},
+			"missingKey",
+			requireError("unable to find service key"),
+			http.StatusBadRequest,
 		},
 		{
 			"aws",
@@ -377,6 +392,7 @@ func TestCNCServer_generateServiceCredentials(t *testing.T) {
 				Type:      "aws",
 				Name:      "service smith",
 			},
+			"key1",
 			awsCheckFunc,
 			http.StatusOK,
 		},
@@ -393,7 +409,7 @@ func TestCNCServer_generateServiceCredentials(t *testing.T) {
 			key1.Set(jwk.AlgorithmKey, jwa.HS256)
 			keys := jwk.NewSet()
 			keys.Add(key1)
-			c := MakeCNCServer(mc, auth, nil, keys, "key1", "")
+			c := MakeCNCServer(mc, auth, nil, keys, tt.jwkKey, "")
 
 			body, err := json.Marshal(tt.request)
 			if err != nil {
