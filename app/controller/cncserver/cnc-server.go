@@ -186,24 +186,6 @@ func (s *cncServer) generateAgentManifestComponents() http.HandlerFunc {
 	}
 }
 
-func (s *cncServer) getStatistics() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("content-type", "application/json")
-
-		ret := fwdapi.StatisticsResponse{
-			ServerTime:      ulid.Now(),
-			Version:         s.version,
-			ConnectedAgents: s.agentReporter.GetStatistics(),
-		}
-		json, err := json.Marshal(ret)
-		if err != nil {
-			util.FailRequest(w, err, http.StatusBadRequest)
-			return
-		}
-		w.Write(json)
-	}
-}
-
 func (s *cncServer) generateServiceCredentials() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("content-type", "application/json")
@@ -296,6 +278,24 @@ func (s *cncServer) generateControlCredentials() http.HandlerFunc {
 			Certificate: user64,
 			Key:         key64,
 			CACert:      ca64,
+		}
+		json, err := json.Marshal(ret)
+		if err != nil {
+			util.FailRequest(w, err, http.StatusBadRequest)
+			return
+		}
+		w.Write(json)
+	}
+}
+
+func (s *cncServer) getStatistics() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("content-type", "application/json")
+
+		ret := fwdapi.StatisticsResponse{
+			ServerTime:      ulid.Now(),
+			Version:         s.version,
+			ConnectedAgents: s.agentReporter.GetStatistics(),
 		}
 		json, err := json.Marshal(ret)
 		if err != nil {
