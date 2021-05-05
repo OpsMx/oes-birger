@@ -20,6 +20,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/lestrrat-go/jwx/jwa"
 	"github.com/lestrrat-go/jwx/jwk"
 )
 
@@ -30,6 +31,7 @@ func makekey(t *testing.T, name string, content string) jwk.Key {
 		t.FailNow()
 	}
 	key.Set(jwk.KeyIDKey, name)
+	key.Set(jwk.AlgorithmKey, jwa.HS256)
 	return key
 }
 

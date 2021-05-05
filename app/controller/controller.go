@@ -32,6 +32,7 @@ import (
 	"google.golang.org/grpc/peer"
 	"google.golang.org/grpc/status"
 
+	"github.com/lestrrat-go/jwx/jwa"
 	"github.com/lestrrat-go/jwx/jwk"
 	"github.com/opsmx/oes-birger/app/controller/agent"
 	"github.com/opsmx/oes-birger/app/controller/cncserver"
@@ -180,6 +181,7 @@ func loadKeyset() {
 			return err
 		}
 		key.Set(jwk.KeyIDKey, info.Name())
+		key.Set(jwk.AlgorithmKey, jwa.HS256)
 		jwtKeyset.Add(key)
 		log.Printf("Loaded service key name %s, length %d", info.Name(), len(content))
 		return nil
