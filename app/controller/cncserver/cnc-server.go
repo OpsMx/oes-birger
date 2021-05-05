@@ -217,12 +217,18 @@ func (s *cncServer) generateServiceCredentials() http.HandlerFunc {
 			return
 		}
 
+		cacert, err := s.authority.GetCACert()
+		if err != nil {
+			util.FailRequest(w, err, http.StatusBadRequest)
+			return
+		}
+
 		ret := fwdapi.ServiceCredentialResponse{
 			AgentName: req.AgentName,
 			Name:      req.Name,
 			Type:      req.Type,
 			URL:       s.cfg.GetServiceURL(),
-			CACert:    s.authority.GetCACert(),
+			CACert:    cacert,
 		}
 
 		username := fmt.Sprintf("%s.%s", req.Name, req.AgentName)

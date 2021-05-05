@@ -40,7 +40,7 @@ const (
 
 type CertificateIssuer interface {
 	GenerateCertificate(CertificateName) (string, string, string, error)
-	GetCACert() string
+	GetCACert() (string, error)
 }
 
 type CertPoolGenerator interface {
@@ -119,13 +119,16 @@ func (c *CA) GetCACertificate() []byte {
 	return c.caCert.Certificate[0]
 }
 
-func toPEM(data []byte, t string) []byte {
+func toPEM(data []byte, t string) ([]byte, error) {
 	p := &bytes.Buffer{}
-	pem.Encode(p, &pem.Block{
+	err := pem.Encode(p, &pem.Block{
 		Type:  t,
 		Bytes: data,
 	})
-	return p.Bytes()
+	if err != nil {
+		return []byte{}, nil
+	}
+	return p.Bytes(), nil
 }
 
 //
@@ -159,8 +162,16 @@ func MakeCertificateAuthority() ([]byte, []byte, error) {
 		return empty, empty, err
 	}
 
-	certPEM := toPEM(certBytes, "CERTIFICATE")
-	certPrivKeyPEM := toPEM(x509.MarshalPKCS1PrivateKey(priv), "RSA PRIVATE KEY")
+	certPEM, err := toPEM(certBytes, "CERTIFICATE")
+	if err != nil {
+		return []byte{}, []byte{}, err
+	}
+
+	certPrivKeyPEM, err := toPEM(x509.MarshalPKCS1PrivateKey(priv), "RSA PRIVATE KEY")
+	if err != nil {
+		return []byte{}, []byte{}, err
+	}
+
 	return certPEM, certPrivKeyPEM, nil
 }
 
@@ -199,12 +210,21 @@ func (c *CA) MakeServerCert(names []string) (*tls.Certificate, error) {
 		return nil, err
 	}
 
-	certPEM := toPEM(certBytes, "CERTIFICATE")
-	certPrivKeyPEM := toPEM(x509.MarshalPKCS1PrivateKey(certPrivKey), "RSA PRIVATE KEY")
+	certPEM, err := toPEM(certBytes, "CERTIFICATE")
+	if err != nil {
+		return nil, err
+	}
+
+	certPrivKeyPEM, err := toPEM(x509.MarshalPKCS1PrivateKey(certPrivKey), "RSA PRIVATE KEY")
+	if err != nil {
+		return nil, err
+	}
+
 	serverCert, err := tls.X509KeyPair(certPEM, certPrivKeyPEM)
 	if err != nil {
 		return nil, err
 	}
+
 	return &serverCert, nil
 }
 
@@ -282,21 +302,35 @@ func (c *CA) GenerateCertificate(name CertificateName) (string, string, string, 
 		return "", "", "", err
 	}
 
-	ca64 := c.GetCACert()
-	cert64 := bytesTo64("CERTIFICATE", certBytes)
-	certPrivKey64 := bytesTo64("RSA PRIVATE KEY", x509.MarshalPKCS1PrivateKey(certPrivKey))
+	ca64, err := c.GetCACert()
+	if err != nil {
+		return "", "", "", err
+	}
+
+	cert64, err := bytesTo64("CERTIFICATE", certBytes)
+	if err != nil {
+		return "", "", "", err
+	}
+
+	certPrivKey64, err := bytesTo64("RSA PRIVATE KEY", x509.MarshalPKCS1PrivateKey(certPrivKey))
+	if err != nil {
+		return "", "", "", err
+	}
 
 	return ca64, cert64, certPrivKey64, nil
 }
 
 // GetCACert returns the authority certificate encoded as base64.
-func (c *CA) GetCACert() string {
+func (c *CA) GetCACert() (string, error) {
 	return bytesTo64("CERTIFICATE", c.caCert.Certificate[0])
 }
 
-func bytesTo64(prefix string, data []byte) string {
-	p := toPEM(data, prefix)
-	return base64.StdEncoding.EncodeToString(p)
+func bytesTo64(prefix string, data []byte) (string, error) {
+	p, err := toPEM(data, prefix)
+	if err != nil {
+		return "", err
+	}
+	return base64.StdEncoding.EncodeToString(p), nil
 }
 
 //
