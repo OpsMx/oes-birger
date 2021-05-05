@@ -140,6 +140,84 @@ func stringEquals(t *testing.T, msg string, got string, want string) {
 
 func TestCNCServer_generateKubectlComponents(t *testing.T) {
 	checkFunc := func(t *testing.T, body []byte) {
+		var response fwdapi.KubeConfigResponse
+		err := json.Unmarshal(body, &response)
+		if err != nil {
+			panic(err)
+		}
+		stringEquals(t, "AgentName", response.AgentName, "agent smith")
+		stringEquals(t, "Name", response.Name, "alice smith")
+		stringEquals(t, "ServerURL", response.ServerURL, "https://service.local")
+		stringEquals(t, "UserCertificate", response.UserCertificate, "b")
+		stringEquals(t, "UserKey", response.UserKey, "c")
+		stringEquals(t, "CACert", response.CACert, "a")
+	}
+
+	tests := []struct {
+		name         string
+		request      interface{}
+		validateBody verifierFunc
+		wantStatus   int
+	}{
+		{
+			"badJSON",
+			"badjson",
+			requireError("json: cannot unmarshal"),
+			http.StatusBadRequest,
+		},
+		{
+			"missingName",
+			fwdapi.KubeConfigRequest{},
+			requireError(" is invalid"),
+			http.StatusBadRequest,
+		},
+		{
+			"working",
+			fwdapi.KubeConfigRequest{
+				AgentName: "agent smith",
+				Name:      "alice smith",
+			},
+			checkFunc,
+			http.StatusOK,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mc := &mockConfig{}
+			auth := &mockAuthority{}
+			c := MakeCNCServer(mc, auth, nil, nil, "", "")
+
+			body, err := json.Marshal(tt.request)
+			if err != nil {
+				panic(err)
+			}
+
+			r := httptest.NewRequest("POST", "https://localhost/foo", bytes.NewReader(body))
+			w := httptest.NewRecorder()
+			h := c.generateKubectlComponents()
+			h.ServeHTTP(w, r)
+
+			if w.Result().StatusCode != tt.wantStatus {
+				t.Errorf("Expected status code %d, got %d", tt.wantStatus, w.Code)
+			}
+
+			ct := w.Result().Header.Get("content-type")
+			if ct != "application/json" {
+				t.Errorf("Expected content-type to be application/json, not %s", ct)
+			}
+
+			resultBody, err := ioutil.ReadAll(w.Result().Body)
+			if err != nil {
+				panic(err)
+			}
+
+			tt.validateBody(t, resultBody)
+		})
+	}
+}
+
+func TestCNCServer_generateAgentManifestComponents(t *testing.T) {
+	checkFunc := func(t *testing.T, body []byte) {
 		var response fwdapi.ManifestResponse
 		err := json.Unmarshal(body, &response)
 		if err != nil {
