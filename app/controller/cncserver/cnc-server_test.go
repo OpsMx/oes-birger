@@ -198,6 +198,11 @@ func TestCNCServer_generateKubectlComponents(t *testing.T) {
 				t.Errorf("Expected status code %d, got %d", tt.wantStatus, w.Code)
 			}
 
+			ct := w.Result().Header.Get("content-type")
+			if ct != "application/json" {
+				t.Errorf("Expected content-type to be application/json, not %s", ct)
+			}
+
 			resultBody, err := ioutil.ReadAll(w.Result().Body)
 			if err != nil {
 				panic(err)

@@ -20,7 +20,6 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log"
 	"net/http"
 
@@ -99,26 +98,18 @@ func (c *cncServer) authenticate(method string, h http.HandlerFunc) http.Handler
 	}
 }
 
-func (s *cncServer) decodeKubectlRequest(j io.Reader) (*fwdapi.KubeConfigRequest, error) {
-	var req fwdapi.KubeConfigRequest
-	err := json.NewDecoder(j).Decode(&req)
-	if err != nil {
-		return nil, err
-	}
-
-	err = req.Validate()
-	if err != nil {
-		return nil, err
-	}
-
-	return &req, nil
-}
-
 func (s *cncServer) generateKubectlComponents() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("content-type", "application/json")
 
-		req, err := s.decodeKubectlRequest(r.Body)
+		var req fwdapi.KubeConfigRequest
+		err := json.NewDecoder(r.Body).Decode(&req)
+		if err != nil {
+			util.FailRequest(w, err, http.StatusBadRequest)
+			return
+		}
+
+		err = req.Validate()
 		if err != nil {
 			util.FailRequest(w, err, http.StatusBadRequest)
 			return
