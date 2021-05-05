@@ -38,6 +38,6 @@ func HTTPError(err error) []byte {
 }
 
 func FailRequest(w http.ResponseWriter, err error, code int) {
-	w.Write(HTTPError(err))
 	w.WriteHeader(code)
+	w.Write(HTTPError(err))
 }
