@@ -12,6 +12,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/lestrrat-go/jwx/jwa"
+	"github.com/lestrrat-go/jwx/jwk"
 	"github.com/opsmx/oes-birger/pkg/ca"
 	"github.com/opsmx/oes-birger/pkg/fwdapi"
 )
@@ -23,6 +25,65 @@ type handlerTracker struct {
 func (h *handlerTracker) handler() http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 		h.called = true
+	}
+}
+
+type mockConfig struct{}
+
+func (*mockConfig) GetAgentAdvertisePort() uint16 { return 1234 }
+
+func (*mockConfig) GetControlListenPort() uint16 { return 4321 }
+
+func (*mockConfig) GetControlURL() string { return "https://control.local" }
+
+func (*mockConfig) GetServiceURL() string { return "https://service.local" }
+
+func (*mockConfig) GetAgentHostname() string { return "agent.local" }
+
+type mockAuthority struct{}
+
+func (*mockAuthority) GenerateCertificate(name ca.CertificateName) (string, string, string, error) {
+	return "a", "b", "c", nil
+}
+
+func (*mockAuthority) GetCACert() string {
+	return "base64-cacert"
+}
+
+func (*mockAuthority) MakeCertPool() (*x509.CertPool, error) {
+	return nil, nil
+}
+
+type verifierFunc func(*testing.T, []byte)
+
+func requireError(matchstring string) verifierFunc {
+	type errorMessage struct {
+		Error struct {
+			Message string `json:"message,omitempty"`
+		} `json:"error,omitempty"`
+	}
+
+	return func(t *testing.T, body []byte) {
+		var msg errorMessage
+		err := json.Unmarshal(body, &msg)
+		if err != nil {
+			panic(err)
+		}
+		if msg.Error.Message == "" {
+			t.Errorf("Expected non-empty error, got %v", msg)
+		}
+		if matchstring == "" {
+			return
+		}
+		if !strings.Contains(msg.Error.Message, matchstring) {
+			t.Errorf("Expected '%s' to contain '%s'", msg.Error.Message, matchstring)
+		}
+	}
+}
+
+func stringEquals(t *testing.T, msg string, got string, want string) {
+	if want != got {
+		t.Errorf("Expected %s to be '%s', not '%s'", msg, want, got)
 	}
 }
 
@@ -76,65 +137,6 @@ func TestCNCServer_authenticate(t *testing.T) {
 				t.Errorf("CNCServer.authenticate = %v, want %v, error %v", h.called, tt.want, w.Body)
 			}
 		})
-	}
-}
-
-type mockConfig struct{}
-
-func (*mockConfig) GetAgentAdvertisePort() uint16 { return 1234 }
-
-func (*mockConfig) GetControlListenPort() uint16 { return 4321 }
-
-func (*mockConfig) GetControlURL() string { return "https://control.local" }
-
-func (*mockConfig) GetServiceURL() string { return "https://service.local" }
-
-func (*mockConfig) GetAgentHostname() string { return "agent.local" }
-
-type mockAuthority struct{}
-
-func (*mockAuthority) GenerateCertificate(name ca.CertificateName) (string, string, string, error) {
-	return "a", "b", "c", nil
-}
-
-func (*mockAuthority) GetCACert() string {
-	return ""
-}
-
-func (*mockAuthority) MakeCertPool() (*x509.CertPool, error) {
-	return nil, nil
-}
-
-type verifierFunc func(*testing.T, []byte)
-
-func requireError(matchstring string) verifierFunc {
-	type errorMessage struct {
-		Error struct {
-			Message string `json:"message,omitempty"`
-		} `json:"error,omitempty"`
-	}
-
-	return func(t *testing.T, body []byte) {
-		var msg errorMessage
-		err := json.Unmarshal(body, &msg)
-		if err != nil {
-			panic(err)
-		}
-		if msg.Error.Message == "" {
-			t.Errorf("Expected non-empty error, got %v", msg)
-		}
-		if matchstring == "" {
-			return
-		}
-		if !strings.Contains(msg.Error.Message, matchstring) {
-			t.Errorf("Expected '%s' to contain '%s'", msg.Error.Message, matchstring)
-		}
-	}
-}
-
-func stringEquals(t *testing.T, msg string, got string, want string) {
-	if want != got {
-		t.Errorf("Expected %s to be '%s', not '%s'", msg, want, got)
 	}
 }
 
@@ -270,6 +272,131 @@ func TestCNCServer_generateAgentManifestComponents(t *testing.T) {
 			r := httptest.NewRequest("POST", "https://localhost/foo", bytes.NewReader(body))
 			w := httptest.NewRecorder()
 			h := c.generateAgentManifestComponents()
+			h.ServeHTTP(w, r)
+
+			if w.Result().StatusCode != tt.wantStatus {
+				t.Errorf("Expected status code %d, got %d", tt.wantStatus, w.Code)
+			}
+
+			ct := w.Result().Header.Get("content-type")
+			if ct != "application/json" {
+				t.Errorf("Expected content-type to be application/json, not %s", ct)
+			}
+
+			resultBody, err := ioutil.ReadAll(w.Result().Body)
+			if err != nil {
+				panic(err)
+			}
+
+			tt.validateBody(t, resultBody)
+		})
+	}
+}
+
+func TestCNCServer_generateServiceCredentials(t *testing.T) {
+	checkFunc := func(t *testing.T, body []byte) {
+		var response fwdapi.ServiceCredentialResponse
+		err := json.Unmarshal(body, &response)
+		if err != nil {
+			panic(err)
+		}
+		stringEquals(t, "AgentName", response.AgentName, "agent smith")
+		stringEquals(t, "Name", response.Name, "service smith")
+		stringEquals(t, "Type", response.Type, "jenkins")
+		stringEquals(t, "URL", response.URL, "https://service.local")
+		stringEquals(t, "CACert", response.CACert, "base64-cacert")
+		stringEquals(t, "CredentialType", response.CredentialType, "basic")
+		creds := response.Credential.(map[string]interface{})
+		if _, found := creds["username"]; !found {
+			t.Errorf("Credential does not have key 'username': %#v", creds)
+		}
+		if _, found := creds["password"]; !found {
+			t.Errorf("Credential does not have key 'password': %#v", creds)
+		}
+	}
+
+	awsCheckFunc := func(t *testing.T, body []byte) {
+		var response fwdapi.ServiceCredentialResponse
+		err := json.Unmarshal(body, &response)
+		if err != nil {
+			panic(err)
+		}
+		stringEquals(t, "AgentName", response.AgentName, "agent smith")
+		stringEquals(t, "Name", response.Name, "service smith")
+		stringEquals(t, "Type", response.Type, "aws")
+		stringEquals(t, "URL", response.URL, "https://service.local")
+		stringEquals(t, "CACert", response.CACert, "base64-cacert")
+		stringEquals(t, "CredentialType", response.CredentialType, "aws")
+		creds := response.Credential.(map[string]interface{})
+		if _, found := creds["awsAccessKey"]; !found {
+			t.Errorf("Credential does not have key 'awsAccessKey': %#v", creds)
+		}
+		if _, found := creds["awsSecretAccessKey"]; !found {
+			t.Errorf("Credential does not have key 'awsSecretAccessKey': %#v", creds)
+		}
+	}
+
+	tests := []struct {
+		name         string
+		request      interface{}
+		validateBody verifierFunc
+		wantStatus   int
+	}{
+		{
+			"badJSON",
+			"badjson",
+			requireError("json: cannot unmarshal"),
+			http.StatusBadRequest,
+		},
+		{
+			"missingName",
+			fwdapi.ServiceCredentialRequest{},
+			requireError("is invalid"),
+			http.StatusBadRequest,
+		},
+		{
+			"working",
+			fwdapi.ServiceCredentialRequest{
+				AgentName: "agent smith",
+				Type:      "jenkins",
+				Name:      "service smith",
+			},
+			checkFunc,
+			http.StatusOK,
+		},
+		{
+			"aws",
+			fwdapi.ServiceCredentialRequest{
+				AgentName: "agent smith",
+				Type:      "aws",
+				Name:      "service smith",
+			},
+			awsCheckFunc,
+			http.StatusOK,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mc := &mockConfig{}
+			auth := &mockAuthority{}
+			key1, err := jwk.New([]byte("key 1"))
+			if err != nil {
+				panic(err)
+			}
+			key1.Set(jwk.KeyIDKey, "key1")
+			key1.Set(jwk.AlgorithmKey, jwa.HS256)
+			keys := jwk.NewSet()
+			keys.Add(key1)
+			c := MakeCNCServer(mc, auth, nil, keys, "key1", "")
+
+			body, err := json.Marshal(tt.request)
+			if err != nil {
+				panic(err)
+			}
+
+			r := httptest.NewRequest("POST", "https://localhost/foo", bytes.NewReader(body))
+			w := httptest.NewRecorder()
+			h := c.generateServiceCredentials()
 			h.ServeHTTP(w, r)
 
 			if w.Result().StatusCode != tt.wantStatus {
