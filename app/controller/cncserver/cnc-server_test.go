@@ -54,6 +54,14 @@ func (*mockAuthority) MakeCertPool() (*x509.CertPool, error) {
 	return nil, nil
 }
 
+type mockAgents struct{}
+
+func (*mockAgents) GetStatistics() interface{} {
+	return struct {
+		Foo string `json:"foo"`
+	}{Foo: "foostring"}
+}
+
 type verifierFunc func(*testing.T, []byte)
 
 func requireError(matchstring string) verifierFunc {
@@ -185,9 +193,7 @@ func TestCNCServer_generateKubectlComponents(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mc := &mockConfig{}
-			auth := &mockAuthority{}
-			c := MakeCNCServer(mc, auth, nil, nil, "", "")
+			c := MakeCNCServer(&mockConfig{}, &mockAuthority{}, nil, nil, "", "")
 
 			body, err := json.Marshal(tt.request)
 			if err != nil {
@@ -260,9 +266,7 @@ func TestCNCServer_generateAgentManifestComponents(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mc := &mockConfig{}
-			auth := &mockAuthority{}
-			c := MakeCNCServer(mc, auth, nil, nil, "", "")
+			c := MakeCNCServer(&mockConfig{}, &mockAuthority{}, nil, nil, "", "")
 
 			body, err := json.Marshal(tt.request)
 			if err != nil {
@@ -399,8 +403,6 @@ func TestCNCServer_generateServiceCredentials(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mc := &mockConfig{}
-			auth := &mockAuthority{}
 			key1, err := jwk.New([]byte("key 1"))
 			if err != nil {
 				panic(err)
@@ -409,7 +411,7 @@ func TestCNCServer_generateServiceCredentials(t *testing.T) {
 			key1.Set(jwk.AlgorithmKey, jwa.HS256)
 			keys := jwk.NewSet()
 			keys.Add(key1)
-			c := MakeCNCServer(mc, auth, nil, keys, tt.jwkKey, "")
+			c := MakeCNCServer(&mockConfig{}, &mockAuthority{}, nil, keys, tt.jwkKey, "")
 
 			body, err := json.Marshal(tt.request)
 			if err != nil {
@@ -481,9 +483,7 @@ func TestCNCServer_generateControlCredentials(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mc := &mockConfig{}
-			auth := &mockAuthority{}
-			c := MakeCNCServer(mc, auth, nil, nil, "", "")
+			c := MakeCNCServer(&mockConfig{}, &mockAuthority{}, nil, nil, "", "")
 
 			body, err := json.Marshal(tt.request)
 			if err != nil {
@@ -512,4 +512,32 @@ func TestCNCServer_generateControlCredentials(t *testing.T) {
 			tt.validateBody(t, resultBody)
 		})
 	}
+}
+
+func TestCNCServer_getStatistics(t *testing.T) {
+	t.Run("getCredentials", func(t *testing.T) {
+		c := MakeCNCServer(nil, nil, &mockAgents{}, nil, "", "")
+
+		r := httptest.NewRequest("GET", "https://localhost/foo", nil)
+		w := httptest.NewRecorder()
+		h := c.getStatistics()
+		h.ServeHTTP(w, r)
+
+		if w.Result().StatusCode != http.StatusOK {
+			t.Errorf("Expected status code %d, got %d", http.StatusOK, w.Code)
+		}
+
+		ct := w.Result().Header.Get("content-type")
+		if ct != "application/json" {
+			t.Errorf("Expected content-type to be application/json, not %s", ct)
+		}
+
+		resultBody, err := ioutil.ReadAll(w.Result().Body)
+		if err != nil {
+			panic(err)
+		}
+		if !strings.Contains(string(resultBody), `"connectedAgents":{"foo":"foostring"}`) {
+			t.Errorf("body invalid: %s", string(resultBody))
+		}
+	})
 }
