@@ -1,5 +1,3 @@
-package agent
-
 /*
  * Copyright 2021 OpsMx, Inc.
  *
@@ -15,6 +13,12 @@ package agent
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+//
+// Package agent implements a directly-connected agent.  This is where the GRPC
+// connection is terminated inside this controller.
+//
+package agent
 
 import "fmt"
 
@@ -90,7 +94,7 @@ type DirectlyConnectedAgentStatistics struct {
 }
 
 //
-// Get statistics for this agent
+// GetStatistics returns a set of stats for connected agents.
 //
 func (s *AgentState) GetStatistics() interface{} {
 	ret := &DirectlyConnectedAgentStatistics{

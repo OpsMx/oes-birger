@@ -59,7 +59,7 @@ func (i *environment) String() string {
 
 func (i *environment) Set(value string) error {
 	if !strings.Contains(value, "=") {
-		return fmt.Errorf("Syntax: NAME=value")
+		return fmt.Errorf("syntax: NAME=value")
 	}
 	*i = append(*i, value)
 	return nil
@@ -159,10 +159,11 @@ func main() {
 	opts := []grpc.DialOption{
 		grpc.WithTransportCredentials(ta),
 		grpc.WithBlock(),
-		grpc.WithTimeout(10 * time.Second),
 	}
 
-	conn, err := grpc.Dial(*host, opts...)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	conn, err := grpc.DialContext(ctx, *host, opts...)
 	if err != nil {
 		log.Fatalf("Could not connect: %v", err)
 	}

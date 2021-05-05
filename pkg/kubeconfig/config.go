@@ -83,7 +83,7 @@ func ReadKubeConfig(contents io.Reader) (*KubeConfig, error) {
 	c := &KubeConfig{}
 	err = yaml.Unmarshal(buf, c)
 	if err != nil {
-		return nil, fmt.Errorf("Unable to unmarshal from YAML: %v", err)
+		return nil, fmt.Errorf("unable to unmarshal from YAML: %v", err)
 	}
 
 	if c.APIVersion != "v1" {
@@ -103,7 +103,7 @@ func (kc *KubeConfig) findContext(name string) (*ContextDetails, error) {
 			return &b.Context, nil
 		}
 	}
-	return nil, fmt.Errorf("Unable to find context named %s", name)
+	return nil, fmt.Errorf("unable to find context named %s", name)
 }
 
 func (kc *KubeConfig) findUser(name string) (*User, error) {
@@ -112,7 +112,7 @@ func (kc *KubeConfig) findUser(name string) (*User, error) {
 			return &b, nil
 		}
 	}
-	return nil, fmt.Errorf("Unable to find user named %s", name)
+	return nil, fmt.Errorf("unable to find user named %s", name)
 }
 
 func (kc *KubeConfig) findCluster(name string) (*Cluster, error) {
@@ -121,7 +121,7 @@ func (kc *KubeConfig) findCluster(name string) (*Cluster, error) {
 			return &b, nil
 		}
 	}
-	return nil, fmt.Errorf("Unable to find cluster named %s", name)
+	return nil, fmt.Errorf("unable to find cluster named %s", name)
 }
 
 // GetContextNames returns a list of all context names.

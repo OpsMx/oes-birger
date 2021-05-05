@@ -76,7 +76,6 @@ type HTTPRequestProcessor interface {
 	executeHTTPRequest(chan *tunnel.AgentToControllerWrapper, *tunnel.HttpRequest)
 }
 
-// TODO: this is currently copied from the controller.  Should be shared.
 func (e *Endpoint) String() string {
 	return fmt.Sprintf("(%s, %s, %v)", e.Type, e.Name, e.Configured)
 }
