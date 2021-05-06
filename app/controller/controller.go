@@ -137,12 +137,22 @@ type HTTPMessage struct {
 
 func healthcheck(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("content-type", "application/json")
-	w.Write([]byte("{}"))
 	w.WriteHeader(200)
+	n, err := w.Write([]byte("{}"))
+	if err != nil {
+		log.Printf("Error writing healthcheck response: %v", err)
+		return
+	}
+	if n != 2 {
+		log.Printf("Failed to write 2 bytes: %d written", n)
+	}
 }
 
 func runPrometheusHTTPServer(port uint16) {
 	log.Printf("Running HTTP listener for Prometheus on port %d", port)
+
+	prometheus.MustRegister(apiRequestCounter)
+	agent.PrometheusRegister()
 
 	mux := http.NewServeMux()
 	mux.Handle("/metrics", promhttp.Handler())
@@ -153,10 +163,7 @@ func runPrometheusHTTPServer(port uint16) {
 		Addr:    fmt.Sprintf(":%d", port),
 		Handler: mux,
 	}
-	server.ListenAndServe()
-
-	prometheus.MustRegister(apiRequestCounter)
-	agent.PrometheusRegister()
+	log.Fatal(server.ListenAndServe())
 }
 
 func loadKeyset() {
@@ -180,8 +187,14 @@ func loadKeyset() {
 		if err != nil {
 			return err
 		}
-		key.Set(jwk.KeyIDKey, info.Name())
-		key.Set(jwk.AlgorithmKey, jwa.HS256)
+		err = key.Set(jwk.KeyIDKey, info.Name())
+		if err != nil {
+			return err
+		}
+		err = key.Set(jwk.AlgorithmKey, jwa.HS256)
+		if err != nil {
+			return err
+		}
 		jwtKeyset.Add(key)
 		log.Printf("Loaded service key name %s, length %d", info.Name(), len(content))
 		return nil

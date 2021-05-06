@@ -35,10 +35,26 @@ const (
 
 func MakeJWT(key jwk.Key, epType string, epName string, agent string) (string, error) {
 	t := jwt.New()
-	t.Set(jwt.IssuerKey, "opsmx")
-	t.Set(JWTEndpointTypeKey, epType)
-	t.Set(JWTEndpointNameKey, epName)
-	t.Set(JWTAgentKey, agent)
+
+	err := t.Set(jwt.IssuerKey, "opsmx")
+	if err != nil {
+		return "", err
+	}
+
+	err = t.Set(JWTEndpointTypeKey, epType)
+	if err != nil {
+		return "", err
+	}
+
+	err = t.Set(JWTEndpointNameKey, epName)
+	if err != nil {
+		return "", err
+	}
+
+	err = t.Set(JWTAgentKey, agent)
+	if err != nil {
+		return "", err
+	}
 
 	signed, err := jwt.Sign(t, jwa.HS256, key)
 	if err != nil {

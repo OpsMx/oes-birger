@@ -30,8 +30,14 @@ func makekey(t *testing.T, name string, content string) jwk.Key {
 		t.Error(err)
 		t.FailNow()
 	}
-	key.Set(jwk.KeyIDKey, name)
-	key.Set(jwk.AlgorithmKey, jwa.HS256)
+	err = key.Set(jwk.KeyIDKey, name)
+	if err != nil {
+		panic(err)
+	}
+	err = key.Set(jwk.AlgorithmKey, jwa.HS256)
+	if err != nil {
+		panic(err)
+	}
 	return key
 }
 

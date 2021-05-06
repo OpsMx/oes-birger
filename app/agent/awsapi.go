@@ -165,7 +165,12 @@ func (a *AwsEndpoint) executeHTTPRequest(dataflow chan *tunnel.AgentToController
 	}
 
 	bodyBuffer := bytes.NewReader(req.Body)
-	a.signer.Sign(httpRequest, bodyBuffer, signerService, signingRegion, ts)
+	_, err = a.signer.Sign(httpRequest, bodyBuffer, signerService, signingRegion, ts)
+	if err != nil {
+		log.Printf("Failed to sign AWS request: %v", err)
+		dataflow <- makeBadGatewayResponse(req.Id)
+		return
+	}
 
 	runHTTPRequest(client, req, httpRequest, dataflow, baseURL)
 }

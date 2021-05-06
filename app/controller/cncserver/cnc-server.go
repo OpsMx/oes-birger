@@ -144,7 +144,15 @@ func (s *cncServer) generateKubectlComponents() http.HandlerFunc {
 			util.FailRequest(w, err, http.StatusBadRequest)
 			return
 		}
-		w.Write(json)
+		n, err := w.Write(json)
+		if err != nil {
+			log.Printf("generateKubectlComponents: error while writing: %v", err)
+			return
+		}
+		if n != len(json) {
+			log.Printf("generateKubectlComponents: failed to write entire message: %d of %d written", n, len(json))
+			return
+		}
 	}
 }
 
@@ -187,7 +195,15 @@ func (s *cncServer) generateAgentManifestComponents() http.HandlerFunc {
 			util.FailRequest(w, err, http.StatusBadRequest)
 			return
 		}
-		w.Write(json)
+		n, err := w.Write(json)
+		if err != nil {
+			log.Printf("generateAgentManifestComponents: error while writing: %v", err)
+			return
+		}
+		if n != len(json) {
+			log.Printf("generateAgentManifestComponents: failed to write entire message: %d of %d written", n, len(json))
+			return
+		}
 	}
 }
 
@@ -259,7 +275,15 @@ func (s *cncServer) generateServiceCredentials() http.HandlerFunc {
 			util.FailRequest(w, err, http.StatusBadRequest)
 			return
 		}
-		w.Write(json)
+		n, err := w.Write(json)
+		if err != nil {
+			log.Printf("generateServiceCredentials: error while writing: %v", err)
+			return
+		}
+		if n != len(json) {
+			log.Printf("generateServiceCredentials: failed to write entire message: %d of %d written", n, len(json))
+			return
+		}
 	}
 }
 
@@ -301,7 +325,15 @@ func (s *cncServer) generateControlCredentials() http.HandlerFunc {
 			util.FailRequest(w, err, http.StatusBadRequest)
 			return
 		}
-		w.Write(json)
+		n, err := w.Write(json)
+		if err != nil {
+			log.Printf("generateControlCredentials: error while writing: %v", err)
+			return
+		}
+		if n != len(json) {
+			log.Printf("generateControlCredentials: failed to write entire message: %d of %d written", n, len(json))
+			return
+		}
 	}
 }
 
@@ -319,7 +351,15 @@ func (s *cncServer) getStatistics() http.HandlerFunc {
 			util.FailRequest(w, err, http.StatusBadRequest)
 			return
 		}
-		w.Write(json)
+		n, err := w.Write(json)
+		if err != nil {
+			log.Printf("getStatistics: error while writing: %v", err)
+			return
+		}
+		if n != len(json) {
+			log.Printf("getStatistics: failed to write entire message: %d of %d written", n, len(json))
+			return
+		}
 	}
 }
 

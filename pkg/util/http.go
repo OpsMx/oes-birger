@@ -22,6 +22,7 @@ package util
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 
 	"github.com/opsmx/oes-birger/pkg/fwdapi"
@@ -42,5 +43,12 @@ func HTTPError(err error) []byte {
 
 func FailRequest(w http.ResponseWriter, err error, code int) {
 	w.WriteHeader(code)
-	w.Write(HTTPError(err))
+	errmsg := HTTPError(err)
+	n, err := w.Write(errmsg)
+	if err != nil {
+		log.Printf("failed to write message in FailRequest: %v", err)
+	}
+	if n != len(errmsg) {
+		log.Printf("failed to write entire message in FailRequest: %d of %d bytes written", n, len(errmsg))
+	}
 }

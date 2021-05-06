@@ -129,7 +129,6 @@ func (s *ConnectedAgents) RemoveAgent(state Agent) error {
 	if !ok {
 		// This should not be possible.
 		err := fmt.Errorf("no agents known by the name of %s", state)
-		log.Printf("%v", err)
 		return err
 	}
 
@@ -137,7 +136,6 @@ func (s *ConnectedAgents) RemoveAgent(state Agent) error {
 	i := sliceIndex(len(agentList), func(i int) bool { return agentList[i] == state })
 	if i == -1 {
 		err := fmt.Errorf("attempt to remove unknown agent %s", state)
-		log.Printf("%v", err)
 		return err
 	}
 	agentList[i] = agentList[len(agentList)-1]

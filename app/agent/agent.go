@@ -197,7 +197,7 @@ func runTunnel(wg *sync.WaitGroup, sa *serverContext, conn *grpc.ClientConn, end
 	}()
 	<-waitc
 	close(dataflow)
-	stream.CloseSend()
+	_ = stream.CloseSend()
 }
 
 func loadCert() []byte {

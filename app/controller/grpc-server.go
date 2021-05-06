@@ -164,13 +164,19 @@ func (s *agentTunnelServer) EventTunnel(stream tunnel.AgentTunnelService_EventTu
 		if err == io.EOF {
 			log.Printf("Closing %s", state)
 			s.closeAllHTTP(httpids)
-			agents.RemoveAgent(state)
+			err2 := agents.RemoveAgent(state)
+			if err2 != nil {
+				log.Printf("while removing agent: %v", err2)
+			}
 			return nil
 		}
 		if err != nil {
 			log.Printf("Agent closed connection: %s", state)
 			s.closeAllHTTP(httpids)
-			agents.RemoveAgent(state)
+			err2 := agents.RemoveAgent(state)
+			if err2 != nil {
+				log.Printf("while removing agent: %v", err2)
+			}
 			return err
 		}
 
@@ -180,7 +186,10 @@ func (s *agentTunnelServer) EventTunnel(stream tunnel.AgentTunnelService_EventTu
 			atomic.StoreUint64(&state.LastPing, tunnel.Now())
 			if err := stream.Send(s.makePingResponse(req)); err != nil {
 				log.Printf("Unable to respond to %s with ping response: %v", state, err)
-				agents.RemoveAgent(state)
+				err2 := agents.RemoveAgent(state)
+				if err2 != nil {
+					log.Printf("while removing agent: %v", err2)
+				}
 				return err
 			}
 		case *tunnel.AgentToControllerWrapper_AgentHello:
@@ -368,12 +377,18 @@ func (s *cmdToolTunnelServer) EventTunnel(stream tunnel.CmdToolTunnelService_Eve
 		in, err := stream.Recv()
 		if err == io.EOF {
 			log.Printf("CmdTool %s closed connection %s", agentIdentity, sessionIdentity)
-			agents.Cancel(ep, operationID)
+			err2 := agents.Cancel(ep, operationID)
+			if err2 != nil {
+				log.Printf("while cancelling operation: %v", err2)
+			}
 			return nil
 		}
 		if err != nil {
 			log.Printf("CmdTool %s closed connection: %s", agentIdentity, sessionIdentity)
-			agents.Cancel(ep, operationID)
+			err2 := agents.Cancel(ep, operationID)
+			if err2 != nil {
+				log.Printf("while cancelling operation: %v", err2)
+			}
 			return err
 		}
 
