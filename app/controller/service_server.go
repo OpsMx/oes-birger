@@ -113,8 +113,7 @@ func extractEndpoint(r *http.Request) (agentIdentity string, endpointType string
 func serviceAPIHandler(w http.ResponseWriter, r *http.Request) {
 	agentIdentity, endpointType, endpointName, err := extractEndpoint(r)
 	if err != nil {
-		w.Write(util.HTTPError(err))
-		w.WriteHeader(http.StatusBadRequest)
+		util.FailRequest(w, err, http.StatusBadRequest)
 		return
 	}
 	ep := agent.AgentSearch{
@@ -153,7 +152,10 @@ func runAPIHandler(ep agent.AgentSearch, w http.ResponseWriter, r *http.Request)
 	go func() {
 		<-notify
 		if !cleanClose {
-			agents.Cancel(ep, transactionID)
+			err := agents.Cancel(ep, transactionID)
+			if err != nil {
+				log.Printf("while cancelling http request: %v", err)
+			}
 		}
 	}()
 
@@ -200,7 +202,21 @@ func runAPIHandler(ep agent.AgentSearch, w http.ResponseWriter, r *http.Request)
 				cleanClose = true
 				return
 			}
-			w.Write(resp.Body)
+			n, err := w.Write(resp.Body)
+			if err != nil {
+				log.Printf("Error: cannot write: %v", err)
+				if !seenHeader {
+					w.WriteHeader(http.StatusBadGateway)
+				}
+				return
+			}
+			if n != len(resp.Body) {
+				log.Printf("Error: did not write full message: %d of %d written", n, len(resp.Body))
+				if !seenHeader {
+					w.WriteHeader(http.StatusBadGateway)
+				}
+				return
+			}
 			if isChunked {
 				flusher.Flush()
 			}

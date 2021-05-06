@@ -91,7 +91,10 @@ func runCommand(client tunnel.CmdToolTunnelServiceClient, cmd string, env []stri
 			},
 		},
 	}
-	stream.Send(&run)
+	err = stream.Send(&run)
+	if err != nil {
+		log.Fatalf("while sending to stream: %v", err)
+	}
 	go func() {
 		for {
 			in, err := stream.Recv()
@@ -125,7 +128,8 @@ func runCommand(client tunnel.CmdToolTunnelServiceClient, cmd string, env []stri
 		}
 	}()
 	<-waitc
-	stream.CloseSend()
+	err = stream.CloseSend()
+	log.Fatalf("While closing stream: %v", err)
 }
 
 func main() {

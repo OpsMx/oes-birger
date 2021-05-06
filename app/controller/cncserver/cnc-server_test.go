@@ -423,8 +423,14 @@ func TestCNCServer_generateServiceCredentials(t *testing.T) {
 			if err != nil {
 				panic(err)
 			}
-			key1.Set(jwk.KeyIDKey, "key1")
-			key1.Set(jwk.AlgorithmKey, jwa.HS256)
+			err = key1.Set(jwk.KeyIDKey, "key1")
+			if err != nil {
+				panic(err)
+			}
+			err = key1.Set(jwk.AlgorithmKey, jwa.HS256)
+			if err != nil {
+				panic(err)
+			}
 			keys := jwk.NewSet()
 			keys.Add(key1)
 			c := MakeCNCServer(&mockConfig{}, &mockAuthority{}, nil, keys, tt.jwkKey, "")
