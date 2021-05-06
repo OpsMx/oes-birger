@@ -1,5 +1,3 @@
-package kubeconfig
-
 /*
  * Copyright 2021 OpsMx, Inc.
  *
@@ -15,6 +13,12 @@ package kubeconfig
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+//
+// Package kubeconfig parses a kubeconfig file, extracting basic information
+// such as user keys, tokens, and the default context.
+//
+package kubeconfig
 
 import (
 	"fmt"

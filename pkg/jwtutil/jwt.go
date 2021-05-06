@@ -1,5 +1,3 @@
-package jwtutil
-
 /*
  * Copyright 2021 OpsMx.
  *
@@ -15,6 +13,11 @@ package jwtutil
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+//
+// Package jwtutil simplifies generating properly formatted web tokens for our use.
+//
+package jwtutil
 
 import (
 	"fmt"

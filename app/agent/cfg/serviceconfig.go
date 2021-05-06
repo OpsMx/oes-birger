@@ -1,5 +1,3 @@
-package cfg
-
 /*
  * Copyright 2021 OpsMx, Inc.
  *
@@ -15,6 +13,14 @@ package cfg
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+//
+// Package cfg handles the top level agent configuration YAML handling.
+//
+// The service-level "Config" element is handled by the Make() methods on
+// each service endpoint type.
+//
+package cfg
 
 import (
 	"io/ioutil"

@@ -1,5 +1,3 @@
-package ca
-
 /*
  * Copyright 2021 OpsMx, Inc.
  *
@@ -15,6 +13,11 @@ package ca
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+//
+// Package ca implements a simple certificate authority.
+//
+package ca
 
 import (
 	"bytes"
@@ -32,10 +35,10 @@ import (
 )
 
 const (
-	DEFAULT_TLS_CERTIFICATE_PATH = "/app/secrets/ca/tls.crt" // use as const
-	DEFAULT_TLS_KEY_PATH         = "/app/secrets/ca/tls.key" // use as const
+	DefaultTLSCertificatePath = "/app/secrets/ca/tls.crt"
+	DefaultTLSKeyPath         = "/app/secrets/ca/tls.key"
 
-	OPSMX_OID_VALUE = 0x6f706d78 // 31-bit max
+	OpsMxOIDValue = 0x6f706d78 // 31-bit max
 )
 
 type CertificateIssuer interface {
@@ -66,10 +69,10 @@ type Config struct {
 
 func (c *Config) applyDefaults() {
 	if len(c.CACertFile) == 0 {
-		c.CACertFile = DEFAULT_TLS_CERTIFICATE_PATH
+		c.CACertFile = DefaultTLSCertificatePath
 	}
 	if len(c.CAKeyFile) == 0 {
-		c.CAKeyFile = DEFAULT_TLS_KEY_PATH
+		c.CAKeyFile = DefaultTLSKeyPath
 	}
 }
 
@@ -244,7 +247,7 @@ const (
 
 func GetCertificateNameFromCert(cert *x509.Certificate) (*CertificateName, error) {
 	for _, atv := range cert.Subject.Names {
-		if atv.Type.Equal([]int{2, 5, 4, OPSMX_OID_VALUE}) {
+		if atv.Type.Equal([]int{2, 5, 4, OpsMxOIDValue}) {
 			var name CertificateName
 			value, ok := atv.Value.(string)
 			if !ok {
@@ -275,7 +278,7 @@ func (c *CA) GenerateCertificate(name CertificateName) (string, string, string, 
 		Subject: pkix.Name{
 			ExtraNames: []pkix.AttributeTypeAndValue{
 				{
-					Type:  []int{2, 5, 4, OPSMX_OID_VALUE},
+					Type:  []int{2, 5, 4, OpsMxOIDValue},
 					Value: string(jsonName),
 				},
 			},

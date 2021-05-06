@@ -116,7 +116,7 @@ var (
 		Subject: pkix.Name{
 			Names: []pkix.AttributeTypeAndValue{
 				{
-					Type:  []int{2, 5, 4, ca.OPSMX_OID_VALUE},
+					Type:  []int{2, 5, 4, ca.OpsMxOIDValue},
 					Value: `{"purpose":"control"}`,
 				},
 			},
@@ -127,7 +127,7 @@ var (
 		Subject: pkix.Name{
 			Names: []pkix.AttributeTypeAndValue{
 				{
-					Type:  []int{2, 5, 4, ca.OPSMX_OID_VALUE},
+					Type:  []int{2, 5, 4, ca.OpsMxOIDValue},
 					Value: `{"purpose":"xxx"}`,
 				},
 			},

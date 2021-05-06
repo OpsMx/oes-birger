@@ -1,5 +1,3 @@
-package ulid
-
 /*
  * Copyright 2021 OpsMx, Inc.
  *
@@ -15,6 +13,12 @@ package ulid
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+//
+// Package ulid is a wrapper to make using ulids in a thread-safe way
+// easier.
+//
+package ulid
 
 import (
 	cryptorand "crypto/rand"

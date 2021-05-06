@@ -16,10 +16,10 @@ package fwdapi
  * limitations under the License.
  */
 
-type HttpErrorMessage struct {
+type HTTPErrorMessage struct {
 	Message string `json:"message"`
 }
 
-type HttpErrorResponse struct {
-	Error *HttpErrorMessage `json:"error"`
+type HTTPErrorResponse struct {
+	Error *HTTPErrorMessage `json:"error"`
 }

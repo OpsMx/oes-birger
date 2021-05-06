@@ -1,5 +1,3 @@
-package secrets
-
 /*
  * Copyright 2021 OpsMx, Inc.
  *
@@ -15,6 +13,12 @@ package secrets
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+//
+// Package secrets loads secrets from various sources, such as Kubernetes
+// secrets.
+//
+package secrets
 
 import (
 	"context"

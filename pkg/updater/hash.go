@@ -1,5 +1,3 @@
-package updater
-
 /*
  * Copyright 2021 OpsMx, Inc.
  *
@@ -15,6 +13,14 @@ package updater
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+//
+// Package updater will handle updating a binary, and perhaps other files.
+// A "hash" is used to indicate a specific file the controller wants us to run,
+// and if updating is enabled, we will replace the currently running binary
+// with a new version.
+//
+package updater
 
 import (
 	"encoding/base64"

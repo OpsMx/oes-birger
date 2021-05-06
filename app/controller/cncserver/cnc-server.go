@@ -1,5 +1,3 @@
-package cncserver
-
 /*
  * Copyright 2021 OpsMx, Inc.
  *
@@ -15,6 +13,13 @@ package cncserver
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+//
+// Package cncserver implements all the control endpoints needed to
+// request various types of secrets and statistics about the running
+// controller.
+//
+package cncserver
 
 import (
 	"crypto/tls"
@@ -75,7 +80,7 @@ func MakeCNCServer(
 	}
 }
 
-func (c *cncServer) authenticate(method string, h http.HandlerFunc) http.HandlerFunc {
+func (s *cncServer) authenticate(method string, h http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != method {
 			err := fmt.Errorf("only '%s' is accepted (not '%s')", method, r.Method)
@@ -319,19 +324,19 @@ func (s *cncServer) getStatistics() http.HandlerFunc {
 }
 
 func (s *cncServer) routes(mux *http.ServeMux) {
-	mux.HandleFunc(fwdapi.KUBECONFIG_ENDPOINT,
+	mux.HandleFunc(fwdapi.KubeconfigEndpoint,
 		s.authenticate("POST", s.generateKubectlComponents()))
 
-	mux.HandleFunc(fwdapi.MANIFEST_ENDPOINT,
+	mux.HandleFunc(fwdapi.ManifestEndpoint,
 		s.authenticate("POST", s.generateAgentManifestComponents()))
 
-	mux.HandleFunc(fwdapi.SERVICE_ENDPOINT,
+	mux.HandleFunc(fwdapi.ServiceEndpoint,
 		s.authenticate("POST", s.generateServiceCredentials()))
 
-	mux.HandleFunc(fwdapi.CONTROL_ENDPOINT,
+	mux.HandleFunc(fwdapi.ControlEndpoint,
 		s.authenticate("POST", s.generateControlCredentials()))
 
-	mux.HandleFunc(fwdapi.STATISTICS_ENDPOINT,
+	mux.HandleFunc(fwdapi.StatisticsEndpoint,
 		s.authenticate("GET", s.getStatistics()))
 
 }

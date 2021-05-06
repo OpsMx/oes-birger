@@ -1,5 +1,3 @@
-package fwdapi
-
 /*
  * Copyright 2021 OpsMx, Inc.
  *
@@ -16,17 +14,23 @@ package fwdapi
  * limitations under the License.
  */
 
+//
+// Package fwdapi handles all the types and some minimal validation of
+// the control API endpoints.
+//
+package fwdapi
+
 const (
-	KUBECONFIG_ENDPOINT = "/api/v1/generateKubectlComponents"
-	MANIFEST_ENDPOINT   = "/api/v1/generateAgentManifestComponents"
-	SERVICE_ENDPOINT    = "/api/v1/generateServiceCredentials"
-	STATISTICS_ENDPOINT = "/api/v1/getAgentStatistics"
-	CONTROL_ENDPOINT    = "/api/v1/generateControlCredentials"
+	KubeconfigEndpoint = "/api/v1/generateKubectlComponents"
+	ManifestEndpoint   = "/api/v1/generateAgentManifestComponents"
+	ServiceEndpoint    = "/api/v1/generateServiceCredentials"
+	StatisticsEndpoint = "/api/v1/getAgentStatistics"
+	ControlEndpoint    = "/api/v1/generateControlCredentials"
 )
 
-///
-/// KUBECONFIG_ENDPOINT
-///
+//
+// KubeConfigRequest defines the request for the KubeconfigEndpoint
+//
 type KubeConfigRequest struct {
 	AgentName string `json:"agentName,omitempty"`
 	Name      string `json:"name,omitempty"`
@@ -41,9 +45,9 @@ type KubeConfigResponse struct {
 	CACert          string `json:"caCert,omitempty"`
 }
 
-///
-/// MANIFEST_ENDPOINT
-///
+//
+// ManifestRequest defines the request for the ManifestEndpoint
+//
 type ManifestRequest struct {
 	AgentName string `json:"agentName,omitempty"`
 }
@@ -57,18 +61,18 @@ type ManifestResponse struct {
 	CACert           string `json:"caCert,omitempty"`
 }
 
-///
-/// STATISTICS_ENDPOINT
-///
+//
+// StatisticsResponse defines the response for the StatisticsEndpoint
+//
 type StatisticsResponse struct {
 	ServerTime      uint64      `json:"serverTime,omitempty"`
 	Version         string      `json:"version,omitempty"`
 	ConnectedAgents interface{} `json:"connectedAgents,omitempty"`
 }
 
-///
-/// SERVICE_ENDPOINT
-///
+//
+// ServiceCredentialRequest defines the request for the ServiceEndpoint
+//
 type ServiceCredentialRequest struct {
 	AgentName string `json:"agentName,omitempty"`
 	Type      string `json:"Type,omitempty"`
@@ -97,9 +101,9 @@ type AwsCredentialResponse struct {
 	AwsSecretAccessKey string `json:"awsSecretAccessKey,omitempty"`
 }
 
-///
-/// CONTROL_ENDPOINT
-///
+//
+// ControlCredentialsRequest defines the request for the ControlEndpoint
+//
 type ControlCredentialsRequest struct {
 	Name string `json:"name,omitempty"`
 }

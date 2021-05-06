@@ -1,5 +1,3 @@
-package util
-
 /*
  * Copyright 2021 OpsMx, Inc.
  *
@@ -16,6 +14,11 @@ package util
  * limitations under the License.
  */
 
+//
+// Package util is a kitchen sink.  Sorry.
+//
+package util
+
 import (
 	"encoding/json"
 	"fmt"
@@ -25,8 +28,8 @@ import (
 )
 
 func HTTPError(err error) []byte {
-	ret := &fwdapi.HttpErrorResponse{
-		Error: &fwdapi.HttpErrorMessage{
+	ret := &fwdapi.HTTPErrorResponse{
+		Error: &fwdapi.HTTPErrorMessage{
 			Message: fmt.Sprintf("Unable to process request: %v", err),
 		},
 	}

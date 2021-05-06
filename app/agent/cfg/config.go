@@ -1,5 +1,3 @@
-package cfg
-
 /*
  * Copyright 2021 OpsMx, Inc.
  *
@@ -16,6 +14,8 @@ package cfg
  * limitations under the License.
  */
 
+package cfg
+
 import (
 	"io/ioutil"
 
@@ -23,9 +23,9 @@ import (
 )
 
 const (
-	DEFAULT_CERT_PATH       = "/app/secrets/agent/tls.crt"
-	DEFAULT_KEY_PATH        = "/app/secrets/agent/tls.key"
-	DEFAULT_USERCONFIG_PATH = "/app/config/services.yaml"
+	DefaultCertPath       = "/app/secrets/agent/tls.crt"
+	DefaultKeyPath        = "/app/secrets/agent/tls.key"
+	DefaultUserconfigPath = "/app/config/services.yaml"
 )
 
 // AgentConfig holds all the configuration for the agent.  The
@@ -45,15 +45,15 @@ func (c *AgentConfig) applyDefaults() {
 	}
 
 	if len(c.CertFile) == 0 {
-		c.CertFile = DEFAULT_CERT_PATH
+		c.CertFile = DefaultCertPath
 	}
 
 	if len(c.KeyFile) == 0 {
-		c.KeyFile = DEFAULT_KEY_PATH
+		c.KeyFile = DefaultKeyPath
 	}
 
 	if len(c.ServicesConfigPath) == 0 {
-		c.ServicesConfigPath = DEFAULT_USERCONFIG_PATH
+		c.ServicesConfigPath = DefaultUserconfigPath
 	}
 }
 

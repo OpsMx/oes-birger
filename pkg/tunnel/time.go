@@ -1,5 +1,3 @@
-package tunnel
-
 /*
  * Copyright 2021 OpsMx, Inc.
  *
@@ -15,6 +13,12 @@ package tunnel
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+//
+// Package tunnel defines and puts some helper funcitons on the GRPC
+// protocol used across the system.
+//
+package tunnel
 
 import (
 	"time"
