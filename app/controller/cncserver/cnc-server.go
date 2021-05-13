@@ -53,7 +53,8 @@ type cncAgentStatsReporter interface {
 	GetStatistics() interface{}
 }
 
-type cncServer struct {
+// CNCServer holds the context for a specific instance of a command and control http server.
+type CNCServer struct {
 	cfg           cncConfig
 	authority     cncCertificateAuthority
 	agentReporter cncAgentStatsReporter
@@ -62,6 +63,9 @@ type cncServer struct {
 	version       string
 }
 
+//
+// MakeCNCServer will return a server that implenets the endpoints for command and control,
+// and and
 func MakeCNCServer(
 	config cncConfig,
 	authority cncCertificateAuthority,
@@ -69,8 +73,8 @@ func MakeCNCServer(
 	jwkset jwk.Set,
 	currentKey string,
 	vers string,
-) *cncServer {
-	return &cncServer{
+) *CNCServer {
+	return &CNCServer{
 		cfg:           config,
 		authority:     authority,
 		agentReporter: agents,
@@ -80,7 +84,7 @@ func MakeCNCServer(
 	}
 }
 
-func (s *cncServer) authenticate(method string, h http.HandlerFunc) http.HandlerFunc {
+func (s *CNCServer) authenticate(method string, h http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != method {
 			err := fmt.Errorf("only '%s' is accepted (not '%s')", method, r.Method)
@@ -103,7 +107,7 @@ func (s *cncServer) authenticate(method string, h http.HandlerFunc) http.Handler
 	}
 }
 
-func (s *cncServer) generateKubectlComponents() http.HandlerFunc {
+func (s *CNCServer) generateKubectlComponents() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("content-type", "application/json")
 
@@ -156,7 +160,7 @@ func (s *cncServer) generateKubectlComponents() http.HandlerFunc {
 	}
 }
 
-func (s *cncServer) generateAgentManifestComponents() http.HandlerFunc {
+func (s *CNCServer) generateAgentManifestComponents() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("content-type", "application/json")
 
@@ -207,7 +211,7 @@ func (s *cncServer) generateAgentManifestComponents() http.HandlerFunc {
 	}
 }
 
-func (s *cncServer) generateServiceCredentials() http.HandlerFunc {
+func (s *CNCServer) generateServiceCredentials() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("content-type", "application/json")
 
@@ -287,7 +291,7 @@ func (s *cncServer) generateServiceCredentials() http.HandlerFunc {
 	}
 }
 
-func (s *cncServer) generateControlCredentials() http.HandlerFunc {
+func (s *CNCServer) generateControlCredentials() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("content-type", "application/json")
 
@@ -337,7 +341,7 @@ func (s *cncServer) generateControlCredentials() http.HandlerFunc {
 	}
 }
 
-func (s *cncServer) getStatistics() http.HandlerFunc {
+func (s *CNCServer) getStatistics() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("content-type", "application/json")
 
@@ -363,7 +367,7 @@ func (s *cncServer) getStatistics() http.HandlerFunc {
 	}
 }
 
-func (s *cncServer) routes(mux *http.ServeMux) {
+func (s *CNCServer) routes(mux *http.ServeMux) {
 	mux.HandleFunc(fwdapi.KubeconfigEndpoint,
 		s.authenticate("POST", s.generateKubectlComponents()))
 
@@ -381,7 +385,8 @@ func (s *cncServer) routes(mux *http.ServeMux) {
 
 }
 
-func (s *cncServer) RunServer(serverCert tls.Certificate) {
+// RunServer will start the HTTPS server and serve requests.
+func (s *CNCServer) RunServer(serverCert tls.Certificate) {
 	log.Printf("Running Command and Control API HTTPS listener on port %d",
 		s.cfg.GetControlListenPort())
 
