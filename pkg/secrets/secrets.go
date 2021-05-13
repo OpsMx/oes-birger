@@ -29,11 +29,14 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 )
 
+// KubernetesSecretLoader will load a secret from a Kubernetes namesapce.
 type KubernetesSecretLoader struct {
 	clientset kubernetes.Interface
 	namespace string
 }
 
+// MakeKubernetesSecretLoading returns a new KubenetesSecretLoader using the Kubernetes service
+// account.
 func MakeKubernetesSecretLoader(namespace string) (*KubernetesSecretLoader, error) {
 	config, err := rest.InClusterConfig()
 	if err != nil {
@@ -42,6 +45,8 @@ func MakeKubernetesSecretLoader(namespace string) (*KubernetesSecretLoader, erro
 	return makeClientset(namespace, config)
 }
 
+// MakeKubernetesSecretLoaderFromKubectl returns a new KubernetesSecretLoader that uses
+// credentials in the provided kubeconfig credentials.
 func MakeKubernetesSecretLoaderFromKubectl(namespace string, kubeconfig string) (*KubernetesSecretLoader, error) {
 	config, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
 	if err != nil {
@@ -50,6 +55,8 @@ func MakeKubernetesSecretLoaderFromKubectl(namespace string, kubeconfig string) 
 	return makeClientset(namespace, config)
 }
 
+// MakeKubernetesSecretLoaderFromClientset creates a new KubernetesSecretLoader from a
+// clientset.
 func MakeKubernetesSecretLoaderFromClientset(namespace string, clientset kubernetes.Interface) *KubernetesSecretLoader {
 	return &KubernetesSecretLoader{
 		clientset: clientset,
@@ -69,6 +76,7 @@ func makeClientset(namespace string, config *rest.Config) (*KubernetesSecretLoad
 	}, nil
 }
 
+// GetSecret will return a secret from Kubernetes, as a map.
 func (s *KubernetesSecretLoader) GetSecret(name string) (*map[string][]byte, error) {
 	deploymentsClient := s.clientset.CoreV1().Secrets(s.namespace)
 
