@@ -1,5 +1,3 @@
-package updater
-
 /*
  * Copyright 2021 OpsMx, Inc.
  *
@@ -16,11 +14,14 @@ package updater
  * limitations under the License.
  */
 
+package updater
+
 import (
 	"os"
 	"syscall"
 )
 
+// HashSelf will generate a hash of the currently running binary.
 func HashSelf() (string, error) {
 	selfPath := os.Args[0]
 
@@ -31,6 +32,7 @@ func HashSelf() (string, error) {
 	return hash.String(), nil
 }
 
+// RestartSelf will replace the currently running binary with the specified binary.
 func RestartSelf(path string) error {
 	if err := syscall.Exec(os.Args[0], os.Args, os.Environ()); err != nil {
 		return err

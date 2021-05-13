@@ -38,6 +38,7 @@ func typeValid(n string) bool {
 	return matched
 }
 
+// Validate ensures that the required fields are set to reasonable values, usually just non-empty strings.
 func (req *ServiceCredentialRequest) Validate() error {
 	if !namePresent(req.AgentName) {
 		return fmt.Errorf("'agentName' is invalid")
@@ -54,6 +55,7 @@ func (req *ServiceCredentialRequest) Validate() error {
 	return nil
 }
 
+// Validate ensures that the required fields are set to reasonable values, usually just non-empty strings.
 func (req *KubeConfigRequest) Validate() error {
 	if !namePresent(req.AgentName) {
 		return fmt.Errorf("'agentName' is invalid")
@@ -66,6 +68,7 @@ func (req *KubeConfigRequest) Validate() error {
 	return nil
 }
 
+// Validate ensures that the required fields are set to reasonable values, usually just non-empty strings.
 func (req *ManifestRequest) Validate() error {
 	if !namePresent(req.AgentName) {
 		return fmt.Errorf("'agentName' is invalid")
@@ -74,6 +77,7 @@ func (req *ManifestRequest) Validate() error {
 	return nil
 }
 
+// Validate ensures that the required fields are set to reasonable values, usually just non-empty strings.
 func (req *ControlCredentialsRequest) Validate() error {
 	if !namePresent(req.Name) {
 		return fmt.Errorf("'name' is invalid")

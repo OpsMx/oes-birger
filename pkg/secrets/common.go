@@ -16,6 +16,7 @@ package secrets
  * limitations under the License.
  */
 
+// SecretLoader is an interface to ensure GetSecret() exists.
 type SecretLoader interface {
 	GetSecret(string) (*map[string][]byte, error)
 }

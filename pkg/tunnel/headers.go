@@ -1,7 +1,3 @@
-package tunnel
-
-import "strings"
-
 /*
  * Copyright 2021 OpsMx, Inc.
  *
@@ -18,6 +14,12 @@ import "strings"
  * limitations under the License.
  */
 
+package tunnel
+
+import "strings"
+
+// GetHeaderValue will search the array of headers, and return the first
+// value if found.  If not found, it will return an empty string.
 func (t *HttpRequest) GetHeaderValue(name string) string {
 	for _, header := range t.Headers {
 		if strings.EqualFold(header.Name, name) {

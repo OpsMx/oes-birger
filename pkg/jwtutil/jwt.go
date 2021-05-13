@@ -28,11 +28,12 @@ import (
 )
 
 const (
-	JWTEndpointTypeKey = "t"
-	JWTEndpointNameKey = "n"
-	JWTAgentKey        = "a"
+	jwtEndpointTypeKey = "t"
+	jwtEndpointNameKey = "n"
+	jwtAgentKey        = "a"
 )
 
+// MakeJWT will return a token with provided type, name, and agent name embeded in the claims.
 func MakeJWT(key jwk.Key, epType string, epName string, agent string) (string, error) {
 	t := jwt.New()
 
@@ -41,17 +42,17 @@ func MakeJWT(key jwk.Key, epType string, epName string, agent string) (string, e
 		return "", err
 	}
 
-	err = t.Set(JWTEndpointTypeKey, epType)
+	err = t.Set(jwtEndpointTypeKey, epType)
 	if err != nil {
 		return "", err
 	}
 
-	err = t.Set(JWTEndpointNameKey, epName)
+	err = t.Set(jwtEndpointNameKey, epName)
 	if err != nil {
 		return "", err
 	}
 
-	err = t.Set(JWTAgentKey, agent)
+	err = t.Set(jwtAgentKey, agent)
 	if err != nil {
 		return "", err
 	}
@@ -70,6 +71,7 @@ func getField(token jwt.Token, name string) (string, error) {
 	return "", fmt.Errorf("missing %s", name)
 }
 
+// ValidateJWT will validate and return the enbedded claims.
 func ValidateJWT(keyset jwk.Set, tokenString string) (epType string, epName string, agent string, err error) {
 	token, err := jwt.Parse(
 		[]byte(tokenString),
@@ -79,13 +81,13 @@ func ValidateJWT(keyset jwk.Set, tokenString string) (epType string, epName stri
 	if err != nil {
 		return
 	}
-	if epType, err = getField(token, JWTEndpointTypeKey); err != nil {
+	if epType, err = getField(token, jwtEndpointTypeKey); err != nil {
 		return "", "", "", err
 	}
-	if epName, err = getField(token, JWTEndpointNameKey); err != nil {
+	if epName, err = getField(token, jwtEndpointNameKey); err != nil {
 		return "", "", "", err
 	}
-	if agent, err = getField(token, JWTAgentKey); err != nil {
+	if agent, err = getField(token, jwtAgentKey); err != nil {
 		return "", "", "", err
 	}
 	return

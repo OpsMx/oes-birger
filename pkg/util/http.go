@@ -24,13 +24,19 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-
-	"github.com/opsmx/oes-birger/pkg/fwdapi"
 )
 
+type httpErrorMessage struct {
+	Message string `json:"message"`
+}
+
+type httpErrorResponse struct {
+	Error *httpErrorMessage `json:"error"`
+}
+
 func httpError(err error) []byte {
-	ret := &fwdapi.HTTPErrorResponse{
-		Error: &fwdapi.HTTPErrorMessage{
+	ret := &httpErrorResponse{
+		Error: &httpErrorMessage{
 			Message: fmt.Sprintf("Unable to process request: %v", err),
 		},
 	}
