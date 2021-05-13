@@ -27,7 +27,3 @@ var (
 		Help: "The currently connected agents",
 	}, []string{"agent"})
 )
-
-func PrometheusRegister() {
-	prometheus.MustRegister(connectedAgentsGauge)
-}
