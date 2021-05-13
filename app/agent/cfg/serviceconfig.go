@@ -50,19 +50,21 @@ type ServiceConfig struct {
 	Name       string                      `yaml:"name"`
 	Type       string                      `yaml:"type"`
 	Config     map[interface{}]interface{} `yaml:"config,omitempty"`
-	Namespaces []ServiceNamespace          `yaml:"namespaces,omitempty"`
+	Namespaces []serviceNamespace          `yaml:"namespaces,omitempty"`
 }
 
-type ServiceNamespace struct {
+type serviceNamespace struct {
 	Name       string   `yaml:"name"`
 	Namespaces []string `yaml:"namespaces"`
 }
 
+// AgentServiceConfig defines a service level configuration top-level list.
 type AgentServiceConfig struct {
 	Commands []CommandConfig `yaml:"commands,omitempty"`
 	Services []ServiceConfig `yaml:"services,omitempty"`
 }
 
+// LoadServiceConfig loads a service configuration YAML file.
 func LoadServiceConfig(filename string) (*AgentServiceConfig, error) {
 	buf, err := ioutil.ReadFile(filename)
 	if err != nil {

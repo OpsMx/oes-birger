@@ -23,9 +23,9 @@ import (
 )
 
 const (
-	DefaultCertPath       = "/app/secrets/agent/tls.crt"
-	DefaultKeyPath        = "/app/secrets/agent/tls.key"
-	DefaultUserconfigPath = "/app/config/services.yaml"
+	defaultCertPath       = "/app/secrets/agent/tls.crt"
+	defaultKeyPath        = "/app/secrets/agent/tls.key"
+	defaultUserconfigPath = "/app/config/services.yaml"
 )
 
 // AgentConfig holds all the configuration for the agent.  The
@@ -45,15 +45,15 @@ func (c *AgentConfig) applyDefaults() {
 	}
 
 	if len(c.CertFile) == 0 {
-		c.CertFile = DefaultCertPath
+		c.CertFile = defaultCertPath
 	}
 
 	if len(c.KeyFile) == 0 {
-		c.KeyFile = DefaultKeyPath
+		c.KeyFile = defaultKeyPath
 	}
 
 	if len(c.ServicesConfigPath) == 0 {
-		c.ServicesConfigPath = DefaultUserconfigPath
+		c.ServicesConfigPath = defaultUserconfigPath
 	}
 }
 
