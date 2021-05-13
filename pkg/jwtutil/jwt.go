@@ -33,7 +33,7 @@ const (
 	jwtAgentKey        = "a"
 )
 
-// MakeJWT will return a token with provided type, name, and agent name embeded in the claims.
+// MakeJWT will return a token with provided type, name, and agent name embedded in the claims.
 func MakeJWT(key jwk.Key, epType string, epName string, agent string) (string, error) {
 	t := jwt.New()
 
