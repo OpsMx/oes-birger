@@ -20,6 +20,7 @@
 //
 package fwdapi
 
+// Endpoint paths
 const (
 	KubeconfigEndpoint = "/api/v1/generateKubectlComponents"
 	ManifestEndpoint   = "/api/v1/generateAgentManifestComponents"
@@ -36,6 +37,9 @@ type KubeConfigRequest struct {
 	Name      string `json:"name,omitempty"`
 }
 
+//
+// KubeConfigResponse defines the response for the KubeconfigEndpoint
+//
 type KubeConfigResponse struct {
 	AgentName       string `json:"agentName,omitempty"`
 	Name            string `json:"name,omitempty"`
@@ -52,6 +56,9 @@ type ManifestRequest struct {
 	AgentName string `json:"agentName,omitempty"`
 }
 
+//
+// ManifestResponse defines the response for the ManifestEndpoint
+//
 type ManifestResponse struct {
 	AgentName        string `json:"agentName,omitempty"`
 	ServerHostname   string `json:"serverHostname,omitempty"`
@@ -79,6 +86,9 @@ type ServiceCredentialRequest struct {
 	Name      string `json:"Name,omitempty"`
 }
 
+//
+// ServiceCredentialResponse defines the response for the ServiceEndpoint
+//
 type ServiceCredentialResponse struct {
 	AgentName      string      `json:"agentName,omitempty"`
 	Name           string      `json:"name,omitempty"`
@@ -91,11 +101,13 @@ type ServiceCredentialResponse struct {
 	CACert         string      `json:"caCert,omitempty"`
 }
 
+// BasicCredentialResponse is the "http basic auth" configuration.
 type BasicCredentialResponse struct {
 	Username string `json:"username,omitempty"`
 	Password string `json:"password,omitempty"`
 }
 
+// AwsCredentialResponse is the "aws access key and secret" configuration.
 type AwsCredentialResponse struct {
 	AwsAccessKey       string `json:"awsAccessKey,omitempty"`
 	AwsSecretAccessKey string `json:"awsSecretAccessKey,omitempty"`
@@ -108,6 +120,9 @@ type ControlCredentialsRequest struct {
 	Name string `json:"name,omitempty"`
 }
 
+//
+// ControlCredentialsResponse defines the response for the ControlEndpoint
+//
 type ControlCredentialsResponse struct {
 	Name        string `json:"name,omitempty"`
 	URL         string `json:"url,omitempty"`

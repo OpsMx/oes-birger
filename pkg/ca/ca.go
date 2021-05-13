@@ -35,17 +35,20 @@ import (
 )
 
 const (
-	DefaultTLSCertificatePath = "/app/secrets/ca/tls.crt"
-	DefaultTLSKeyPath         = "/app/secrets/ca/tls.key"
+	defaultTLSCertificatePath = "/app/secrets/ca/tls.crt"
+	defaultTLSKeyPath         = "/app/secrets/ca/tls.key"
 
+	// OpsMxOIDValue is the name OID ending we add to store our JSON "claims"
 	OpsMxOIDValue = 0x6f706d78 // 31-bit max
 )
 
+// CertificateIssuer implements a generic CA
 type CertificateIssuer interface {
 	GenerateCertificate(CertificateName) (string, string, string, error)
 	GetCACert() (string, error)
 }
 
+// CertPoolGenerator implements a method to make a TLS x509 certificate pool for servers
 type CertPoolGenerator interface {
 	MakeCertPool() (*x509.CertPool, error)
 }
@@ -69,10 +72,10 @@ type Config struct {
 
 func (c *Config) applyDefaults() {
 	if len(c.CACertFile) == 0 {
-		c.CACertFile = DefaultTLSCertificatePath
+		c.CACertFile = defaultTLSCertificatePath
 	}
 	if len(c.CAKeyFile) == 0 {
-		c.CAKeyFile = DefaultTLSKeyPath
+		c.CAKeyFile = defaultTLSKeyPath
 	}
 }
 
@@ -231,6 +234,10 @@ func (c *CA) MakeServerCert(names []string) (*tls.Certificate, error) {
 	return &serverCert, nil
 }
 
+//
+// CertificateName holds the items we will encode in the certificate, so we can determine what
+// endpoint is being requested.
+//
 type CertificateName struct {
 	Name    string `json:"name,omitempty"`
 	Type    string `json:"type,omitempty"`
@@ -238,6 +245,7 @@ type CertificateName struct {
 	Purpose string `json:"purpose,omitempty"`
 }
 
+// Certificate purposes, intended to be on CertificateName.Purpose
 const (
 	CertificatePurposeControl       = "control"
 	CertificatePurposeAgent         = "agent"
@@ -245,6 +253,8 @@ const (
 	CertificatePurposeRemoteCommand = "remote-command"
 )
 
+// GetCertificateNameFromCert extracts the CertificateName from the certificate, or returns
+// an error if not found.
 func GetCertificateNameFromCert(cert *x509.Certificate) (*CertificateName, error) {
 	for _, atv := range cert.Subject.Names {
 		if atv.Type.Equal([]int{2, 5, 4, OpsMxOIDValue}) {
