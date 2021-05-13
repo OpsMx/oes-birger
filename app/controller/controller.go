@@ -151,7 +151,7 @@ func healthcheck(w http.ResponseWriter, r *http.Request) {
 func runPrometheusHTTPServer(port uint16) {
 	log.Printf("Running HTTP listener for Prometheus on port %d", port)
 
-	prometheus.MustRegister(apiRequestCounter)
+	//prometheus.MustRegister(apiRequestCounter)
 	agent.PrometheusRegister()
 
 	mux := http.NewServeMux()
