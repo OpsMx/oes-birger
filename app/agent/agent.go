@@ -58,29 +58,29 @@ var (
 
 	secretsLoader secrets.SecretLoader
 
-	endpoints []Endpoint
+	endpoints []configuredEndpoint
 )
 
 type serverContext struct{}
 
-type Endpoint struct {
+type configuredEndpoint struct {
 	Name       string   `json:"name,omitempty"`
 	Type       string   `json:"type,omitempty"`
 	Configured bool     `json:"configured,omitempty"`
 	Namespace  []string `json:"namespace,omitempty"`
 
-	instance HTTPRequestProcessor
+	instance httpRequestProcessor
 }
 
-type HTTPRequestProcessor interface {
+type httpRequestProcessor interface {
 	executeHTTPRequest(chan *tunnel.AgentToControllerWrapper, *tunnel.HttpRequest)
 }
 
-func (e *Endpoint) String() string {
+func (e *configuredEndpoint) String() string {
 	return fmt.Sprintf("(%s, %s, %v)", e.Type, e.Name, e.Configured)
 }
 
-func runTunnel(wg *sync.WaitGroup, sa *serverContext, conn *grpc.ClientConn, endpoints []Endpoint) {
+func runTunnel(wg *sync.WaitGroup, sa *serverContext, conn *grpc.ClientConn, endpoints []configuredEndpoint) {
 	defer wg.Done()
 
 	ticker := time.NewTicker(time.Duration(*tickTime) * time.Second)
@@ -217,9 +217,9 @@ func loadCert() []byte {
 
 func configureEndpoints(secretsLoader secrets.SecretLoader) {
 	// For each service, if it is enabled, find and create an instance.
-	endpoints = []Endpoint{}
+	endpoints = []configuredEndpoint{}
 	for _, service := range agentServiceConfig.Services {
-		var instance HTTPRequestProcessor
+		var instance httpRequestProcessor
 		var configured bool
 
 		if service.Enabled {
@@ -244,7 +244,7 @@ func configureEndpoints(secretsLoader secrets.SecretLoader) {
 			if len(service.Namespaces) == 0 {
 				// If it did not return an error, a nil instance means it is not fully configured.
 				log.Printf("Adding endpoint type %s, name %s, configured %v", service.Type, service.Name, configured)
-				endpoints = append(endpoints, Endpoint{
+				endpoints = append(endpoints, configuredEndpoint{
 					Type:       service.Type,
 					Name:       service.Name,
 					Configured: configured,
@@ -253,7 +253,7 @@ func configureEndpoints(secretsLoader secrets.SecretLoader) {
 			} else {
 				for _, ns := range service.Namespaces {
 					log.Printf("Adding endpoint type %s, name %s, configured %v, namespaces %v", service.Type, ns.Name, configured, ns.Namespaces)
-					newep := Endpoint{
+					newep := configuredEndpoint{
 						Type:       service.Type,
 						Name:       ns.Name,
 						Configured: configured,

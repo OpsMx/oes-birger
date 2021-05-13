@@ -114,7 +114,7 @@ func makeHeaders(headers map[string][]string) []*tunnel.HttpHeader {
 //  * We look in our local list of possible endpoints.  Error if not found.
 //  * One of the endpoint paths (directly connected preferred, but if none use another controller)
 //  * The message is sent to the endpoint.
-//  * If the "other side" cancells the request, we expect to get notified.
+//  * If the "other side" cancels the request, we expect to get notified.
 //  * If we cancel the request, we notify the endpoint.
 //  * Multiple data packets can flow in either direction:  { header, data... }
 //  * If the endpoint vanishes, we will cancel all outstanding transactions.

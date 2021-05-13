@@ -28,7 +28,7 @@ import (
 	"github.com/opsmx/oes-birger/pkg/fwdapi"
 )
 
-func HTTPError(err error) []byte {
+func httpError(err error) []byte {
 	ret := &fwdapi.HTTPErrorResponse{
 		Error: &fwdapi.HTTPErrorMessage{
 			Message: fmt.Sprintf("Unable to process request: %v", err),
@@ -41,9 +41,12 @@ func HTTPError(err error) []byte {
 	return json
 }
 
+// FailRequest marks a request as failed.  This will set the provided status code,
+// and write to the message body a JSON format error message.  The http.ResponseWriter
+// should not have been used, or be used after calling FailRequest.
 func FailRequest(w http.ResponseWriter, err error, code int) {
 	w.WriteHeader(code)
-	errmsg := HTTPError(err)
+	errmsg := httpError(err)
 	n, err := w.Write(errmsg)
 	if err != nil {
 		log.Printf("failed to write message in FailRequest: %v", err)

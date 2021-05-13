@@ -35,7 +35,7 @@ type KubernetesSecretLoader struct {
 	namespace string
 }
 
-// MakeKubernetesSecretLoading returns a new KubenetesSecretLoader using the Kubernetes service
+// MakeKubernetesSecretLoader returns a new KubenetesSecretLoader using the Kubernetes service
 // account.
 func MakeKubernetesSecretLoader(namespace string) (*KubernetesSecretLoader, error) {
 	config, err := rest.InClusterConfig()

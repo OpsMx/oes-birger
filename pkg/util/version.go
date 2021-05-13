@@ -18,6 +18,7 @@ package util
 
 import "fmt"
 
+// Versions hold the current version, which is expected to use semantic versioning.
 type Versions struct {
 	Major int
 	Minor int
