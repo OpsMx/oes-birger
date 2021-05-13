@@ -87,7 +87,7 @@ func (s *AgentState) HasEndpoint(endpointType string, endpointName string) bool 
 // DirectlyConnectedAgentStatistics describes statistics for a directly connected agent.
 //
 type DirectlyConnectedAgentStatistics struct {
-	AgentStatistics
+	BaseStatistics
 	ConnectedAt uint64 `json:"connectedAt"`
 	LastPing    uint64 `json:"lastPing"`
 	LastUse     uint64 `json:"lastUse"`

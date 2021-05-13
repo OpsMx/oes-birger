@@ -91,7 +91,7 @@ func (a *FakeAgent) GetSession() string {
 	return a.session
 }
 
-type FakeStats AgentStatistics
+type FakeStats BaseStatistics
 
 func (a *FakeAgent) GetStatistics() interface{} {
 	return FakeStats{Name: a.name, Session: a.session, ConnectionType: "fake"}

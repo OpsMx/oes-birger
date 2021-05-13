@@ -28,7 +28,12 @@ var (
 	rnd = rand.New(rand.NewSource(time.Now().UnixNano())) // not used for crypto
 )
 
-type AgentStatistics struct {
+//
+// BaseStatistics defines the standard statistics returned for every
+// agent type.  This should be included in the specific agent types,
+// such as "directly connected" or "on other controller" agent connections.
+//
+type BaseStatistics struct {
 	Name           string     `json:"name,omitempty"`
 	Session        string     `json:"session,omitempty"`
 	ConnectionType string     `json:"connectionType,omitempty"`
