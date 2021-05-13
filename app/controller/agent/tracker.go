@@ -152,7 +152,7 @@ func (s *ConnectedAgents) RemoveAgent(state Agent) error {
 	return nil
 }
 
-func (s *ConnectedAgents) findService(ep AgentSearch) (Agent, error) {
+func (s *ConnectedAgents) findService(ep Search) (Agent, error) {
 	agentList, ok := s.m[ep.Name]
 	if !ok || len(agentList) == 0 {
 		return nil, fmt.Errorf("no agents connected for %s", ep)
@@ -174,7 +174,7 @@ func (s *ConnectedAgents) findService(ep AgentSearch) (Agent, error) {
 // Send will search for the specific agent and endpoint. send a message to an agent, and return true if an agent
 // was found.
 //
-func (s *ConnectedAgents) Send(ep AgentSearch, message interface{}) (string, bool) {
+func (s *ConnectedAgents) Send(ep Search, message interface{}) (string, bool) {
 	s.RLock()
 	defer s.RUnlock()
 	agent, err := s.findService(ep)
@@ -189,7 +189,7 @@ func (s *ConnectedAgents) Send(ep AgentSearch, message interface{}) (string, boo
 //
 // Cancel will cancel an ongoing request.
 //
-func (s *ConnectedAgents) Cancel(ep AgentSearch, id string) error {
+func (s *ConnectedAgents) Cancel(ep Search, id string) error {
 	// The session must be set, if not this is an error.
 	if len(ep.Session) == 0 {
 		return fmt.Errorf("session is not set (coding error)")

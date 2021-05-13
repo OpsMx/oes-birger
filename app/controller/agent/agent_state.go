@@ -22,7 +22,8 @@ package agent
 
 import "fmt"
 
-type AgentState struct {
+// DirectlyConnectedAgent holds all the magic needed to implement a directly connected agent.
+type DirectlyConnectedAgent struct {
 	Name            string
 	Session         string
 	Endpoints       []Endpoint
@@ -35,23 +36,29 @@ type AgentState struct {
 	LastUse         uint64
 }
 
-func (s *AgentState) GetSession() string {
+// GetSession returns the randomly assigned session ID.  This is assigned each time
+// an agent connects, and allows routing of cancellation and other messages to the
+// correct instance of an agent.
+func (s *DirectlyConnectedAgent) GetSession() string {
 	return s.Session
 }
 
-func (s *AgentState) GetName() string {
+// GetName returns the agent name.
+func (s *DirectlyConnectedAgent) GetName() string {
 	return s.Name
 }
 
-func (s *AgentState) GetEndpoints() []Endpoint {
+// GetEndpoints returns the list of endpoints.
+func (s *DirectlyConnectedAgent) GetEndpoints() []Endpoint {
 	return s.Endpoints
 }
 
-func (s AgentState) String() string {
+func (s DirectlyConnectedAgent) String() string {
 	return fmt.Sprintf("(name=%s, session=%s)", s.Name, s.Session)
 }
 
-func (s *AgentState) Close() {
+// Close will shut down an agent's requests channels.
+func (s *DirectlyConnectedAgent) Close() {
 	close(s.InRequest)
 	close(s.InCancelRequest)
 }
@@ -59,7 +66,7 @@ func (s *AgentState) Close() {
 //
 // Send sends a message to a specific Agent
 //
-func (s *AgentState) Send(message interface{}) string {
+func (s *DirectlyConnectedAgent) Send(message interface{}) string {
 	s.InRequest <- message
 	return s.Session
 }
@@ -67,14 +74,14 @@ func (s *AgentState) Send(message interface{}) string {
 //
 // Cancel cancels a specific stream
 //
-func (s *AgentState) Cancel(id string) {
+func (s *DirectlyConnectedAgent) Cancel(id string) {
 	s.InCancelRequest <- id
 }
 
 //
 // HasEndpoint returns true if the endpoint is presend and configured.
 //
-func (s *AgentState) HasEndpoint(endpointType string, endpointName string) bool {
+func (s *DirectlyConnectedAgent) HasEndpoint(endpointType string, endpointName string) bool {
 	for _, ep := range s.Endpoints {
 		if ep.Type == endpointType && ep.Name == endpointName {
 			return ep.Configured
@@ -96,7 +103,7 @@ type DirectlyConnectedAgentStatistics struct {
 //
 // GetStatistics returns a set of stats for connected agents.
 //
-func (s *AgentState) GetStatistics() interface{} {
+func (s *DirectlyConnectedAgent) GetStatistics() interface{} {
 	ret := &DirectlyConnectedAgentStatistics{
 		ConnectedAt: s.ConnectedAt,
 		LastPing:    s.LastPing,

@@ -145,7 +145,7 @@ func (s *agentTunnelServer) EventTunnel(stream tunnel.AgentTunnelService_EventTu
 	inCancelRequest := make(chan string, 1)
 	httpids := &sessionList{m: make(map[string]chan *tunnel.AgentToControllerWrapper)}
 
-	state := &agent.AgentState{
+	state := &agent.DirectlyConnectedAgent{
 		Name:            agentIdentity,
 		Session:         sessionIdentity,
 		InRequest:       inRequest,
@@ -368,7 +368,7 @@ func (s *cmdToolTunnelServer) EventTunnel(stream tunnel.CmdToolTunnelService_Eve
 	}()
 
 	operationID := ulidContext.Ulid()
-	ep := agent.AgentSearch{
+	ep := agent.Search{
 		Name:         agentIdentity,
 		EndpointType: "remote-command",
 	}

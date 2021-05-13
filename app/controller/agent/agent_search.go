@@ -21,14 +21,16 @@ import (
 	"strings"
 )
 
-type AgentSearch struct {
+// Search defines the parameters to narrow down an agent.  Each field is required
+// other than Session, which may be empty when "any session" is fine.
+type Search struct {
 	Name         string // The agent name
 	EndpointType string // the endpoint type, eg "jenkins", "kubernetes", "remote-command"
 	EndpointName string // the endpoint name, eg "jenkins1" or "kubernetes1"
 	Session      string // the session ID for a specific agent, used to cancel.
 }
 
-func (a AgentSearch) String() string {
+func (a Search) String() string {
 	l := []string{
 		fmt.Sprintf("name=%s", a.Name),
 	}
@@ -44,6 +46,7 @@ func (a AgentSearch) String() string {
 	return fmt.Sprintf("(%s)", strings.Join(l, ", "))
 }
 
-func (a *AgentSearch) MatchesAgent(t Agent) bool {
+// MatchesAgent returns true if a given agent matches the search criteria.
+func (a *Search) MatchesAgent(t Agent) bool {
 	return a.Name == t.GetName() && (len(a.Session) == 0 || a.Session == t.GetSession())
 }

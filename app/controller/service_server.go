@@ -116,7 +116,7 @@ func serviceAPIHandler(w http.ResponseWriter, r *http.Request) {
 		util.FailRequest(w, err, http.StatusBadRequest)
 		return
 	}
-	ep := agent.AgentSearch{
+	ep := agent.Search{
 		Name:         agentIdentity,
 		EndpointType: endpointType,
 		EndpointName: endpointName,
@@ -124,7 +124,7 @@ func serviceAPIHandler(w http.ResponseWriter, r *http.Request) {
 	runAPIHandler(ep, w, r)
 }
 
-func runAPIHandler(ep agent.AgentSearch, w http.ResponseWriter, r *http.Request) {
+func runAPIHandler(ep agent.Search, w http.ResponseWriter, r *http.Request) {
 	apiRequestCounter.WithLabelValues(ep.Name).Inc()
 
 	transactionID := ulidContext.Ulid()

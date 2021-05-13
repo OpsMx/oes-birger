@@ -134,21 +134,28 @@ func (c *ControllerConfig) addAllHostnames() {
 	c.addIfMissing(c.RemoteCommandHostname, "cmdToolHostname")
 }
 
+// GetServiceURL returns a fullly formatted URL string with hostname and port.
 func (c *ControllerConfig) GetServiceURL() string {
 	return fmt.Sprintf("https://%s:%d", *c.ServiceHostname, c.ServiceListenPort)
 }
 
+// GetControlURL returns a fullly formatted URL string with hostname and port.
 func (c *ControllerConfig) GetControlURL() string {
 	return fmt.Sprintf("https://%s:%d", *c.ControlHostname, c.ControlListenPort)
 }
 
+// GetAgentAdvertisePort returns the port the CNC server will use to advertise agent
+// connections in manifests.
 func (c *ControllerConfig) GetAgentAdvertisePort() uint16 {
 	return c.AgentAdvertisePort
 }
 
+// GetAgentHostname is the hostname used in CNC manifests for agents.
 func (c *ControllerConfig) GetAgentHostname() string {
 	return *c.AgentHostname
 }
+
+// GetControlListenPort returns the port the CNC server should listen on.
 func (c *ControllerConfig) GetControlListenPort() uint16 {
 	return c.ControlListenPort
 }
