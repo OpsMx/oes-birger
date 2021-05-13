@@ -74,7 +74,7 @@ func (f *FakeSecretLoader) GetSecret(name string) (*map[string][]byte, error) {
 func TestGenericEndpoint_loadBase64Secrets(t *testing.T) {
 	tests := []struct {
 		name            string
-		creds           GenericEndpointCredentials
+		creds           genericEndpointCredentials
 		wantRawUsername string
 		wantRawPassword string
 		wantRawToken    string
@@ -83,7 +83,7 @@ func TestGenericEndpoint_loadBase64Secrets(t *testing.T) {
 		// Bogus credential type
 		{
 			"credential type bogus",
-			GenericEndpointCredentials{Type: "X"},
+			genericEndpointCredentials{Type: "X"},
 			"", "", "",
 			true,
 		},
@@ -91,7 +91,7 @@ func TestGenericEndpoint_loadBase64Secrets(t *testing.T) {
 		// No type set
 		{
 			"no credential fields set",
-			GenericEndpointCredentials{},
+			genericEndpointCredentials{},
 			"", "", "",
 			false,
 		},
@@ -99,7 +99,7 @@ func TestGenericEndpoint_loadBase64Secrets(t *testing.T) {
 		// Type 'none'
 		{
 			"credential type none, no other fields set",
-			GenericEndpointCredentials{},
+			genericEndpointCredentials{},
 			"", "", "",
 			false,
 		},
@@ -107,37 +107,37 @@ func TestGenericEndpoint_loadBase64Secrets(t *testing.T) {
 		// Type 'basic'
 		{
 			"credential type basic, nothing set",
-			GenericEndpointCredentials{Type: "basic"},
+			genericEndpointCredentials{Type: "basic"},
 			"", "", "",
 			true,
 		},
 		{
 			"credential type basic, username set, passowrd not set",
-			GenericEndpointCredentials{Type: "basic", Username: fooString},
+			genericEndpointCredentials{Type: "basic", Username: fooString},
 			"", "", "",
 			true,
 		},
 		{
 			"credential type basic, username set, passowrd not set",
-			GenericEndpointCredentials{Type: "basic", Password: barString},
+			genericEndpointCredentials{Type: "basic", Password: barString},
 			"", "", "",
 			true,
 		},
 		{
 			"credential type basic, username set, password set",
-			GenericEndpointCredentials{Type: "basic", Username: fooString, Password: barString},
+			genericEndpointCredentials{Type: "basic", Username: fooString, Password: barString},
 			"foo", "bar", "",
 			false,
 		},
 		{
 			"credential type basic, username junk, password set",
-			GenericEndpointCredentials{Type: "basic", Username: "X", Password: barString},
+			genericEndpointCredentials{Type: "basic", Username: "X", Password: barString},
 			"", "", "",
 			true,
 		},
 		{
 			"credential type basic, username set, password junk",
-			GenericEndpointCredentials{Type: "basic", Username: fooString, Password: "X"},
+			genericEndpointCredentials{Type: "basic", Username: fooString, Password: "X"},
 			"", "", "",
 			true,
 		},
@@ -145,19 +145,19 @@ func TestGenericEndpoint_loadBase64Secrets(t *testing.T) {
 		// Type 'bearer'
 		{
 			"credential type bearer, nothing set",
-			GenericEndpointCredentials{Type: "bearer"},
+			genericEndpointCredentials{Type: "bearer"},
 			"", "", "",
 			true,
 		},
 		{
 			"credential type bearer, token set",
-			GenericEndpointCredentials{Type: "bearer", Token: bazString},
+			genericEndpointCredentials{Type: "bearer", Token: bazString},
 			"", "", "baz",
 			false,
 		},
 		{
 			"credential type bearer, token bogus",
-			GenericEndpointCredentials{Type: "bearer", Token: "X"},
+			genericEndpointCredentials{Type: "bearer", Token: "X"},
 			"", "", "",
 			true,
 		},
@@ -167,7 +167,7 @@ func TestGenericEndpoint_loadBase64Secrets(t *testing.T) {
 			ep := &GenericEndpoint{
 				endpointType: "jenkins",
 				endpointName: "epname",
-				config: GenericEndpointConfig{
+				config: genericEndpointConfig{
 					URL:         "http://example.com",
 					Credentials: tt.creds,
 				},
@@ -194,7 +194,7 @@ func TestGenericEndpoint_loadKubernetesSecrets(t *testing.T) {
 
 	tests := []struct {
 		name            string
-		creds           GenericEndpointCredentials
+		creds           genericEndpointCredentials
 		wantRawUsername string
 		wantRawPassword string
 		wantRawToken    string
@@ -202,7 +202,7 @@ func TestGenericEndpoint_loadKubernetesSecrets(t *testing.T) {
 	}{
 		{
 			"credential type bogus",
-			GenericEndpointCredentials{Type: "X", SecretName: "__t"},
+			genericEndpointCredentials{Type: "X", SecretName: "__t"},
 			"", "", "",
 			"unknown or unsupported credential type",
 		},
@@ -210,7 +210,7 @@ func TestGenericEndpoint_loadKubernetesSecrets(t *testing.T) {
 		// Type 'none'
 		{
 			"credential type none, secretName set",
-			GenericEndpointCredentials{Type: "none", SecretName: "u__"},
+			genericEndpointCredentials{Type: "none", SecretName: "u__"},
 			"", "", "",
 			"none: secretName should not be set",
 		},
@@ -218,25 +218,25 @@ func TestGenericEndpoint_loadKubernetesSecrets(t *testing.T) {
 		// Type 'basic
 		{
 			"credential type basic, secretName missing",
-			GenericEndpointCredentials{Type: "basic", SecretName: "missing"},
+			genericEndpointCredentials{Type: "basic", SecretName: "missing"},
 			"", "", "",
 			"secret key not found",
 		},
 		{
 			"credential type basic, secretName has username",
-			GenericEndpointCredentials{Type: "basic", SecretName: "u__"},
+			genericEndpointCredentials{Type: "basic", SecretName: "u__"},
 			"", "", "",
 			"basic: password missing",
 		},
 		{
 			"credential type basic, secretName has password",
-			GenericEndpointCredentials{Type: "basic", SecretName: "_p_"},
+			genericEndpointCredentials{Type: "basic", SecretName: "_p_"},
 			"", "", "",
 			"basic: username missing",
 		},
 		{
 			"credential type basic, secretName has username password",
-			GenericEndpointCredentials{Type: "basic", SecretName: "up_"},
+			genericEndpointCredentials{Type: "basic", SecretName: "up_"},
 			"foo", "bar", "",
 			"",
 		},
@@ -244,13 +244,13 @@ func TestGenericEndpoint_loadKubernetesSecrets(t *testing.T) {
 		// Type 'bearer'
 		{
 			"credential type bearer, secretName has token",
-			GenericEndpointCredentials{Type: "bearer", SecretName: "__t"},
+			genericEndpointCredentials{Type: "bearer", SecretName: "__t"},
 			"", "", "baz",
 			"",
 		},
 		{
 			"credential type bearer, secretName has no token",
-			GenericEndpointCredentials{Type: "bearer", SecretName: "___"},
+			genericEndpointCredentials{Type: "bearer", SecretName: "___"},
 			"", "", "",
 			"bearer: token missing in secret",
 		},
@@ -260,7 +260,7 @@ func TestGenericEndpoint_loadKubernetesSecrets(t *testing.T) {
 			ep := &GenericEndpoint{
 				endpointType: "jenkins",
 				endpointName: "j1",
-				config: GenericEndpointConfig{
+				config: genericEndpointConfig{
 					URL:         "http://example.com",
 					Credentials: tt.creds,
 				},

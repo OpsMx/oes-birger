@@ -36,15 +36,16 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-type AwsConfig struct {
-	Credentials AwsCredentials `yaml:"credentials,omitempty"`
+type awsConfig struct {
+	Credentials awsCredentials `yaml:"credentials,omitempty"`
 }
 
-type AwsCredentials struct {
+type awsCredentials struct {
 	Type       string `yaml:"type,omitempty"`
 	SecretName string `yaml:"secretName,omitempty"`
 }
 
+// AwsEndpoint holds the AWS state for proxying AWS calls.
 type AwsEndpoint struct {
 	creds  *credentials.Credentials
 	signer *v4.Signer
@@ -62,10 +63,11 @@ var stripHeaders = map[string]bool{
 	"X-Opsmx-Service-Signing-Name": true,
 }
 
+// MakeAwsEndpoint returns a configured AWS endpoint, or an error if the configuration is invalid.
 func MakeAwsEndpoint(name string, configBytes []byte, secretsLoader secrets.SecretLoader) (*AwsEndpoint, bool, error) {
 	k := &AwsEndpoint{}
 
-	var config AwsConfig
+	var config awsConfig
 	err := yaml.Unmarshal(configBytes, &config)
 	if err != nil {
 		return nil, false, err

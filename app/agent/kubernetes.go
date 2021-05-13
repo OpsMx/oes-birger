@@ -36,14 +36,16 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-type KubernetesConfig struct {
+type kubernetesConfig struct {
 	KubeConfig string `yaml:"kubeConfig,omitempty"`
 }
 
+// KubernetesEndpoint implements a kubernetes endpoint state, including the credentials and namespaces
+// defined in the configuration.
 type KubernetesEndpoint struct {
 	sync.RWMutex
 	f      kubeContext
-	config KubernetesConfig
+	config kubernetesConfig
 }
 
 type kubeContext struct {
@@ -55,10 +57,11 @@ type kubeContext struct {
 	insecure   bool
 }
 
+// MakeKubernetesEndpoint creates a new Kubernetes endpoint based on the provided config.
 func MakeKubernetesEndpoint(name string, configBytes []byte) (*KubernetesEndpoint, bool, error) {
 	k := &KubernetesEndpoint{}
 
-	var config KubernetesConfig
+	var config kubernetesConfig
 	err := yaml.Unmarshal(configBytes, &config)
 	if err != nil {
 		return nil, false, err

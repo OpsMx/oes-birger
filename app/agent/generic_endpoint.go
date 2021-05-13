@@ -31,7 +31,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-type GenericEndpointCredentials struct {
+type genericEndpointCredentials struct {
 	Type       string `yaml:"type,omitempty"`
 	Username   string `yaml:"username,omitempty"`
 	Password   string `yaml:"password,omitempty"`
@@ -43,16 +43,18 @@ type GenericEndpointCredentials struct {
 	rawToken    string `yaml:"-"`
 }
 
-type GenericEndpointConfig struct {
+type genericEndpointConfig struct {
 	URL         string                     `yaml:"url,omitempty"`
 	Insecure    bool                       `yaml:"insecure,omitempty"`
-	Credentials GenericEndpointCredentials `yaml:"credentials,omitempty"`
+	Credentials genericEndpointCredentials `yaml:"credentials,omitempty"`
 }
 
+// GenericEndpoint defines the state (config and credentials) for a generic HTTP
+// endpoint.
 type GenericEndpoint struct {
 	endpointType string
 	endpointName string
-	config       GenericEndpointConfig
+	config       genericEndpointConfig
 }
 
 func (ep *GenericEndpoint) loadSecrets(secretsLoader secrets.SecretLoader) error {
@@ -143,13 +145,14 @@ func (ep *GenericEndpoint) loadKubernetesSecrets(secretsLoader secrets.SecretLoa
 	}
 }
 
+// MakeGenericEndpoint returns a generic HTTP endpoint which allows calling a HTTP service.
 func MakeGenericEndpoint(endpointType string, endpointName string, configBytes []byte, secretsLoader secrets.SecretLoader) (*GenericEndpoint, bool, error) {
 	ep := &GenericEndpoint{
 		endpointType: endpointType,
 		endpointName: endpointName,
 	}
 
-	var config GenericEndpointConfig
+	var config genericEndpointConfig
 	err := yaml.Unmarshal(configBytes, &config)
 	if err != nil {
 		return nil, false, err
