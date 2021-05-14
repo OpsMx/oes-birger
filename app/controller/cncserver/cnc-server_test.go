@@ -313,8 +313,8 @@ func TestCNCServer_generateAgentManifestComponents(t *testing.T) {
 	}
 }
 
-func TestCNCServer_generateServiceCredentials(t *testing.T) {
-	checkFunc := func(t *testing.T, body []byte) {
+func MakeServiceCheckFunc() func(*testing.T, []byte) {
+	return func(t *testing.T, body []byte) {
 		var response fwdapi.ServiceCredentialResponse
 		err := json.Unmarshal(body, &response)
 		if err != nil {
@@ -337,8 +337,10 @@ func TestCNCServer_generateServiceCredentials(t *testing.T) {
 			t.Errorf("Credential does not have key 'password': %#v", creds)
 		}
 	}
+}
 
-	awsCheckFunc := func(t *testing.T, body []byte) {
+func MakeAWSCheckFunc() func(*testing.T, []byte) {
+	return func(t *testing.T, body []byte) {
 		var response fwdapi.ServiceCredentialResponse
 		err := json.Unmarshal(body, &response)
 		if err != nil {
@@ -361,6 +363,11 @@ func TestCNCServer_generateServiceCredentials(t *testing.T) {
 			t.Errorf("Credential does not have key 'awsSecretAccessKey': %#v", creds)
 		}
 	}
+}
+
+func TestCNCServer_generateServiceCredentials(t *testing.T) {
+	serviceCheckFunc := MakeServiceCheckFunc()
+	awsCheckFunc := MakeAWSCheckFunc()
 
 	tests := []struct {
 		name         string
@@ -391,7 +398,7 @@ func TestCNCServer_generateServiceCredentials(t *testing.T) {
 				Name:      "service smith",
 			},
 			"key1",
-			checkFunc,
+			serviceCheckFunc,
 			http.StatusOK,
 		},
 		{
