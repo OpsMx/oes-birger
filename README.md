@@ -1,5 +1,7 @@
 # OpsMX API and Command Forwarder
 
+[![Go Report Card](https://goreportcard.com/badge/github.com/opsmx/oes-birger)](https://goreportcard.com/report/github.com/opsmx/oes-birger)
+
 This implements a service where, by running an agent inside a Kubernetes
 cluster, remote commands can still be sent to it even if the cluster is
 behind a firewall.
