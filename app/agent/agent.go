@@ -56,6 +56,8 @@ var (
 	config             *cfg.AgentConfig
 	agentServiceConfig *cfg.AgentServiceConfig
 
+	hostname = getHostname()
+
 	secretsLoader secrets.SecretLoader
 
 	endpoints []configuredEndpoint
@@ -80,23 +82,8 @@ func (e *configuredEndpoint) String() string {
 	return fmt.Sprintf("(%s, %s, %v)", e.Type, e.Name, e.Configured)
 }
 
-func runTunnel(wg *sync.WaitGroup, sa *serverContext, conn *grpc.ClientConn, endpoints []configuredEndpoint) {
-	defer wg.Done()
-
-	ticker := time.NewTicker(time.Duration(*tickTime) * time.Second)
-
-	client := tunnel.NewAgentTunnelServiceClient(conn)
-	ctx := context.Background()
-
-	stream, err := client.EventTunnel(ctx)
-	if err != nil {
-		log.Fatalf("%v.EventTunnel(_) = _, %v", client, err)
-	}
+func endpointsToPB(endpoints []configuredEndpoint) []*tunnel.EndpointHealth {
 	pbEndpoints := make([]*tunnel.EndpointHealth, len(endpoints))
-	hostname, err := os.Hostname()
-	if err != nil {
-		log.Printf("Unable to get hostname: %v, using 'unknown'", err)
-	}
 	for i, ep := range endpoints {
 		endp := &tunnel.EndpointHealth{
 			Name:       ep.Name,
@@ -106,6 +93,44 @@ func runTunnel(wg *sync.WaitGroup, sa *serverContext, conn *grpc.ClientConn, end
 		}
 		pbEndpoints[i] = endp
 	}
+	return pbEndpoints
+}
+
+func tickerPinger(stream tunnel.AgentTunnelService_EventTunnelClient) {
+	ticker := time.NewTicker(time.Duration(*tickTime) * time.Second)
+
+	for ts := range ticker.C {
+		req := &tunnel.AgentToControllerWrapper{
+			Event: &tunnel.AgentToControllerWrapper_PingRequest{
+				PingRequest: &tunnel.PingRequest{Ts: uint64(ts.UnixNano())},
+			},
+		}
+		if err := stream.Send(req); err != nil {
+			log.Fatalf("Unable to send a PingRequest: %v", err)
+		}
+	}
+}
+
+func dataflowHandler(dataflow chan *tunnel.AgentToControllerWrapper, stream tunnel.AgentTunnelService_EventTunnelClient) {
+	for ew := range dataflow {
+		if err := stream.Send(ew); err != nil {
+			log.Fatalf("Unable to respond over GRPC: %v", err)
+		}
+	}
+
+}
+
+func runTunnel(wg *sync.WaitGroup, sa *serverContext, conn *grpc.ClientConn, endpoints []configuredEndpoint) {
+	defer wg.Done()
+
+	client := tunnel.NewAgentTunnelServiceClient(conn)
+	ctx := context.Background()
+
+	stream, err := client.EventTunnel(ctx)
+	if err != nil {
+		log.Fatalf("%v.EventTunnel(_) = _, %v", client, err)
+	}
+	pbEndpoints := endpointsToPB(endpoints)
 	helloMsg := &tunnel.AgentHello{
 		Version:   version.String(),
 		Endpoints: pbEndpoints,
@@ -122,28 +147,8 @@ func runTunnel(wg *sync.WaitGroup, sa *serverContext, conn *grpc.ClientConn, end
 
 	dataflow := make(chan *tunnel.AgentToControllerWrapper, 20)
 
-	// Handle periodic pings from the ticker.
-	go func() {
-		for ts := range ticker.C {
-			req := &tunnel.AgentToControllerWrapper{
-				Event: &tunnel.AgentToControllerWrapper_PingRequest{
-					PingRequest: &tunnel.PingRequest{Ts: uint64(ts.UnixNano())},
-				},
-			}
-			if err = stream.Send(req); err != nil {
-				log.Fatalf("Unable to send a PingRequest: %v", err)
-			}
-		}
-	}()
-
-	// Handle data flowing back to the controller
-	go func() {
-		for ew := range dataflow {
-			if err = stream.Send(ew); err != nil {
-				log.Printf("Unable to respond over GRPC: %v", err)
-			}
-		}
-	}()
+	go tickerPinger(stream)
+	go dataflowHandler(dataflow, stream)
 
 	waitc := make(chan struct{})
 	go func() {
@@ -265,6 +270,15 @@ func configureEndpoints(secretsLoader secrets.SecretLoader) {
 			}
 		}
 	}
+}
+
+func getHostname() string {
+	hn, err := os.Hostname()
+	if err != nil {
+		log.Printf("Unable to get hostname: %v, using 'unknown'", err)
+		return "unknown"
+	}
+	return hn
 }
 
 func main() {
