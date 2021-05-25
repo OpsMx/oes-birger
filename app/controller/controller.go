@@ -52,7 +52,7 @@ const (
 
 var (
 	versionBuild = -1
-	version      = util.Versions{Major: 2, Minor: 2, Patch: 0, Build: versionBuild}
+	version      = util.Versions{Major: 2, Minor: 2, Patch: 1, Build: versionBuild}
 
 	configFile = flag.String("configFile", "/app/config/config.yaml", "The file with the controller config")
 
