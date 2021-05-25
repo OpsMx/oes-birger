@@ -28,6 +28,7 @@ import (
 	"github.com/opsmx/oes-birger/pkg/jwtutil"
 	"github.com/opsmx/oes-birger/pkg/tunnel"
 	"github.com/opsmx/oes-birger/pkg/util"
+	"github.com/tevino/abool"
 )
 
 func runHTTPSServer(serverCert tls.Certificate) {
@@ -124,6 +125,27 @@ func serviceAPIHandler(w http.ResponseWriter, r *http.Request) {
 	runAPIHandler(ep, w, r)
 }
 
+func copyHeaders(resp *tunnel.HttpResponse, w http.ResponseWriter) {
+	for name := range w.Header() {
+		w.Header().Del(name)
+	}
+	for _, header := range resp.Headers {
+		for _, value := range header.Values {
+			w.Header().Add(header.Name, value)
+		}
+	}
+}
+
+func handleDone(n <-chan struct{}, cc *abool.AtomicBool, target agent.Search, id string) {
+	<-n
+	if cc.IsNotSet() {
+		err := agents.Cancel(target, id)
+		if err != nil {
+			log.Printf("while cancelling http request: %v", err)
+		}
+	}
+}
+
 func runAPIHandler(ep agent.Search, w http.ResponseWriter, r *http.Request) {
 	apiRequestCounter.WithLabelValues(ep.Name).Inc()
 
@@ -147,17 +169,9 @@ func runAPIHandler(ep agent.Search, w http.ResponseWriter, r *http.Request) {
 	}
 	ep.Session = sessionID
 
-	cleanClose := false
+	cleanClose := abool.New()
 	notify := r.Context().Done()
-	go func() {
-		<-notify
-		if !cleanClose {
-			err := agents.Cancel(ep, transactionID)
-			if err != nil {
-				log.Printf("while cancelling http request: %v", err)
-			}
-		}
-	}()
+	go handleDone(notify, cleanClose, ep, transactionID)
 
 	seenHeader := false
 	isChunked := false
@@ -169,7 +183,7 @@ func runAPIHandler(ep agent.Search, w http.ResponseWriter, r *http.Request) {
 				log.Printf("Request timed out sending to agent")
 				w.WriteHeader(http.StatusBadGateway)
 			}
-			cleanClose = true
+			cleanClose.Set()
 			return
 		}
 
@@ -178,17 +192,10 @@ func runAPIHandler(ep agent.Search, w http.ResponseWriter, r *http.Request) {
 			resp := in.GetHttpResponse()
 			seenHeader = true
 			isChunked = resp.ContentLength < 0
-			for name := range w.Header() {
-				r.Header.Del(name)
-			}
-			for _, header := range resp.Headers {
-				for _, value := range header.Values {
-					w.Header().Add(header.Name, value)
-				}
-			}
+			copyHeaders(resp, w)
 			w.WriteHeader(int(resp.Status))
 			if resp.ContentLength == 0 {
-				cleanClose = true
+				cleanClose.Set()
 				return
 			}
 		case *tunnel.AgentToControllerWrapper_HttpChunkedResponse:
@@ -199,7 +206,7 @@ func runAPIHandler(ep agent.Search, w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			if len(resp.Body) == 0 {
-				cleanClose = true
+				cleanClose.Set()
 				return
 			}
 			n, err := w.Write(resp.Body)
