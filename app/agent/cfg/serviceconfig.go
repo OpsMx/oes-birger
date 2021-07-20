@@ -51,6 +51,8 @@ type ServiceConfig struct {
 	Type       string                      `yaml:"type"`
 	Config     map[interface{}]interface{} `yaml:"config,omitempty"`
 	Namespaces []serviceNamespace          `yaml:"namespaces,omitempty"`
+	AccountID  string                      `yaml:"accountId,omitempty"`
+	AssumeRole string                      `yaml:"assumeRole,omitempty"`
 }
 
 type serviceNamespace struct {

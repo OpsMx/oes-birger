@@ -201,6 +201,8 @@ func (s *agentTunnelServer) EventTunnel(stream tunnel.AgentTunnelService_EventTu
 					Type:       ep.Type,
 					Configured: ep.Configured,
 					Namespaces: ep.Namespaces,
+					AccountID:  ep.AccountID,
+					AssumeRole: ep.AssumeRole,
 				}
 			}
 			state.Endpoints = endpoints
