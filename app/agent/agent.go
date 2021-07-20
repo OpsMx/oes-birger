@@ -70,6 +70,8 @@ type configuredEndpoint struct {
 	Type       string   `json:"type,omitempty"`
 	Configured bool     `json:"configured,omitempty"`
 	Namespace  []string `json:"namespace,omitempty"`
+	AccountID  string   `json:"accountId,omitempty"`
+	AssumeRole string   `json:"assumeRole,omitempty"`
 
 	instance httpRequestProcessor
 }
@@ -90,6 +92,8 @@ func endpointsToPB(endpoints []configuredEndpoint) []*tunnel.EndpointHealth {
 			Type:       ep.Type,
 			Configured: ep.Configured,
 			Namespaces: ep.Namespace,
+			AccountID:  ep.AccountID,
+			AssumeRole: ep.AssumeRole,
 		}
 		pbEndpoints[i] = endp
 	}
@@ -254,6 +258,8 @@ func configureEndpoints(secretsLoader secrets.SecretLoader) {
 					Name:       service.Name,
 					Configured: configured,
 					instance:   instance,
+					AccountID:  service.AccountID,
+					AssumeRole: service.AssumeRole,
 				})
 			} else {
 				for _, ns := range service.Namespaces {

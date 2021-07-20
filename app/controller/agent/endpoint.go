@@ -27,7 +27,9 @@ type Endpoint struct {
 	Name       string   `json:"name,omitempty"`
 	Type       string   `json:"type,omitempty"`
 	Configured bool     `json:"configured,omitempty"`
-	Namespaces []string `json:"namespaces,omitempty"`
+	Namespaces []string `json:"namespaces,omitempty"` // kubernetes
+	AccountID  string   `json:"accountId,omitempty"`  // AWS
+	AssumeRole string   `json:"assumeRole,omitempty"` // AWS
 }
 
 func (e *Endpoint) String() string {
