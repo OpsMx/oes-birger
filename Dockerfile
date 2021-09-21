@@ -18,7 +18,7 @@
 # Install the latest versions of our mods.  This is done as a separate step
 # so it will pull from an image cache if possible, unless there are changes.
 #
-FROM golang:1.16.3-alpine AS buildmod
+FROM golang:1.17.1-alpine3.14 AS buildmod
 ENV CGO_ENABLED=0
 RUN mkdir /build
 WORKDIR /build
@@ -41,12 +41,27 @@ RUN GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o /out/agent-binaries/age
 RUN GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o /out/agent-binaries/agent.arm64.latest app/agent/*.go
 
 #
+# Establish a base OS image used by all the applications.
+#
+FROM alpine:3.14 AS base-image
+RUN apk update && apk add ca-certificates && rm -rf /var/cache/apk/*
+RUN update-ca-certificates
+RUN mkdir /local /local/ca-certificates && rm -rf /usr/local/share/ca-certificates && ln -s  /local/ca-certificates /usr/local/share/ca-certificates
+COPY docker/run.sh /app/run.sh
+ENTRYPOINT ["/bin/sh", "/app/run.sh"]
+
+#
+# For a base image without an OS, this can be used:
+#
+#FROM scratch AS base-image
+#COPY --from=alpine:3.14 /etc/ssl/cert.pem /etc/ssl/cert.pem
+
+#
 # Build the agent image.  This should be a --target on docker build.
 #
-FROM scratch AS agent-image
+FROM base-image AS agent-image
 WORKDIR /app
 COPY --from=build-binaries /out/agent /app
-COPY --from=alpine:3.12 /etc/ssl/cert.pem /etc/ssl/cert.pem
 EXPOSE 9102
 CMD ["/app/agent"]
 
@@ -55,7 +70,7 @@ CMD ["/app/agent"]
 # Note that the agent is also added, so the binary can be served from
 # the controller to auto-update the remote agent.
 #
-FROM scratch AS controller-image
+FROM base-image AS controller-image
 WORKDIR /app
 COPY --from=build-binaries /out/controller /app
 COPY --from=build-binaries /out/agent-binaries /app/agent-binaries
@@ -65,7 +80,7 @@ CMD ["/app/controller"]
 #
 # Build the make-ca image.  This should be a --target on docker build.
 #
-FROM scratch AS make-ca-image
+FROM base-image AS make-ca-image
 WORKDIR /app
 COPY --from=build-binaries /out/make-ca /app
 CMD ["/app/make-ca"]
