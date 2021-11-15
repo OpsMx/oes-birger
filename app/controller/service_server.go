@@ -152,7 +152,7 @@ func runAPIHandler(ep agent.Search, w http.ResponseWriter, r *http.Request) {
 	transactionID := ulidContext.Ulid()
 
 	body, _ := ioutil.ReadAll(r.Body)
-	req := &tunnel.HttpRequest{
+	req := &tunnel.OpenHTTPTunnelRequest{
 		Id:      transactionID,
 		Type:    ep.EndpointType,
 		Name:    ep.EndpointName,

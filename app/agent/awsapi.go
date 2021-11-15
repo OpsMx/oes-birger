@@ -110,7 +110,7 @@ func MakeAwsEndpoint(name string, configBytes []byte, secretsLoader secrets.Secr
 	return k, true, nil
 }
 
-func (a *AwsEndpoint) executeHTTPRequest(dataflow chan *tunnel.AgentToControllerWrapper, req *tunnel.HttpRequest) {
+func (a *AwsEndpoint) executeHTTPRequest(dataflow chan *tunnel.AgentToControllerWrapper, req *tunnel.OpenHTTPTunnelRequest) {
 	log.Printf("Running request %v", req)
 	tlsConfig := &tls.Config{
 		MinVersion: tls.VersionTLS12,

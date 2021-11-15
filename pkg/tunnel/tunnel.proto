@@ -34,7 +34,7 @@ message HttpHeader {
     repeated string values = 2;
 }
 
-message HttpRequest {
+message OpenHTTPTunnelRequest {
     string id = 1;
     string name = 2;
     string type = 3;
@@ -134,7 +134,7 @@ message AgentHello {
 message ControllerToAgentWrapper {
     oneof event {
         PingResponse pingResponse = 1;
-        HttpRequest httpRequest = 2;
+        OpenHTTPTunnelRequest openHTTPTunnelRequest = 2;
         CancelRequest cancelRequest = 3;
         CommandRequest commandRequest = 4;
         CommandData commandData = 5;

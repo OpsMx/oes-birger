@@ -35,7 +35,7 @@ func makeHeaders(headers map[string][]string) []*tunnel.HttpHeader {
 	return ret
 }
 
-func copyHeaders(req *tunnel.HttpRequest, httpRequest *http.Request) {
+func copyHeaders(req *tunnel.OpenHTTPTunnelRequest, httpRequest *http.Request) {
 	for _, header := range req.Headers {
 		for _, value := range header.Values {
 			httpRequest.Header.Add(header.Name, value)
@@ -79,7 +79,7 @@ func makeResponse(id string, response *http.Response) *tunnel.AgentToControllerW
 	}
 }
 
-func runHTTPRequest(client *http.Client, req *tunnel.HttpRequest, httpRequest *http.Request, dataflow chan *tunnel.AgentToControllerWrapper, baseURL string) {
+func runHTTPRequest(client *http.Client, req *tunnel.OpenHTTPTunnelRequest, httpRequest *http.Request, dataflow chan *tunnel.AgentToControllerWrapper, baseURL string) {
 	log.Printf("Sending HTTP request: %s to %v", req.Method, baseURL+req.URI)
 	httpResponse, err := client.Do(httpRequest)
 	if err != nil {

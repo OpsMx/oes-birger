@@ -77,7 +77,7 @@ type configuredEndpoint struct {
 }
 
 type httpRequestProcessor interface {
-	executeHTTPRequest(chan *tunnel.AgentToControllerWrapper, *tunnel.HttpRequest)
+	executeHTTPRequest(chan *tunnel.AgentToControllerWrapper, *tunnel.OpenHTTPTunnelRequest)
 }
 
 func (e *configuredEndpoint) String() string {
@@ -172,8 +172,8 @@ func runTunnel(wg *sync.WaitGroup, sa *serverContext, conn *grpc.ClientConn, end
 			case *tunnel.ControllerToAgentWrapper_CancelRequest:
 				req := in.GetCancelRequest()
 				callCancelFunction(req.Id)
-			case *tunnel.ControllerToAgentWrapper_HttpRequest:
-				req := in.GetHttpRequest()
+			case *tunnel.ControllerToAgentWrapper_OpenHTTPTunnelRequest:
+				req := in.GetOpenHTTPTunnelRequest()
 				found := false
 				for _, endpoint := range endpoints {
 					if endpoint.Configured && endpoint.Type == req.Type && endpoint.Name == req.Name {

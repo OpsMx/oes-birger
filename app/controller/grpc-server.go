@@ -85,8 +85,8 @@ func (s *agentTunnelServer) handleHTTPRequests(session string, requestChan chan 
 		case *HTTPMessage:
 			s.addHTTPId(httpids, value.Cmd.Id, value.Out)
 			resp := &tunnel.ControllerToAgentWrapper{
-				Event: &tunnel.ControllerToAgentWrapper_HttpRequest{
-					HttpRequest: value.Cmd,
+				Event: &tunnel.ControllerToAgentWrapper_OpenHTTPTunnelRequest{
+					OpenHTTPTunnelRequest: value.Cmd,
 				},
 			}
 			if err := stream.Send(resp); err != nil {
