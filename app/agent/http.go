@@ -45,8 +45,8 @@ func copyHeaders(req *tunnel.OpenHTTPTunnelRequest, httpRequest *http.Request) {
 
 func makeChunkedResponse(id string, data []byte) *tunnel.AgentToControllerWrapper {
 	return &tunnel.AgentToControllerWrapper{
-		Event: &tunnel.AgentToControllerWrapper_HttpChunkedResponse{
-			HttpChunkedResponse: &tunnel.HttpChunkedResponse{
+		Event: &tunnel.AgentToControllerWrapper_HttpTunnelChunkedResponse{
+			HttpTunnelChunkedResponse: &tunnel.HttpTunnelChunkedResponse{
 				Id:   id,
 				Body: data,
 			},
@@ -56,8 +56,8 @@ func makeChunkedResponse(id string, data []byte) *tunnel.AgentToControllerWrappe
 
 func makeBadGatewayResponse(id string) *tunnel.AgentToControllerWrapper {
 	return &tunnel.AgentToControllerWrapper{
-		Event: &tunnel.AgentToControllerWrapper_HttpResponse{
-			HttpResponse: &tunnel.HttpResponse{
+		Event: &tunnel.AgentToControllerWrapper_HttpTunnelResponse{
+			HttpTunnelResponse: &tunnel.HttpTunnelResponse{
 				Id:            id,
 				Status:        http.StatusBadGateway,
 				ContentLength: 0,
@@ -68,8 +68,8 @@ func makeBadGatewayResponse(id string) *tunnel.AgentToControllerWrapper {
 
 func makeResponse(id string, response *http.Response) *tunnel.AgentToControllerWrapper {
 	return &tunnel.AgentToControllerWrapper{
-		Event: &tunnel.AgentToControllerWrapper_HttpResponse{
-			HttpResponse: &tunnel.HttpResponse{
+		Event: &tunnel.AgentToControllerWrapper_HttpTunnelResponse{
+			HttpTunnelResponse: &tunnel.HttpTunnelResponse{
 				Id:            id,
 				Status:        int32(response.StatusCode),
 				ContentLength: response.ContentLength,

@@ -125,7 +125,7 @@ func serviceAPIHandler(w http.ResponseWriter, r *http.Request) {
 	runAPIHandler(ep, w, r)
 }
 
-func copyHeaders(resp *tunnel.HttpResponse, w http.ResponseWriter) {
+func copyHeaders(resp *tunnel.HttpTunnelResponse, w http.ResponseWriter) {
 	for name := range w.Header() {
 		w.Header().Del(name)
 	}
@@ -188,8 +188,8 @@ func runAPIHandler(ep agent.Search, w http.ResponseWriter, r *http.Request) {
 		}
 
 		switch x := in.Event.(type) {
-		case *tunnel.AgentToControllerWrapper_HttpResponse:
-			resp := in.GetHttpResponse()
+		case *tunnel.AgentToControllerWrapper_HttpTunnelResponse:
+			resp := in.GetHttpTunnelResponse()
 			seenHeader = true
 			isChunked = resp.ContentLength < 0
 			copyHeaders(resp, w)
@@ -198,8 +198,8 @@ func runAPIHandler(ep agent.Search, w http.ResponseWriter, r *http.Request) {
 				cleanClose.Set()
 				return
 			}
-		case *tunnel.AgentToControllerWrapper_HttpChunkedResponse:
-			resp := in.GetHttpChunkedResponse()
+		case *tunnel.AgentToControllerWrapper_HttpTunnelChunkedResponse:
+			resp := in.GetHttpTunnelChunkedResponse()
 			if !seenHeader {
 				log.Printf("Error: got ChunkedResponse before HttpResponse")
 				w.WriteHeader(http.StatusBadGateway)

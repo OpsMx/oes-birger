@@ -210,8 +210,8 @@ func (s *agentTunnelServer) EventTunnel(stream tunnel.AgentTunnelService_EventTu
 			state.Hostname = req.Hostname
 			agents.AddAgent(state)
 			s.sendWebhook(state, req.Endpoints)
-		case *tunnel.AgentToControllerWrapper_HttpResponse:
-			resp := in.GetHttpResponse()
+		case *tunnel.AgentToControllerWrapper_HttpTunnelResponse:
+			resp := in.GetHttpTunnelResponse()
 			atomic.StoreUint64(&state.LastUse, tunnel.Now())
 			httpids.Lock()
 			dest := httpids.m[resp.Id]
@@ -224,8 +224,8 @@ func (s *agentTunnelServer) EventTunnel(stream tunnel.AgentTunnelService_EventTu
 				log.Printf("Got response to unknown HTTP request id %s from %s", resp.Id, agentIdentity)
 			}
 			httpids.Unlock()
-		case *tunnel.AgentToControllerWrapper_HttpChunkedResponse:
-			resp := in.GetHttpChunkedResponse()
+		case *tunnel.AgentToControllerWrapper_HttpTunnelChunkedResponse:
+			resp := in.GetHttpTunnelChunkedResponse()
 			atomic.StoreUint64(&state.LastUse, tunnel.Now())
 			httpids.Lock()
 			dest := httpids.m[resp.Id]
