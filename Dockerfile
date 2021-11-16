@@ -18,7 +18,7 @@
 # Install the latest versions of our mods.  This is done as a separate step
 # so it will pull from an image cache if possible, unless there are changes.
 #
-FROM golang:1.17.1-alpine3.14 AS buildmod
+FROM golang:1.17.2-alpine3.14 AS buildmod
 ENV CGO_ENABLED=0
 RUN mkdir /build
 WORKDIR /build
