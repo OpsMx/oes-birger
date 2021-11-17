@@ -240,16 +240,16 @@ func (ke *KubernetesEndpoint) executeHTTPRequest(dataflow chan *tunnel.AgentToCo
 	httpRequest, err := http.NewRequestWithContext(ctx, req.Method, c.serverURL+req.URI, bytes.NewBuffer(req.Body))
 	if err != nil {
 		log.Printf("Failed to build request for %s to %s: %v", req.Method, c.serverURL+req.URI, err)
-		dataflow <- makeBadGatewayResponse(req.Id)
+		dataflow <- tunnel.MakeBadGatewayResponse(req.Id)
 		return
 	}
 
-	copyHeaders(req, httpRequest)
+	tunnel.CopyHeaders(req, httpRequest)
 	if len(c.token) > 0 {
 		httpRequest.Header.Set("Authorization", "Bearer "+c.token)
 	}
 
-	runHTTPRequest(client, req, httpRequest, dataflow, c.serverURL)
+	tunnel.RunHTTPRequest(client, req, httpRequest, dataflow, c.serverURL)
 }
 
 func (ke *KubernetesEndpoint) loadKubernetesSecurity() *kubeContext {

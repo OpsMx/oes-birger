@@ -198,11 +198,11 @@ func (ep *GenericEndpoint) executeHTTPRequest(dataflow chan *tunnel.AgentToContr
 	httpRequest, err := http.NewRequestWithContext(ctx, req.Method, ep.config.URL+req.URI, bytes.NewBuffer(req.Body))
 	if err != nil {
 		log.Printf("Failed to build request for %s to %s: %v", req.Method, ep.config.URL+req.URI, err)
-		dataflow <- makeBadGatewayResponse(req.Id)
+		dataflow <- tunnel.MakeBadGatewayResponse(req.Id)
 		return
 	}
 
-	copyHeaders(req, httpRequest)
+	tunnel.CopyHeaders(req, httpRequest)
 
 	creds := ep.config.Credentials
 	switch creds.Type {
@@ -214,5 +214,5 @@ func (ep *GenericEndpoint) executeHTTPRequest(dataflow chan *tunnel.AgentToContr
 		httpRequest.Header.Set("Authorization", "Token "+creds.rawToken)
 	}
 
-	runHTTPRequest(client, req, httpRequest, dataflow, ep.config.URL)
+	tunnel.RunHTTPRequest(client, req, httpRequest, dataflow, ep.config.URL)
 }

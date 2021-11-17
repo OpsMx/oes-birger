@@ -1,5 +1,3 @@
-package main
-
 /*
  * Copyright 2021 OpsMx, Inc.
  *
@@ -16,26 +14,30 @@ package main
  * limitations under the License.
  */
 
+package tunnel
+
 import (
 	"context"
 	"io"
 	"log"
 	"net/http"
-
-	"github.com/opsmx/oes-birger/pkg/tunnel"
 )
 
-func makeHeaders(headers map[string][]string) []*tunnel.HttpHeader {
-	ret := make([]*tunnel.HttpHeader, 0)
+var (
+	emptyBytes = []byte("")
+)
+
+func makeHeaders(headers map[string][]string) []*HttpHeader {
+	ret := make([]*HttpHeader, 0)
 	for name, values := range headers {
 		if name != "Authorization" {
-			ret = append(ret, &tunnel.HttpHeader{Name: name, Values: values})
+			ret = append(ret, &HttpHeader{Name: name, Values: values})
 		}
 	}
 	return ret
 }
 
-func copyHeaders(req *tunnel.OpenHTTPTunnelRequest, httpRequest *http.Request) {
+func CopyHeaders(req *OpenHTTPTunnelRequest, httpRequest *http.Request) {
 	for _, header := range req.Headers {
 		for _, value := range header.Values {
 			httpRequest.Header.Add(header.Name, value)
@@ -43,10 +45,10 @@ func copyHeaders(req *tunnel.OpenHTTPTunnelRequest, httpRequest *http.Request) {
 	}
 }
 
-func makeChunkedResponse(id string, data []byte) *tunnel.AgentToControllerWrapper {
-	return &tunnel.AgentToControllerWrapper{
-		Event: &tunnel.AgentToControllerWrapper_HttpTunnelChunkedResponse{
-			HttpTunnelChunkedResponse: &tunnel.HttpTunnelChunkedResponse{
+func makeChunkedResponse(id string, data []byte) *AgentToControllerWrapper {
+	return &AgentToControllerWrapper{
+		Event: &AgentToControllerWrapper_HttpTunnelChunkedResponse{
+			HttpTunnelChunkedResponse: &HttpTunnelChunkedResponse{
 				Id:   id,
 				Body: data,
 			},
@@ -54,10 +56,10 @@ func makeChunkedResponse(id string, data []byte) *tunnel.AgentToControllerWrappe
 	}
 }
 
-func makeBadGatewayResponse(id string) *tunnel.AgentToControllerWrapper {
-	return &tunnel.AgentToControllerWrapper{
-		Event: &tunnel.AgentToControllerWrapper_HttpTunnelResponse{
-			HttpTunnelResponse: &tunnel.HttpTunnelResponse{
+func MakeBadGatewayResponse(id string) *AgentToControllerWrapper {
+	return &AgentToControllerWrapper{
+		Event: &AgentToControllerWrapper_HttpTunnelResponse{
+			HttpTunnelResponse: &HttpTunnelResponse{
 				Id:            id,
 				Status:        http.StatusBadGateway,
 				ContentLength: 0,
@@ -66,10 +68,10 @@ func makeBadGatewayResponse(id string) *tunnel.AgentToControllerWrapper {
 	}
 }
 
-func makeResponse(id string, response *http.Response) *tunnel.AgentToControllerWrapper {
-	return &tunnel.AgentToControllerWrapper{
-		Event: &tunnel.AgentToControllerWrapper_HttpTunnelResponse{
-			HttpTunnelResponse: &tunnel.HttpTunnelResponse{
+func makeResponse(id string, response *http.Response) *AgentToControllerWrapper {
+	return &AgentToControllerWrapper{
+		Event: &AgentToControllerWrapper_HttpTunnelResponse{
+			HttpTunnelResponse: &HttpTunnelResponse{
 				Id:            id,
 				Status:        int32(response.StatusCode),
 				ContentLength: response.ContentLength,
@@ -79,12 +81,12 @@ func makeResponse(id string, response *http.Response) *tunnel.AgentToControllerW
 	}
 }
 
-func runHTTPRequest(client *http.Client, req *tunnel.OpenHTTPTunnelRequest, httpRequest *http.Request, dataflow chan *tunnel.AgentToControllerWrapper, baseURL string) {
+func RunHTTPRequest(client *http.Client, req *OpenHTTPTunnelRequest, httpRequest *http.Request, dataflow chan *AgentToControllerWrapper, baseURL string) {
 	log.Printf("Sending HTTP request: %s to %v", req.Method, baseURL+req.URI)
 	httpResponse, err := client.Do(httpRequest)
 	if err != nil {
 		log.Printf("Failed to execute request for %s to %s: %v", req.Method, baseURL+req.URI, err)
-		dataflow <- makeBadGatewayResponse(req.Id)
+		dataflow <- MakeBadGatewayResponse(req.Id)
 		return
 	}
 

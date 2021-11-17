@@ -138,7 +138,7 @@ func (a *AwsEndpoint) executeHTTPRequest(dataflow chan *tunnel.AgentToController
 
 	if len(host) == 0 || len(port) == 0 || len(signerService) == 0 || len(signingRegion) == 0 || len(timestamp) == 0 {
 		log.Printf("aws: required headers missing from request")
-		dataflow <- makeBadGatewayResponse(req.Id)
+		dataflow <- tunnel.MakeBadGatewayResponse(req.Id)
 		return
 	}
 
@@ -152,7 +152,7 @@ func (a *AwsEndpoint) executeHTTPRequest(dataflow chan *tunnel.AgentToController
 	httpRequest, err := http.NewRequestWithContext(ctx, req.Method, actualurl, bytes.NewBuffer(req.Body))
 	if err != nil {
 		log.Printf("Failed to build request for %s to %s: %v", req.Method, actualurl, err)
-		dataflow <- makeBadGatewayResponse(req.Id)
+		dataflow <- tunnel.MakeBadGatewayResponse(req.Id)
 		return
 	}
 
@@ -170,9 +170,9 @@ func (a *AwsEndpoint) executeHTTPRequest(dataflow chan *tunnel.AgentToController
 	_, err = a.signer.Sign(httpRequest, bodyBuffer, signerService, signingRegion, ts)
 	if err != nil {
 		log.Printf("Failed to sign AWS request: %v", err)
-		dataflow <- makeBadGatewayResponse(req.Id)
+		dataflow <- tunnel.MakeBadGatewayResponse(req.Id)
 		return
 	}
 
-	runHTTPRequest(client, req, httpRequest, dataflow, baseURL)
+	tunnel.RunHTTPRequest(client, req, httpRequest, dataflow, baseURL)
 }
