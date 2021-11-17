@@ -46,6 +46,8 @@ type ControllerConfig struct {
 	AgentAdvertisePort      uint16                  `yaml:"agentAdvertisePort"`
 	RemoteCommandHostname   *string                 `yaml:"remoteCommandHostname"`
 	RemoteCommandListenPort uint16                  `yaml:"remoteCommandListenPort"`
+	IncomingServices        []incomingServiceConfig `yaml:"incomingServices,omitempty"`
+	OutgoingServices        []outgoingServiceConfig `yaml:"outgoingServices,omitempty"`
 }
 
 type agentConfig struct {
@@ -54,6 +56,25 @@ type agentConfig struct {
 
 type serviceAuthConfig struct {
 	CurrentKeyName string `yaml:"currentKeyName,omitempty"`
+}
+
+type incomingServiceConfig struct {
+	Name               string `yaml:"name,omitempty"`
+	Port               uint16 `yaml:"port,omitempty"`
+	ServiceType        string `yaml:"serviceType,omitempty"`
+	UseHTTP            bool   `yaml:"useHTTP,omitempty"`
+	DestinationAgent   string `yaml:"destinationAgent,omitempty"`
+	DestinationService string `yaml:"destinationService,omitempty"`
+}
+
+type outgoingServiceConfig struct {
+	Name            string   `yaml:"name,omitempty"`
+	DestinationHost string   `yaml:"destinationHost,omitempty"`
+	DestinationPort string   `yaml:"destinationPort,omitempty"`
+	ServiceType     string   `yaml:"serviceType,omitempty"`
+	Insecure        bool     `yaml:"insecure,omitempty"`
+	UseHTTP         bool     `yaml:"useHTTP,omitempty"`
+	AllowedAgents   []string `yaml:"allowedAgents,omitempty"`
 }
 
 // LoadConfig will load YAML configuration from the provided filename,
