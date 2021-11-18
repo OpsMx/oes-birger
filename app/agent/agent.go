@@ -169,22 +169,29 @@ func runTunnel(wg *sync.WaitGroup, sa *serverContext, conn *grpc.ClientConn, end
 			switch x := in.Event.(type) {
 			case *tunnel.ControllerToAgentWrapper_PingResponse:
 				continue
-			case *tunnel.ControllerToAgentWrapper_CancelRequest:
-				req := in.GetCancelRequest()
-				callCancelFunction(req.Id)
-			case *tunnel.ControllerToAgentWrapper_OpenHTTPTunnelRequest:
-				req := in.GetOpenHTTPTunnelRequest()
-				found := false
-				for _, endpoint := range endpoints {
-					if endpoint.Configured && endpoint.Type == req.Type && endpoint.Name == req.Name {
-						go endpoint.instance.executeHTTPRequest(dataflow, req)
-						found = true
-						break
+			case *tunnel.ControllerToAgentWrapper_HttpTunnelControl:
+				switch y := x.HttpTunnelControl.ControlType.(type) {
+				case *tunnel.HttpTunnelControl_CancelRequest:
+					req := in.GetHttpTunnelControl().GetCancelRequest()
+					callCancelFunction(req.Id)
+				case *tunnel.HttpTunnelControl_OpenHTTPTunnelRequest:
+					req := in.GetHttpTunnelControl().GetOpenHTTPTunnelRequest()
+					found := false
+					for _, endpoint := range endpoints {
+						if endpoint.Configured && endpoint.Type == req.Type && endpoint.Name == req.Name {
+							go endpoint.instance.executeHTTPRequest(dataflow, req)
+							found = true
+							break
+						}
 					}
-				}
-				if !found {
-					log.Printf("Request for unsupported HTTP tunnel type=%s name=%s", req.Type, req.Name)
-					dataflow <- tunnel.MakeBadGatewayResponse(req.Id)
+					if !found {
+						log.Printf("Request for unsupported HTTP tunnel type=%s name=%s", req.Type, req.Name)
+						dataflow <- tunnel.MakeBadGatewayResponse(req.Id)
+					}
+				case nil:
+					continue;
+				default:
+					log.Printf("Received unknown HttpControl type: %T", y)
 				}
 			case *tunnel.ControllerToAgentWrapper_CommandRequest:
 				req := in.GetCommandRequest()

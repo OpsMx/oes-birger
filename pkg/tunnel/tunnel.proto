@@ -130,12 +130,20 @@ message AgentHello {
     string hostname = 3;
 }
 
+message HttpTunnelControl {
+    oneof controlType {
+        OpenHTTPTunnelRequest openHTTPTunnelRequest = 1;
+        CancelRequest cancelRequest = 2;
+        HttpTunnelResponse httpTunnelResponse = 3;
+        HttpTunnelChunkedResponse httpTunnelChunkedResponse = 4;
+    }
+}
+
 // Messages sent from server to agent
 message ControllerToAgentWrapper {
     oneof event {
         PingResponse pingResponse = 1;
-        OpenHTTPTunnelRequest openHTTPTunnelRequest = 2;
-        CancelRequest cancelRequest = 3;
+        HttpTunnelControl httpTunnelControl = 2;
         CommandRequest commandRequest = 4;
         CommandData commandData = 5;
     }
