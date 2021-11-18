@@ -170,29 +170,7 @@ func runTunnel(wg *sync.WaitGroup, sa *serverContext, conn *grpc.ClientConn, end
 			case *tunnel.ControllerToAgentWrapper_PingResponse:
 				continue
 			case *tunnel.ControllerToAgentWrapper_HttpTunnelControl:
-				switch y := x.HttpTunnelControl.ControlType.(type) {
-				case *tunnel.HttpTunnelControl_CancelRequest:
-					req := in.GetHttpTunnelControl().GetCancelRequest()
-					callCancelFunction(req.Id)
-				case *tunnel.HttpTunnelControl_OpenHTTPTunnelRequest:
-					req := in.GetHttpTunnelControl().GetOpenHTTPTunnelRequest()
-					found := false
-					for _, endpoint := range endpoints {
-						if endpoint.Configured && endpoint.Type == req.Type && endpoint.Name == req.Name {
-							go endpoint.instance.executeHTTPRequest(dataflow, req)
-							found = true
-							break
-						}
-					}
-					if !found {
-						log.Printf("Request for unsupported HTTP tunnel type=%s name=%s", req.Type, req.Name)
-						dataflow <- tunnel.MakeBadGatewayResponse(req.Id)
-					}
-				case nil:
-					continue;
-				default:
-					log.Printf("Received unknown HttpControl type: %T", y)
-				}
+				handleTunnelCommand(x.HttpTunnelControl, endpoints, dataflow)
 			case *tunnel.ControllerToAgentWrapper_CommandRequest:
 				req := in.GetCommandRequest()
 				log.Printf("Got cmd request: %s %v %v", req.Name, req.Arguments, req.Environment)
@@ -214,6 +192,32 @@ func runTunnel(wg *sync.WaitGroup, sa *serverContext, conn *grpc.ClientConn, end
 	<-waitc
 	close(dataflow)
 	_ = stream.CloseSend()
+}
+
+func handleTunnelCommand(tunnelControl *tunnel.HttpTunnelControl, endpoints []configuredEndpoint, dataflow chan *tunnel.AgentToControllerWrapper) {
+	switch controlMessage := tunnelControl.ControlType.(type) {
+	case *tunnel.HttpTunnelControl_CancelRequest:
+		callCancelFunction(controlMessage.CancelRequest.Id)
+	case *tunnel.HttpTunnelControl_OpenHTTPTunnelRequest:
+		req := controlMessage.OpenHTTPTunnelRequest
+		found := false
+		for _, endpoint := range endpoints {
+			if endpoint.Configured && endpoint.Type == req.Type && endpoint.Name == req.Name {
+				go endpoint.instance.executeHTTPRequest(dataflow, req)
+				found = true
+				break
+			}
+		}
+		if !found {
+			log.Printf("Request for unsupported HTTP tunnel type=%s name=%s", req.Type, req.Name)
+			dataflow <- tunnel.MakeBadGatewayResponse(req.Id)
+		}
+	case nil:
+		return
+	default:
+		log.Printf("Received unknown HttpControl type: %T", controlMessage)
+	}
+
 }
 
 func loadCert() []byte {
