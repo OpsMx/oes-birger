@@ -173,7 +173,7 @@ func MakeGenericEndpoint(endpointType string, endpointName string, configBytes [
 	return ep, true, nil
 }
 
-func (ep *GenericEndpoint) executeHTTPRequest(dataflow chan *tunnel.AgentToControllerWrapper, req *tunnel.OpenHTTPTunnelRequest) {
+func (ep *GenericEndpoint) executeHTTPRequest(dataflow chan *tunnel.MessageWrapper, req *tunnel.OpenHTTPTunnelRequest) {
 	log.Printf("Running request %v", req)
 	tlsConfig := &tls.Config{
 		MinVersion: tls.VersionTLS12,

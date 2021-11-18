@@ -132,7 +132,7 @@ func makeHeaders(headers map[string][]string) []*tunnel.HttpHeader {
 
 // HTTPMessage holds the context of an incoming HTTP request.
 type HTTPMessage struct {
-	Out chan *tunnel.AgentToControllerWrapper
+	Out chan *tunnel.MessageWrapper
 	Cmd *tunnel.OpenHTTPTunnelRequest
 }
 

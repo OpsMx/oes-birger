@@ -39,8 +39,8 @@ func (c *agentTunnelServiceClient) EventTunnel(ctx context.Context, opts ...grpc
 }
 
 type AgentTunnelService_EventTunnelClient interface {
-	Send(*AgentToControllerWrapper) error
-	Recv() (*ControllerToAgentWrapper, error)
+	Send(*MessageWrapper) error
+	Recv() (*MessageWrapper, error)
 	grpc.ClientStream
 }
 
@@ -48,12 +48,12 @@ type agentTunnelServiceEventTunnelClient struct {
 	grpc.ClientStream
 }
 
-func (x *agentTunnelServiceEventTunnelClient) Send(m *AgentToControllerWrapper) error {
+func (x *agentTunnelServiceEventTunnelClient) Send(m *MessageWrapper) error {
 	return x.ClientStream.SendMsg(m)
 }
 
-func (x *agentTunnelServiceEventTunnelClient) Recv() (*ControllerToAgentWrapper, error) {
-	m := new(ControllerToAgentWrapper)
+func (x *agentTunnelServiceEventTunnelClient) Recv() (*MessageWrapper, error) {
+	m := new(MessageWrapper)
 	if err := x.ClientStream.RecvMsg(m); err != nil {
 		return nil, err
 	}
@@ -93,8 +93,8 @@ func _AgentTunnelService_EventTunnel_Handler(srv interface{}, stream grpc.Server
 }
 
 type AgentTunnelService_EventTunnelServer interface {
-	Send(*ControllerToAgentWrapper) error
-	Recv() (*AgentToControllerWrapper, error)
+	Send(*MessageWrapper) error
+	Recv() (*MessageWrapper, error)
 	grpc.ServerStream
 }
 
@@ -102,12 +102,12 @@ type agentTunnelServiceEventTunnelServer struct {
 	grpc.ServerStream
 }
 
-func (x *agentTunnelServiceEventTunnelServer) Send(m *ControllerToAgentWrapper) error {
+func (x *agentTunnelServiceEventTunnelServer) Send(m *MessageWrapper) error {
 	return x.ServerStream.SendMsg(m)
 }
 
-func (x *agentTunnelServiceEventTunnelServer) Recv() (*AgentToControllerWrapper, error) {
-	m := new(AgentToControllerWrapper)
+func (x *agentTunnelServiceEventTunnelServer) Recv() (*MessageWrapper, error) {
+	m := new(MessageWrapper)
 	if err := x.ServerStream.RecvMsg(m); err != nil {
 		return nil, err
 	}

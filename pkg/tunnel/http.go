@@ -46,12 +46,16 @@ func CopyHeaders(req *OpenHTTPTunnelRequest, httpRequest *http.Request) {
 	}
 }
 
-func makeChunkedResponse(id string, data []byte) *AgentToControllerWrapper {
-	return &AgentToControllerWrapper{
-		Event: &AgentToControllerWrapper_HttpTunnelChunkedResponse{
-			HttpTunnelChunkedResponse: &HttpTunnelChunkedResponse{
-				Id:   id,
-				Body: data,
+func makeChunkedResponse(id string, data []byte) *MessageWrapper {
+	return &MessageWrapper{
+		Event: &MessageWrapper_HttpTunnelControl{
+			HttpTunnelControl: &HttpTunnelControl{
+				ControlType: &HttpTunnelControl_HttpTunnelChunkedResponse{
+					HttpTunnelChunkedResponse: &HttpTunnelChunkedResponse{
+						Id:   id,
+						Body: data,
+					},
+				},
 			},
 		},
 	}
@@ -59,33 +63,41 @@ func makeChunkedResponse(id string, data []byte) *AgentToControllerWrapper {
 
 // MakeBadGatewayResponse will generate a 502 HTTP status code and return it,
 // to indicate there is no such endpoint in the agent.
-func MakeBadGatewayResponse(id string) *AgentToControllerWrapper {
-	return &AgentToControllerWrapper{
-		Event: &AgentToControllerWrapper_HttpTunnelResponse{
-			HttpTunnelResponse: &HttpTunnelResponse{
-				Id:            id,
-				Status:        http.StatusBadGateway,
-				ContentLength: 0,
+func MakeBadGatewayResponse(id string) *MessageWrapper {
+	return &MessageWrapper{
+		Event: &MessageWrapper_HttpTunnelControl{
+			HttpTunnelControl: &HttpTunnelControl{
+				ControlType: &HttpTunnelControl_HttpTunnelResponse{
+					HttpTunnelResponse: &HttpTunnelResponse{
+						Id:            id,
+						Status:        http.StatusBadGateway,
+						ContentLength: 0,
+					},
+				},
 			},
 		},
 	}
 }
 
-func makeResponse(id string, response *http.Response) *AgentToControllerWrapper {
-	return &AgentToControllerWrapper{
-		Event: &AgentToControllerWrapper_HttpTunnelResponse{
-			HttpTunnelResponse: &HttpTunnelResponse{
-				Id:            id,
-				Status:        int32(response.StatusCode),
-				ContentLength: response.ContentLength,
-				Headers:       makeHeaders(response.Header),
+func makeResponse(id string, response *http.Response) *MessageWrapper {
+	return &MessageWrapper{
+		Event: &MessageWrapper_HttpTunnelControl{
+			HttpTunnelControl: &HttpTunnelControl{
+				ControlType: &HttpTunnelControl_HttpTunnelResponse{
+					HttpTunnelResponse: &HttpTunnelResponse{
+						Id:            id,
+						Status:        int32(response.StatusCode),
+						ContentLength: response.ContentLength,
+						Headers:       makeHeaders(response.Header),
+					},
+				},
 			},
 		},
 	}
 }
 
 // RunHTTPRequest will make a HTTP request, and send the data to the remote end.
-func RunHTTPRequest(client *http.Client, req *OpenHTTPTunnelRequest, httpRequest *http.Request, dataflow chan *AgentToControllerWrapper, baseURL string) {
+func RunHTTPRequest(client *http.Client, req *OpenHTTPTunnelRequest, httpRequest *http.Request, dataflow chan *MessageWrapper, baseURL string) {
 	log.Printf("Sending HTTP request: %s to %v", req.Method, baseURL+req.URI)
 	httpResponse, err := client.Do(httpRequest)
 	if err != nil {
@@ -126,8 +138,8 @@ func RunHTTPRequest(client *http.Client, req *OpenHTTPTunnelRequest, httpRequest
 }
 
 // MakeHttpTunnelCancelRequest will make a wrapped request to cancel a specific
-func MakeHttpTunnelCancelRequest(id string) *ControllerToAgentWrapper_HttpTunnelControl {
-	return &ControllerToAgentWrapper_HttpTunnelControl{
+func MakeHttpTunnelCancelRequest(id string) *MessageWrapper_HttpTunnelControl {
+	return &MessageWrapper_HttpTunnelControl{
 		HttpTunnelControl: &HttpTunnelControl{
 			ControlType: &HttpTunnelControl_CancelRequest{
 				CancelRequest: &CancelRequest{Id: id},
@@ -137,8 +149,8 @@ func MakeHttpTunnelCancelRequest(id string) *ControllerToAgentWrapper_HttpTunnel
 }
 
 // MakeHttpTunnelOpenTunnelRequest will make a wrapped request to open an http tunnel
-func MakeHttpTunnelOpenTunnelRequest(req *OpenHTTPTunnelRequest) *ControllerToAgentWrapper_HttpTunnelControl {
-	return &ControllerToAgentWrapper_HttpTunnelControl{
+func MakeHttpTunnelOpenTunnelRequest(req *OpenHTTPTunnelRequest) *MessageWrapper_HttpTunnelControl {
+	return &MessageWrapper_HttpTunnelControl{
 		HttpTunnelControl: &HttpTunnelControl{
 			ControlType: &HttpTunnelControl_OpenHTTPTunnelRequest{
 				OpenHTTPTunnelRequest: req,

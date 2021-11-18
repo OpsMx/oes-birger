@@ -139,25 +139,16 @@ message HttpTunnelControl {
     }
 }
 
-// Messages sent from server to agent
-message ControllerToAgentWrapper {
-    oneof event {
-        PingResponse pingResponse = 1;
-        HttpTunnelControl httpTunnelControl = 2;
-        CommandRequest commandRequest = 4;
-        CommandData commandData = 5;
-    }
-}
-
-// Messages sent from agent to server
-message AgentToControllerWrapper {
+// Messages sent from controller to agent, or agent to controller
+message MessageWrapper {
     oneof event {
         PingRequest pingRequest = 1;
-        HttpTunnelResponse httpTunnelResponse = 2;
-        HttpTunnelChunkedResponse httpTunnelChunkedResponse = 3;
-        AgentHello agentHello = 4;
+        PingResponse pingResponse = 2;
+        AgentHello agentHello = 3;
+        HttpTunnelControl httpTunnelControl = 4;
         CommandData commandData = 5;
         CommandTermination commandTermination = 6;
+        CommandRequest commandRequest = 7;
     }
 }
 
@@ -182,7 +173,7 @@ message ControllerToCmdToolWrapper {
 //
 
 service AgentTunnelService {
-    rpc EventTunnel(stream AgentToControllerWrapper) returns (stream ControllerToAgentWrapper) {}
+    rpc EventTunnel(stream MessageWrapper) returns (stream MessageWrapper) {}
 }
 
 service CmdToolTunnelService {

@@ -77,7 +77,7 @@ type configuredEndpoint struct {
 }
 
 type httpRequestProcessor interface {
-	executeHTTPRequest(chan *tunnel.AgentToControllerWrapper, *tunnel.OpenHTTPTunnelRequest)
+	executeHTTPRequest(chan *tunnel.MessageWrapper, *tunnel.OpenHTTPTunnelRequest)
 }
 
 func (e *configuredEndpoint) String() string {
@@ -104,8 +104,8 @@ func tickerPinger(stream tunnel.AgentTunnelService_EventTunnelClient) {
 	ticker := time.NewTicker(time.Duration(*tickTime) * time.Second)
 
 	for ts := range ticker.C {
-		req := &tunnel.AgentToControllerWrapper{
-			Event: &tunnel.AgentToControllerWrapper_PingRequest{
+		req := &tunnel.MessageWrapper{
+			Event: &tunnel.MessageWrapper_PingRequest{
 				PingRequest: &tunnel.PingRequest{Ts: uint64(ts.UnixNano())},
 			},
 		}
@@ -115,7 +115,7 @@ func tickerPinger(stream tunnel.AgentTunnelService_EventTunnelClient) {
 	}
 }
 
-func dataflowHandler(dataflow chan *tunnel.AgentToControllerWrapper, stream tunnel.AgentTunnelService_EventTunnelClient) {
+func dataflowHandler(dataflow chan *tunnel.MessageWrapper, stream tunnel.AgentTunnelService_EventTunnelClient) {
 	for ew := range dataflow {
 		if err := stream.Send(ew); err != nil {
 			log.Fatalf("Unable to respond over GRPC: %v", err)
@@ -140,8 +140,8 @@ func runTunnel(wg *sync.WaitGroup, sa *serverContext, conn *grpc.ClientConn, end
 		Endpoints: pbEndpoints,
 		Hostname:  hostname,
 	}
-	hello := &tunnel.AgentToControllerWrapper{
-		Event: &tunnel.AgentToControllerWrapper_AgentHello{
+	hello := &tunnel.MessageWrapper{
+		Event: &tunnel.MessageWrapper_AgentHello{
 			AgentHello: helloMsg,
 		},
 	}
@@ -149,7 +149,7 @@ func runTunnel(wg *sync.WaitGroup, sa *serverContext, conn *grpc.ClientConn, end
 		log.Fatalf("Unable to send hello packet: %v", err)
 	}
 
-	dataflow := make(chan *tunnel.AgentToControllerWrapper, 20)
+	dataflow := make(chan *tunnel.MessageWrapper, 20)
 
 	go tickerPinger(stream)
 	go dataflowHandler(dataflow, stream)
@@ -167,11 +167,11 @@ func runTunnel(wg *sync.WaitGroup, sa *serverContext, conn *grpc.ClientConn, end
 				log.Fatalf("Failed to receive a message: %T: %v", err, err)
 			}
 			switch x := in.Event.(type) {
-			case *tunnel.ControllerToAgentWrapper_PingResponse:
+			case *tunnel.MessageWrapper_PingResponse:
 				continue
-			case *tunnel.ControllerToAgentWrapper_HttpTunnelControl:
+			case *tunnel.MessageWrapper_HttpTunnelControl:
 				handleTunnelCommand(x.HttpTunnelControl, endpoints, dataflow)
-			case *tunnel.ControllerToAgentWrapper_CommandRequest:
+			case *tunnel.MessageWrapper_CommandRequest:
 				req := in.GetCommandRequest()
 				log.Printf("Got cmd request: %s %v %v", req.Name, req.Arguments, req.Environment)
 				switch req.Name {
@@ -194,7 +194,7 @@ func runTunnel(wg *sync.WaitGroup, sa *serverContext, conn *grpc.ClientConn, end
 	_ = stream.CloseSend()
 }
 
-func handleTunnelCommand(tunnelControl *tunnel.HttpTunnelControl, endpoints []configuredEndpoint, dataflow chan *tunnel.AgentToControllerWrapper) {
+func handleTunnelCommand(tunnelControl *tunnel.HttpTunnelControl, endpoints []configuredEndpoint, dataflow chan *tunnel.MessageWrapper) {
 	switch controlMessage := tunnelControl.ControlType.(type) {
 	case *tunnel.HttpTunnelControl_CancelRequest:
 		callCancelFunction(controlMessage.CancelRequest.Id)
@@ -217,7 +217,6 @@ func handleTunnelCommand(tunnelControl *tunnel.HttpTunnelControl, endpoints []co
 	default:
 		log.Printf("Received unknown HttpControl type: %T", controlMessage)
 	}
-
 }
 
 func loadCert() []byte {

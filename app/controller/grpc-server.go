@@ -53,9 +53,9 @@ func (s *agentTunnelServer) sendWebhook(state agent.Agent, endpoints []*tunnel.E
 	hook.Send(req)
 }
 
-func (s *agentTunnelServer) makePingResponse(req *tunnel.PingRequest) *tunnel.ControllerToAgentWrapper {
-	resp := &tunnel.ControllerToAgentWrapper{
-		Event: &tunnel.ControllerToAgentWrapper_PingResponse{
+func (s *agentTunnelServer) makePingResponse(req *tunnel.PingRequest) *tunnel.MessageWrapper {
+	resp := &tunnel.MessageWrapper{
+		Event: &tunnel.MessageWrapper_PingResponse{
 			PingResponse: &tunnel.PingResponse{Ts: uint64(time.Now().UnixNano()), EchoedTs: req.Ts},
 		},
 	}
@@ -64,7 +64,7 @@ func (s *agentTunnelServer) makePingResponse(req *tunnel.PingRequest) *tunnel.Co
 
 type sessionList struct {
 	sync.RWMutex
-	m map[string]chan *tunnel.AgentToControllerWrapper
+	m map[string]chan *tunnel.MessageWrapper
 }
 
 func (s *agentTunnelServer) removeHTTPId(httpids *sessionList, id string) {
@@ -73,7 +73,7 @@ func (s *agentTunnelServer) removeHTTPId(httpids *sessionList, id string) {
 	delete(httpids.m, id)
 }
 
-func (s *agentTunnelServer) addHTTPId(httpids *sessionList, id string, c chan *tunnel.AgentToControllerWrapper) {
+func (s *agentTunnelServer) addHTTPId(httpids *sessionList, id string, c chan *tunnel.MessageWrapper) {
 	httpids.Lock()
 	defer httpids.Unlock()
 	httpids.m[id] = c
@@ -84,7 +84,7 @@ func (s *agentTunnelServer) handleHTTPRequests(session string, requestChan chan 
 		switch value := interfacedRequest.(type) {
 		case *HTTPMessage:
 			s.addHTTPId(httpids, value.Cmd.Id, value.Out)
-			resp := &tunnel.ControllerToAgentWrapper{
+			resp := &tunnel.MessageWrapper{
 				Event: tunnel.MakeHttpTunnelOpenTunnelRequest(value.Cmd),
 			}
 			if err := stream.Send(resp); err != nil {
@@ -93,8 +93,8 @@ func (s *agentTunnelServer) handleHTTPRequests(session string, requestChan chan 
 		case *runCmdMessage:
 			log.Printf("cmd %s %s %v %v running", value.cmd.Id, value.cmd.Name, value.cmd.Arguments, value.cmd.Environment)
 			s.addHTTPId(httpids, value.cmd.Id, value.out)
-			resp := &tunnel.ControllerToAgentWrapper{
-				Event: &tunnel.ControllerToAgentWrapper_CommandRequest{
+			resp := &tunnel.MessageWrapper{
+				Event: &tunnel.MessageWrapper_CommandRequest{
 					CommandRequest: value.cmd,
 				},
 			}
@@ -110,7 +110,7 @@ func (s *agentTunnelServer) handleHTTPRequests(session string, requestChan chan 
 func (s *agentTunnelServer) handleHTTPCancelRequest(session string, cancelChan chan string, httpids *sessionList, stream tunnel.AgentTunnelService_EventTunnelServer) {
 	for id := range cancelChan {
 		s.removeHTTPId(httpids, id)
-		resp := &tunnel.ControllerToAgentWrapper{
+		resp := &tunnel.MessageWrapper{
 			Event: tunnel.MakeHttpTunnelCancelRequest(id),
 		}
 		if err := stream.Send(resp); err != nil {
@@ -139,7 +139,7 @@ func (s *agentTunnelServer) EventTunnel(stream tunnel.AgentTunnelService_EventTu
 
 	inRequest := make(chan interface{}, 1)
 	inCancelRequest := make(chan string, 1)
-	httpids := &sessionList{m: make(map[string]chan *tunnel.AgentToControllerWrapper)}
+	httpids := &sessionList{m: make(map[string]chan *tunnel.MessageWrapper)}
 
 	state := &agent.DirectlyConnectedAgent{
 		Name:            agentIdentity,
@@ -177,7 +177,7 @@ func (s *agentTunnelServer) EventTunnel(stream tunnel.AgentTunnelService_EventTu
 		}
 
 		switch x := in.Event.(type) {
-		case *tunnel.AgentToControllerWrapper_PingRequest:
+		case *tunnel.MessageWrapper_PingRequest:
 			req := in.GetPingRequest()
 			atomic.StoreUint64(&state.LastPing, tunnel.Now())
 			if err := stream.Send(s.makePingResponse(req)); err != nil {
@@ -188,7 +188,7 @@ func (s *agentTunnelServer) EventTunnel(stream tunnel.AgentTunnelService_EventTu
 				}
 				return err
 			}
-		case *tunnel.AgentToControllerWrapper_AgentHello:
+		case *tunnel.MessageWrapper_AgentHello:
 			req := in.GetAgentHello()
 			endpoints := make([]agent.Endpoint, len(req.Endpoints))
 			for i, ep := range req.Endpoints {
@@ -206,35 +206,38 @@ func (s *agentTunnelServer) EventTunnel(stream tunnel.AgentTunnelService_EventTu
 			state.Hostname = req.Hostname
 			agents.AddAgent(state)
 			s.sendWebhook(state, req.Endpoints)
-		case *tunnel.AgentToControllerWrapper_HttpTunnelResponse:
-			resp := in.GetHttpTunnelResponse()
-			atomic.StoreUint64(&state.LastUse, tunnel.Now())
-			httpids.Lock()
-			dest := httpids.m[resp.Id]
-			if dest != nil {
-				dest <- in
-				if resp.ContentLength == 0 {
-					delete(httpids.m, resp.Id)
+		case *tunnel.MessageWrapper_HttpTunnelControl:
+			switch controlMessage := x.HttpTunnelControl.ControlType.(type) {
+			case *tunnel.HttpTunnelControl_HttpTunnelResponse:
+				resp := controlMessage.HttpTunnelResponse
+				atomic.StoreUint64(&state.LastUse, tunnel.Now())
+				httpids.Lock()
+				dest := httpids.m[resp.Id]
+				if dest != nil {
+					dest <- in
+					if resp.ContentLength == 0 {
+						delete(httpids.m, resp.Id)
+					}
+				} else {
+					log.Printf("Got response to unknown HTTP request id %s from %s", resp.Id, agentIdentity)
 				}
-			} else {
-				log.Printf("Got response to unknown HTTP request id %s from %s", resp.Id, agentIdentity)
-			}
-			httpids.Unlock()
-		case *tunnel.AgentToControllerWrapper_HttpTunnelChunkedResponse:
-			resp := in.GetHttpTunnelChunkedResponse()
-			atomic.StoreUint64(&state.LastUse, tunnel.Now())
-			httpids.Lock()
-			dest := httpids.m[resp.Id]
-			if dest != nil {
-				dest <- in
-				if len(resp.Body) == 0 {
-					delete(httpids.m, resp.Id)
+				httpids.Unlock()
+			case *tunnel.HttpTunnelControl_HttpTunnelChunkedResponse:
+				resp := controlMessage.HttpTunnelChunkedResponse
+				atomic.StoreUint64(&state.LastUse, tunnel.Now())
+				httpids.Lock()
+				dest := httpids.m[resp.Id]
+				if dest != nil {
+					dest <- in
+					if len(resp.Body) == 0 {
+						delete(httpids.m, resp.Id)
+					}
+				} else {
+					log.Printf("Got response to unknown HTTP request id %s from %s", resp.Id, state)
 				}
-			} else {
-				log.Printf("Got response to unknown HTTP request id %s from %s", resp.Id, state)
+				httpids.Unlock()
 			}
-			httpids.Unlock()
-		case *tunnel.AgentToControllerWrapper_CommandTermination:
+		case *tunnel.MessageWrapper_CommandTermination:
 			resp := in.GetCommandTermination()
 			atomic.StoreUint64(&state.LastUse, tunnel.Now())
 			httpids.Lock()
@@ -247,7 +250,7 @@ func (s *agentTunnelServer) EventTunnel(stream tunnel.AgentTunnelService_EventTu
 				log.Printf("Got response to unknown CMD request id %s from %s", resp.Id, state)
 			}
 			httpids.Unlock()
-		case *tunnel.AgentToControllerWrapper_CommandData:
+		case *tunnel.MessageWrapper_CommandData:
 			resp := in.GetCommandData()
 			atomic.StoreUint64(&state.LastUse, tunnel.Now())
 			httpids.Lock()
@@ -320,7 +323,7 @@ func (s *cmdToolTunnelServer) makeCommandTermination(exitstatus int) *tunnel.Con
 }
 
 type runCmdMessage struct {
-	out chan *tunnel.AgentToControllerWrapper
+	out chan *tunnel.MessageWrapper
 	cmd *tunnel.CommandRequest
 }
 
@@ -332,18 +335,18 @@ func (s *cmdToolTunnelServer) EventTunnel(stream tunnel.CmdToolTunnelService_Eve
 	log.Printf("CmdTool %s connected", agentIdentity)
 
 	sessionIdentity := ulidContext.Ulid()
-	agentResponseChan := make(chan *tunnel.AgentToControllerWrapper)
+	agentResponseChan := make(chan *tunnel.MessageWrapper)
 
 	go func() {
 		for in := range agentResponseChan {
 			switch x := in.Event.(type) {
-			case *tunnel.AgentToControllerWrapper_CommandTermination:
+			case *tunnel.MessageWrapper_CommandTermination:
 				resp := in.GetCommandTermination()
 				log.Printf("Got command exit code %d", resp.ExitCode)
 				if err := stream.Send(s.makeCommandTermination(int(resp.ExitCode))); err != nil {
 					log.Printf("While sending: %v", err)
 				}
-			case *tunnel.AgentToControllerWrapper_CommandData:
+			case *tunnel.MessageWrapper_CommandData:
 				resp := in.GetCommandData()
 				msg := &tunnel.ControllerToCmdToolWrapper{
 					Event: &tunnel.ControllerToCmdToolWrapper_CommandData{

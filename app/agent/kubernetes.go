@@ -205,7 +205,7 @@ func (ke *KubernetesEndpoint) loadServiceAccount() (*kubeContext, error) {
 	}, nil
 }
 
-func (ke *KubernetesEndpoint) executeHTTPRequest(dataflow chan *tunnel.AgentToControllerWrapper, req *tunnel.OpenHTTPTunnelRequest) {
+func (ke *KubernetesEndpoint) executeHTTPRequest(dataflow chan *tunnel.MessageWrapper, req *tunnel.OpenHTTPTunnelRequest) {
 	c := ke.makeServerContextFields()
 
 	// TODO: A ServerCA is technically optional, but we might want to fail if it's not present...
