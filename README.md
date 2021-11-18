@@ -45,21 +45,20 @@ As a warning, this is my first attempt at any Go code...
 
 # Prerequisites
 
-`go get -u github.com/golang/protobuf/{proto,protoc-gen-go}`
-
-`go get -u google.golang.org/grpc`
+`$ go install google.golang.org/protobuf/cmd/protoc-gen-go`
+`$ go install google.golang.org/grpc/cmd/protoc-gen-go-grpc`
 
 # Building
 
-`protoc --go_out=plugins=grpc:tunnel tunnel/tunnel.proto`
+`$ make`
 
 # Running
 
 Start the controller:
-`go run controller/controller.go`
+`$ go run controller/controller.go`
 
 Start a agent:
-`go run agent/agent.go -identity skan1`
+`$ go run agent/agent.go -identity skan1`
 
 # Certificates
 
