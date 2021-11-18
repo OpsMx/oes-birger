@@ -46,6 +46,7 @@ As a warning, this is my first attempt at any Go code...
 # Prerequisites
 
 `$ go install google.golang.org/protobuf/cmd/protoc-gen-go`
+
 `$ go install google.golang.org/grpc/cmd/protoc-gen-go-grpc`
 
 # Building
