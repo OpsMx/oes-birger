@@ -124,3 +124,25 @@ func RunHTTPRequest(client *http.Client, req *OpenHTTPTunnelRequest, httpRequest
 		}
 	}
 }
+
+// MakeHttpTunnelCancelRequest will make a wrapped request to cancel a specific
+func MakeHttpTunnelCancelRequest(id string) *ControllerToAgentWrapper_HttpTunnelControl {
+	return &ControllerToAgentWrapper_HttpTunnelControl{
+		HttpTunnelControl: &HttpTunnelControl{
+			ControlType: &HttpTunnelControl_CancelRequest{
+				CancelRequest: &CancelRequest{Id: id},
+			},
+		},
+	}
+}
+
+// MakeHttpTunnelOpenTunnelRequest will make a wrapped request to open an http tunnel
+func MakeHttpTunnelOpenTunnelRequest(req *OpenHTTPTunnelRequest) *ControllerToAgentWrapper_HttpTunnelControl {
+	return &ControllerToAgentWrapper_HttpTunnelControl{
+		HttpTunnelControl: &HttpTunnelControl{
+			ControlType: &HttpTunnelControl_OpenHTTPTunnelRequest{
+				OpenHTTPTunnelRequest: req,
+			},
+		},
+	}
+}
