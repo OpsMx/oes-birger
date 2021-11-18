@@ -37,6 +37,7 @@ func makeHeaders(headers map[string][]string) []*HttpHeader {
 	return ret
 }
 
+// CopyHeaders will copy the headers from a tunnel request to the http request.
 func CopyHeaders(req *OpenHTTPTunnelRequest, httpRequest *http.Request) {
 	for _, header := range req.Headers {
 		for _, value := range header.Values {
@@ -56,6 +57,8 @@ func makeChunkedResponse(id string, data []byte) *AgentToControllerWrapper {
 	}
 }
 
+// MakeBadGatewayResponse will generate a 502 HTTP status code and return it,
+// to indicate there is no such endpoint in the agent.
 func MakeBadGatewayResponse(id string) *AgentToControllerWrapper {
 	return &AgentToControllerWrapper{
 		Event: &AgentToControllerWrapper_HttpTunnelResponse{
