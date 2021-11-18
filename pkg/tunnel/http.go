@@ -81,6 +81,7 @@ func makeResponse(id string, response *http.Response) *AgentToControllerWrapper 
 	}
 }
 
+// RunHTTPRequest will make a HTTP request, and send the data to the remote end.
 func RunHTTPRequest(client *http.Client, req *OpenHTTPTunnelRequest, httpRequest *http.Request, dataflow chan *AgentToControllerWrapper, baseURL string) {
 	log.Printf("Sending HTTP request: %s to %v", req.Method, baseURL+req.URI)
 	httpResponse, err := client.Do(httpRequest)
