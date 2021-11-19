@@ -171,17 +171,6 @@ func runTunnel(wg *sync.WaitGroup, sa *serverContext, conn *grpc.ClientConn, end
 				continue
 			case *tunnel.MessageWrapper_HttpTunnelControl:
 				handleTunnelCommand(x.HttpTunnelControl, endpoints, dataflow)
-			case *tunnel.MessageWrapper_CommandRequest:
-				req := in.GetCommandRequest()
-				log.Printf("Got cmd request: %s %v %v", req.Name, req.Arguments, req.Environment)
-				switch req.Name {
-				case "sh":
-					log.Printf("Running 'sh'")
-					go runCommand(dataflow, req)
-				default:
-					log.Printf("Unknown command %s", req.Name)
-					dataflow <- makeCommandFailed(req, nil, "Agent: Unknown command")
-				}
 			case nil:
 				continue
 			default:

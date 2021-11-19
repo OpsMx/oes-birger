@@ -90,17 +90,6 @@ func (s *agentTunnelServer) handleHTTPRequests(session string, requestChan chan 
 			if err := stream.Send(resp); err != nil {
 				log.Printf("Unable to send to agent %s for HTTP request %s", session, value.Cmd.Id)
 			}
-		case *runCmdMessage:
-			log.Printf("cmd %s %s %v %v running", value.cmd.Id, value.cmd.Name, value.cmd.Arguments, value.cmd.Environment)
-			s.addHTTPId(httpids, value.cmd.Id, value.out)
-			resp := &tunnel.MessageWrapper{
-				Event: &tunnel.MessageWrapper_CommandRequest{
-					CommandRequest: value.cmd,
-				},
-			}
-			if err := stream.Send(resp); err != nil {
-				log.Printf("Unable to send to agent %s for CMD request %s", session, value.cmd.Id)
-			}
 		default:
 			log.Printf("Got unexpected message type: %T", interfacedRequest)
 		}
@@ -237,30 +226,6 @@ func (s *agentTunnelServer) EventTunnel(stream tunnel.AgentTunnelService_EventTu
 				}
 				httpids.Unlock()
 			}
-		case *tunnel.MessageWrapper_CommandTermination:
-			resp := in.GetCommandTermination()
-			atomic.StoreUint64(&state.LastUse, tunnel.Now())
-			httpids.Lock()
-			dest := httpids.m[resp.Id]
-			if dest != nil {
-				dest <- in
-				close(dest)
-				delete(httpids.m, resp.Id)
-			} else {
-				log.Printf("Got response to unknown CMD request id %s from %s", resp.Id, state)
-			}
-			httpids.Unlock()
-		case *tunnel.MessageWrapper_CommandData:
-			resp := in.GetCommandData()
-			atomic.StoreUint64(&state.LastUse, tunnel.Now())
-			httpids.Lock()
-			dest := httpids.m[resp.Id]
-			if dest != nil {
-				dest <- in
-			} else {
-				log.Printf("Got response to unknown CMD request id %s from %s", resp.Id, state)
-			}
-			httpids.Unlock()
 		case nil:
 			// ignore for now
 		default:
@@ -301,147 +266,5 @@ func runAgentGRPCServer(serverCert tls.Certificate) {
 	tunnel.RegisterAgentTunnelServiceServer(grpcServer, newAgentServer())
 	if err := grpcServer.Serve(lis); err != nil {
 		log.Fatalf("Failed to start Agent GRPC server: %v", err)
-	}
-}
-
-type cmdToolTunnelServer struct {
-	tunnel.UnimplementedCmdToolTunnelServiceServer
-}
-
-func newCmdToolServer() *cmdToolTunnelServer {
-	return &cmdToolTunnelServer{}
-}
-
-func (s *cmdToolTunnelServer) makeCommandTermination(exitstatus int) *tunnel.ControllerToCmdToolWrapper {
-	return &tunnel.ControllerToCmdToolWrapper{
-		Event: &tunnel.ControllerToCmdToolWrapper_CommandTermination{
-			CommandTermination: &tunnel.CmdToolCommandTermination{
-				ExitCode: int32(exitstatus),
-			},
-		},
-	}
-}
-
-type runCmdMessage struct {
-	out chan *tunnel.MessageWrapper
-	cmd *tunnel.CommandRequest
-}
-
-func (s *cmdToolTunnelServer) EventTunnel(stream tunnel.CmdToolTunnelService_EventTunnelServer) error {
-	agentIdentity, err := getAgentNameFromContext(stream.Context())
-	if err != nil {
-		return err
-	}
-	log.Printf("CmdTool %s connected", agentIdentity)
-
-	sessionIdentity := ulidContext.Ulid()
-	agentResponseChan := make(chan *tunnel.MessageWrapper)
-
-	go func() {
-		for in := range agentResponseChan {
-			switch x := in.Event.(type) {
-			case *tunnel.MessageWrapper_CommandTermination:
-				resp := in.GetCommandTermination()
-				log.Printf("Got command exit code %d", resp.ExitCode)
-				if err := stream.Send(s.makeCommandTermination(int(resp.ExitCode))); err != nil {
-					log.Printf("While sending: %v", err)
-				}
-			case *tunnel.MessageWrapper_CommandData:
-				resp := in.GetCommandData()
-				msg := &tunnel.ControllerToCmdToolWrapper{
-					Event: &tunnel.ControllerToCmdToolWrapper_CommandData{
-						CommandData: &tunnel.CmdToolCommandData{
-							Body:    resp.Body,
-							Channel: resp.Channel,
-							Closed:  resp.Closed,
-						},
-					},
-				}
-				if err := stream.Send(msg); err != nil {
-					log.Printf("Sending CommandData to tool: %v", err)
-				}
-			case nil:
-				// ignore for now
-			default:
-				log.Printf("CmdTool %s unknown message from agent: %s: %T", agentIdentity, sessionIdentity, x)
-			}
-		}
-	}()
-
-	operationID := ulidContext.Ulid()
-	ep := agent.Search{
-		Name:         agentIdentity,
-		EndpointType: "remote-command",
-	}
-
-	for {
-		in, err := stream.Recv()
-		if err == io.EOF {
-			log.Printf("CmdTool %s closed connection %s", agentIdentity, sessionIdentity)
-			err2 := agents.Cancel(ep, operationID)
-			if err2 != nil {
-				log.Printf("while cancelling operation: %v", err2)
-			}
-			return nil
-		}
-		if err != nil {
-			log.Printf("CmdTool %s closed connection: %s", agentIdentity, sessionIdentity)
-			err2 := agents.Cancel(ep, operationID)
-			if err2 != nil {
-				log.Printf("while cancelling operation: %v", err2)
-			}
-			return err
-		}
-
-		switch x := in.Event.(type) {
-		case *tunnel.CmdToolToControllerWrapper_CommandRequest:
-			req := in.GetCommandRequest()
-			log.Printf("CmdTool %s request: %v", agentIdentity, req)
-			ep.EndpointName = req.Name
-			cmd := &tunnel.CommandRequest{
-				Id:          operationID,
-				Name:        req.Name,
-				Arguments:   req.Arguments,
-				Environment: req.Environment,
-			}
-			message := &runCmdMessage{out: agentResponseChan, cmd: cmd}
-			sessionID, found := agents.Send(ep, message)
-			ep.Session = sessionID
-			if !found {
-				close(agentResponseChan)
-				return fmt.Errorf("unknown agent: %s", agentIdentity)
-			}
-		case nil:
-			// ignore for now
-		default:
-			log.Printf("CmdTool %s unknown message: %s: %T", agentIdentity, sessionIdentity, x)
-		}
-	}
-}
-
-func runCmdToolGRPCServer(serverCert tls.Certificate) {
-	//
-	// Set up GRPC server
-	//
-	log.Printf("Starting CmdTool GRPC server on port %d...", config.RemoteCommandListenPort)
-	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", config.RemoteCommandListenPort))
-	if err != nil {
-		log.Fatalf("Failed to listen: %v", err)
-	}
-
-	certPool, err := authority.MakeCertPool()
-	if err != nil {
-		log.Fatalf("While making certpool: %v", err)
-	}
-	creds := credentials.NewTLS(&tls.Config{
-		ClientCAs:    certPool,
-		ClientAuth:   tls.RequireAndVerifyClientCert,
-		Certificates: []tls.Certificate{serverCert},
-		MinVersion:   tls.VersionTLS13,
-	})
-	grpcServer := grpc.NewServer(grpc.Creds(creds))
-	tunnel.RegisterCmdToolTunnelServiceServer(grpcServer, newCmdToolServer())
-	if err := grpcServer.Serve(lis); err != nil {
-		log.Fatalf("Failed to start CmdTool GRPC server: %v", err)
 	}
 }

@@ -261,8 +261,6 @@ func main() {
 	cnc := cncserver.MakeCNCServer(config, authority, agents, jwtKeyset, jwtCurrentKey, version.String())
 	go cnc.RunServer(*serverCert)
 
-	go runCmdToolGRPCServer(*serverCert)
-
 	go runAgentGRPCServer(*serverCert)
 
 	runPrometheusHTTPServer(config.PrometheusListenPort)
