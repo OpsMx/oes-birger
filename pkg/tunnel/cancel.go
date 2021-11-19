@@ -42,7 +42,7 @@ func UnregisterCancelFunction(id string) {
 	delete(cancelRegistry.m, id)
 }
 
-// CallCancelFunction will call the function assoicated with the id, if any.
+// CallCancelFunction will call the function associated with the id, if any.
 func CallCancelFunction(id string) {
 	cancelRegistry.Lock()
 	defer cancelRegistry.Unlock()
