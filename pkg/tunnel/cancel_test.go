@@ -38,11 +38,22 @@ func TestCancel(t *testing.T) {
 	}
 }
 
-// Test that we can call the cancel function when asked to.
+// Test that cancelling unknown IDs don't crash, but do nothing.
 func TestCancelUnknownId(t *testing.T) {
 	reset()
 	RegisterCancelFunction("cf1", cancelFunction)
 	CallCancelFunction("cf2")
+	if cancelCalled {
+		t.Failed()
+	}
+}
+
+// Test that unknown IDs don't crash, but do nothing.
+func TestUnregister(t *testing.T) {
+	reset()
+	RegisterCancelFunction("cf1", cancelFunction)
+	UnregisterCancelFunction("cf1")
+	CallCancelFunction("cf1")
 	if cancelCalled {
 		t.Failed()
 	}
