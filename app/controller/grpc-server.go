@@ -196,42 +196,47 @@ func (s *agentTunnelServer) EventTunnel(stream tunnel.AgentTunnelService_EventTu
 			agents.AddAgent(state)
 			s.sendWebhook(state, req.Endpoints)
 		case *tunnel.MessageWrapper_HttpTunnelControl:
-			switch controlMessage := x.HttpTunnelControl.ControlType.(type) {
-			case *tunnel.HttpTunnelControl_HttpTunnelResponse:
-				resp := controlMessage.HttpTunnelResponse
-				atomic.StoreUint64(&state.LastUse, tunnel.Now())
-				httpids.Lock()
-				dest := httpids.m[resp.Id]
-				if dest != nil {
-					dest <- in
-					if resp.ContentLength == 0 {
-						delete(httpids.m, resp.Id)
-					}
-				} else {
-					log.Printf("Got response to unknown HTTP request id %s from %s", resp.Id, agentIdentity)
-				}
-				httpids.Unlock()
-			case *tunnel.HttpTunnelControl_HttpTunnelChunkedResponse:
-				resp := controlMessage.HttpTunnelChunkedResponse
-				atomic.StoreUint64(&state.LastUse, tunnel.Now())
-				httpids.Lock()
-				dest := httpids.m[resp.Id]
-				if dest != nil {
-					dest <- in
-					if len(resp.Body) == 0 {
-						delete(httpids.m, resp.Id)
-					}
-				} else {
-					log.Printf("Got response to unknown HTTP request id %s from %s", resp.Id, state)
-				}
-				httpids.Unlock()
-			}
+			handleHTTPControl(x.HttpTunnelControl, state, httpids, in, agentIdentity)
 		case nil:
 			// ignore for now
 		default:
 			log.Printf("Received unknown message: %s: %T", state, x)
 		}
 	}
+}
+
+func handleHTTPControl(httpControl *tunnel.HttpTunnelControl, state *agent.DirectlyConnectedAgent, httpids *sessionList, in *tunnel.MessageWrapper, agentIdentity string) {
+	switch controlMessage := httpControl.ControlType.(type) {
+	case *tunnel.HttpTunnelControl_HttpTunnelResponse:
+		resp := controlMessage.HttpTunnelResponse
+		atomic.StoreUint64(&state.LastUse, tunnel.Now())
+		httpids.Lock()
+		dest := httpids.m[resp.Id]
+		if dest != nil {
+			dest <- in
+			if resp.ContentLength == 0 {
+				delete(httpids.m, resp.Id)
+			}
+		} else {
+			log.Printf("Got response to unknown HTTP request id %s from %s", resp.Id, agentIdentity)
+		}
+		httpids.Unlock()
+	case *tunnel.HttpTunnelControl_HttpTunnelChunkedResponse:
+		resp := controlMessage.HttpTunnelChunkedResponse
+		atomic.StoreUint64(&state.LastUse, tunnel.Now())
+		httpids.Lock()
+		dest := httpids.m[resp.Id]
+		if dest != nil {
+			dest <- in
+			if len(resp.Body) == 0 {
+				delete(httpids.m, resp.Id)
+			}
+		} else {
+			log.Printf("Got response to unknown HTTP request id %s from %s", resp.Id, state)
+		}
+		httpids.Unlock()
+	}
+
 }
 
 type agentTunnelServer struct {
