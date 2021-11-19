@@ -1,5 +1,3 @@
-package main
-
 /*
  * Copyright 2021 OpsMx, Inc.
  *
@@ -15,6 +13,8 @@ package main
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+package main
 
 import (
 	"bytes"
@@ -145,30 +145,36 @@ func (ke *KubernetesEndpoint) serverContextFromKubeconfig(kconfig *kubeconfig.Ku
 	return nil
 }
 
+func tlsCertEqual(s1 *tls.Certificate, s2 *tls.Certificate) bool {
+	if s1 == nil && s2 == nil {
+		return true
+	}
+	if (s1 != nil && s2 == nil) || (s1 == nil && s2 != nil) {
+		return false
+	}
+	return bytes.Equal(s1.Certificate[0], s2.Certificate[0])
+}
+
+func x509CertEqual(s1 *x509.Certificate, s2 *x509.Certificate) bool {
+	if s1 == nil && s2 == nil {
+		return true
+	}
+	if (s1 != nil && s2 == nil) || (s1 == nil && s2 != nil) {
+		return false
+	}
+	return s1.Equal(s2)
+}
+
 func (scf *kubeContext) isSameAs(scf2 *kubeContext) bool {
 	if scf.username != scf2.username || scf.serverURL != scf2.serverURL || scf.token != scf2.token || scf.insecure != scf2.insecure {
 		return false
 	}
 
-	if (scf.serverCA == nil && scf2.serverCA != nil) || (scf.serverCA != nil && scf2.serverCA == nil) {
+	if !x509CertEqual(scf.serverCA, scf2.serverCA) {
 		return false
 	}
-	if scf.serverCA != nil && scf2.serverCA != nil {
-		if !scf.serverCA.Equal(scf2.serverCA) {
-			return false
-		}
-	}
 
-	if (scf.clientCert == nil && scf2.clientCert != nil) || (scf.clientCert != nil && scf2.clientCert == nil) {
-		return false
-	}
-	if scf.clientCert != nil && scf2.clientCert != nil {
-		if !bytes.Equal(scf.clientCert.Certificate[0], scf2.clientCert.Certificate[0]) {
-			return false
-		}
-	}
-
-	return true
+	return tlsCertEqual(scf.clientCert, scf2.clientCert)
 }
 
 func (ke *KubernetesEndpoint) loadServiceAccount() (*kubeContext, error) {
