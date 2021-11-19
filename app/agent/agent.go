@@ -197,7 +197,7 @@ func runTunnel(wg *sync.WaitGroup, sa *serverContext, conn *grpc.ClientConn, end
 func handleTunnelCommand(tunnelControl *tunnel.HttpTunnelControl, endpoints []configuredEndpoint, dataflow chan *tunnel.MessageWrapper) {
 	switch controlMessage := tunnelControl.ControlType.(type) {
 	case *tunnel.HttpTunnelControl_CancelRequest:
-		callCancelFunction(controlMessage.CancelRequest.Id)
+		tunnel.CallCancelFunction(controlMessage.CancelRequest.Id)
 	case *tunnel.HttpTunnelControl_OpenHTTPTunnelRequest:
 		req := controlMessage.OpenHTTPTunnelRequest
 		found := false

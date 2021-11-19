@@ -110,8 +110,8 @@ func makeCommandDataClosed(req *tunnel.CommandRequest, channel tunnel.ChannelDir
 
 func runCommand(dataflow chan *tunnel.MessageWrapper, req *tunnel.CommandRequest) {
 	ctx, cancel := context.WithCancel(context.Background())
-	registerCancelFunction(req.Id, cancel)
-	defer unregisterCancelFunction(req.Id)
+	tunnel.RegisterCancelFunction(req.Id, cancel)
+	defer tunnel.UnregisterCancelFunction(req.Id)
 
 	log.Printf("Got command request: %v", req)
 

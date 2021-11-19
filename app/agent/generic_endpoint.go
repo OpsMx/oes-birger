@@ -192,8 +192,8 @@ func (ep *GenericEndpoint) executeHTTPRequest(dataflow chan *tunnel.MessageWrapp
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
-	registerCancelFunction(req.Id, cancel)
-	defer unregisterCancelFunction(req.Id)
+	tunnel.RegisterCancelFunction(req.Id, cancel)
+	defer tunnel.UnregisterCancelFunction(req.Id)
 
 	httpRequest, err := http.NewRequestWithContext(ctx, req.Method, ep.config.URL+req.URI, bytes.NewBuffer(req.Body))
 	if err != nil {

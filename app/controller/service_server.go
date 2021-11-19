@@ -146,6 +146,12 @@ func handleDone(n <-chan struct{}, cc *abool.AtomicBool, target agent.Search, id
 	}
 }
 
+type apiHandlerState struct {
+	seenHeader bool
+	isChunked  bool
+	flusher    http.Flusher
+}
+
 func runAPIHandler(ep agent.Search, w http.ResponseWriter, r *http.Request) {
 	apiRequestCounter.WithLabelValues(ep.Name).Inc()
 
@@ -173,13 +179,12 @@ func runAPIHandler(ep agent.Search, w http.ResponseWriter, r *http.Request) {
 	notify := r.Context().Done()
 	go handleDone(notify, cleanClose, ep, transactionID)
 
-	seenHeader := false
-	isChunked := false
-	flusher := w.(http.Flusher)
+	var handlerState apiHandlerState
+	handlerState.flusher = w.(http.Flusher)
 	for {
 		in, more := <-message.Out
 		if !more {
-			if !seenHeader {
+			if !handlerState.seenHeader {
 				log.Printf("Request timed out sending to agent")
 				w.WriteHeader(http.StatusBadGateway)
 			}
@@ -192,8 +197,8 @@ func runAPIHandler(ep agent.Search, w http.ResponseWriter, r *http.Request) {
 			switch controlMessage := x.HttpTunnelControl.ControlType.(type) {
 			case *tunnel.HttpTunnelControl_HttpTunnelResponse:
 				resp := controlMessage.HttpTunnelResponse
-				seenHeader = true
-				isChunked = resp.ContentLength < 0
+				handlerState.seenHeader = true
+				handlerState.isChunked = resp.ContentLength < 0
 				copyHeaders(resp, w)
 				w.WriteHeader(int(resp.Status))
 				if resp.ContentLength == 0 {
@@ -202,7 +207,7 @@ func runAPIHandler(ep agent.Search, w http.ResponseWriter, r *http.Request) {
 				}
 			case *tunnel.HttpTunnelControl_HttpTunnelChunkedResponse:
 				resp := controlMessage.HttpTunnelChunkedResponse
-				if !seenHeader {
+				if !handlerState.seenHeader {
 					log.Printf("Error: got ChunkedResponse before HttpResponse")
 					w.WriteHeader(http.StatusBadGateway)
 					return
@@ -214,20 +219,20 @@ func runAPIHandler(ep agent.Search, w http.ResponseWriter, r *http.Request) {
 				n, err := w.Write(resp.Body)
 				if err != nil {
 					log.Printf("Error: cannot write: %v", err)
-					if !seenHeader {
+					if !handlerState.seenHeader {
 						w.WriteHeader(http.StatusBadGateway)
 					}
 					return
 				}
 				if n != len(resp.Body) {
 					log.Printf("Error: did not write full message: %d of %d written", n, len(resp.Body))
-					if !seenHeader {
+					if !handlerState.seenHeader {
 						w.WriteHeader(http.StatusBadGateway)
 					}
 					return
 				}
-				if isChunked {
-					flusher.Flush()
+				if handlerState.isChunked {
+					handlerState.flusher.Flush()
 				}
 			case nil:
 				// ignore for now

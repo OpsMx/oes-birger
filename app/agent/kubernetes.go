@@ -234,8 +234,8 @@ func (ke *KubernetesEndpoint) executeHTTPRequest(dataflow chan *tunnel.MessageWr
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
-	registerCancelFunction(req.Id, cancel)
-	defer unregisterCancelFunction(req.Id)
+	tunnel.RegisterCancelFunction(req.Id, cancel)
+	defer tunnel.UnregisterCancelFunction(req.Id)
 
 	httpRequest, err := http.NewRequestWithContext(ctx, req.Method, c.serverURL+req.URI, bytes.NewBuffer(req.Body))
 	if err != nil {

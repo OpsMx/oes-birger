@@ -143,8 +143,8 @@ func (a *AwsEndpoint) executeHTTPRequest(dataflow chan *tunnel.MessageWrapper, r
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
-	registerCancelFunction(req.Id, cancel)
-	defer unregisterCancelFunction(req.Id)
+	tunnel.RegisterCancelFunction(req.Id, cancel)
+	defer tunnel.UnregisterCancelFunction(req.Id)
 
 	baseURL := fmt.Sprintf("https://%s:%s", host, port)
 	actualurl := fmt.Sprintf("https://%s:%s%s", host, port, req.URI)

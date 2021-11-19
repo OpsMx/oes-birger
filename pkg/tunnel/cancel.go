@@ -1,5 +1,3 @@
-package main
-
 /*
  * Copyright 2021 OpsMx, Inc.
  *
@@ -16,6 +14,8 @@ package main
  * limitations under the License.
  */
 
+package tunnel
+
 import (
 	"context"
 	"log"
@@ -27,19 +27,19 @@ var cancelRegistry = struct {
 	m map[string]context.CancelFunc
 }{m: make(map[string]context.CancelFunc)}
 
-func registerCancelFunction(id string, cancel context.CancelFunc) {
+func RegisterCancelFunction(id string, cancel context.CancelFunc) {
 	cancelRegistry.Lock()
 	defer cancelRegistry.Unlock()
 	cancelRegistry.m[id] = cancel
 }
 
-func unregisterCancelFunction(id string) {
+func UnregisterCancelFunction(id string) {
 	cancelRegistry.Lock()
 	defer cancelRegistry.Unlock()
 	delete(cancelRegistry.m, id)
 }
 
-func callCancelFunction(id string) {
+func CallCancelFunction(id string) {
 	cancelRegistry.Lock()
 	defer cancelRegistry.Unlock()
 	cancel, ok := cancelRegistry.m[id]
