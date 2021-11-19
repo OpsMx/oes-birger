@@ -1,9 +1,9 @@
-# OpsMX API and Command Forwarder
+# OpsMX API Forwarder
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/opsmx/oes-birger)](https://goreportcard.com/report/github.com/opsmx/oes-birger)
 
 This implements a service where, by running an agent inside a Kubernetes
-cluster, remote commands can still be sent to it even if the cluster is
+cluster, API calls can still be sent to it even if the cluster is
 behind a firewall.
 
 The purpose of this is to allow reaching into a Kubernetes cluster which is
@@ -38,10 +38,8 @@ the specific agent is chosen at random.
 
 Currently only one remote cluster is targeted by an agent, although
 multiple namespaces can be managed.  The agent itself is very small, and
-as it does not currently use a Linux distribution, has a very small
-security footprint.
-
-As a warning, this is my first attempt at any Go code...
+as it uses a small alpine Linux base image with few additional packages,
+has a very small security footprint.
 
 # Prerequisites
 
@@ -69,18 +67,8 @@ the Kubernetes secret YAML format.
 
 The CA key and certificate will be used by the controller to generate a
 server certificate on startup with all the defined server names it may be using.
-It will also use this to generate additional keys for control, command-requests,
+It will also use this to generate additional keys for control,
 kubernetes API requests, and agents on request.
 
-## Certificate Names
-
-The server certificate is a standard server cert, which will be used by the
-usual Go libraries to verify that the server is presenting an identity
-that matches the URL being used to contact it.
-
-For agent, command, remote-command, and agent certificates, the CommonName is
-treated specially.  The format is "agentName.type" where "agentName" is used to
-match incoming Kubernetes API requests and remote-command requests to a connected
-agent, by name.  That is, if an agent connects with a certificate named "foo.agent",
-then a certificate called "foo.remote-command" or "foo.client" can connect and send
-it Kubernets API requests or remote-command requests.
+The certificates issued by the controller's built-in CA have a specific OID which
+describes the endpoint type when connecting.  This is required.

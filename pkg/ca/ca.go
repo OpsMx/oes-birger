@@ -247,10 +247,9 @@ type CertificateName struct {
 
 // Certificate purposes, intended to be on CertificateName.Purpose
 const (
-	CertificatePurposeControl       = "control"
-	CertificatePurposeAgent         = "agent"
-	CertificatePurposeService       = "service"
-	CertificatePurposeRemoteCommand = "remote-command"
+	CertificatePurposeControl = "control"
+	CertificatePurposeAgent   = "agent"
+	CertificatePurposeService = "service"
 )
 
 // GetCertificateNameFromCert extracts the CertificateName from the certificate, or returns

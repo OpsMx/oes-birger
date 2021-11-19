@@ -31,23 +31,21 @@ import (
 // configuration file is loaded from disk first, and then any
 // environment variables are applied.
 type ControllerConfig struct {
-	Agents                  map[string]*agentConfig `yaml:"agents,omitempty"`
-	ServiceAuth             serviceAuthConfig       `yaml:"serviceAuth,omitempty"`
-	Webhook                 string                  `yaml:"webhook,omitempty"`
-	ServerNames             []string                `yaml:"serverNames,omitempty"`
-	CAConfig                ca.Config               `yaml:"caConfig,omitempty"`
-	PrometheusListenPort    uint16                  `yaml:"prometheusListenPort"`
-	ServiceHostname         *string                 `yaml:"serviceHostname"`
-	ServiceListenPort       uint16                  `yaml:"serviceListenPort"`
-	ControlHostname         *string                 `yaml:"controlHostname"`
-	ControlListenPort       uint16                  `yaml:"controlListenPort"`
-	AgentHostname           *string                 `yaml:"agentHostname"`
-	AgentListenPort         uint16                  `yaml:"agentListenPort"`
-	AgentAdvertisePort      uint16                  `yaml:"agentAdvertisePort"`
-	RemoteCommandHostname   *string                 `yaml:"remoteCommandHostname"`
-	RemoteCommandListenPort uint16                  `yaml:"remoteCommandListenPort"`
-	IncomingServices        []incomingServiceConfig `yaml:"incomingServices,omitempty"`
-	OutgoingServices        []outgoingServiceConfig `yaml:"outgoingServices,omitempty"`
+	Agents               map[string]*agentConfig `yaml:"agents,omitempty"`
+	ServiceAuth          serviceAuthConfig       `yaml:"serviceAuth,omitempty"`
+	Webhook              string                  `yaml:"webhook,omitempty"`
+	ServerNames          []string                `yaml:"serverNames,omitempty"`
+	CAConfig             ca.Config               `yaml:"caConfig,omitempty"`
+	PrometheusListenPort uint16                  `yaml:"prometheusListenPort"`
+	ServiceHostname      *string                 `yaml:"serviceHostname"`
+	ServiceListenPort    uint16                  `yaml:"serviceListenPort"`
+	ControlHostname      *string                 `yaml:"controlHostname"`
+	ControlListenPort    uint16                  `yaml:"controlListenPort"`
+	AgentHostname        *string                 `yaml:"agentHostname"`
+	AgentListenPort      uint16                  `yaml:"agentListenPort"`
+	AgentAdvertisePort   uint16                  `yaml:"agentAdvertisePort"`
+	IncomingServices     []incomingServiceConfig `yaml:"incomingServices,omitempty"`
+	OutgoingServices     []outgoingServiceConfig `yaml:"outgoingServices,omitempty"`
 }
 
 type agentConfig struct {
@@ -116,13 +114,6 @@ func LoadConfig(f io.Reader) (*ControllerConfig, error) {
 		return nil, fmt.Errorf("controlHostname not set")
 	}
 
-	if config.RemoteCommandListenPort == 0 {
-		config.RemoteCommandListenPort = 9004
-	}
-	if config.RemoteCommandHostname == nil {
-		return nil, fmt.Errorf("remoteCommandHostname not set")
-	}
-
 	if config.PrometheusListenPort == 0 {
 		config.PrometheusListenPort = 9102
 	}
@@ -150,9 +141,8 @@ func (c *ControllerConfig) addIfMissing(target *string, reason string) {
 
 func (c *ControllerConfig) addAllHostnames() {
 	c.addIfMissing(c.AgentHostname, "agentHostname")
-	c.addIfMissing(c.ControlHostname, "commandHostname")
+	c.addIfMissing(c.ControlHostname, "controlHostname")
 	c.addIfMissing(c.ServiceHostname, "serviceHostname")
-	c.addIfMissing(c.RemoteCommandHostname, "cmdToolHostname")
 }
 
 // GetServiceURL returns a fullly formatted URL string with hostname and port.
@@ -198,6 +188,4 @@ func (c *ControllerConfig) Dump() {
 		*c.AgentHostname, c.AgentListenPort, c.AgentAdvertisePort)
 	log.Printf("Control hostname: %s, port %d",
 		*c.ControlHostname, c.ControlListenPort)
-	log.Printf("RemoteCommand hostname: %s, port %d",
-		*c.RemoteCommandHostname, c.RemoteCommandListenPort)
 }

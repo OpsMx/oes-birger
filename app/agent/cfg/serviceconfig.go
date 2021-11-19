@@ -28,20 +28,6 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// CommandConfig defines a remote host we can run commands on.
-// Each host has a `Name`, which can be targeted from Spinnaker.
-// There are no environment overrides for these.
-type CommandConfig struct {
-	Enabled               bool   `yaml:"enabled"`
-	Name                  string `yaml:"name"`
-	Host                  string `yaml:"host"`
-	Username              string `yaml:"username"`
-	KnownHosts            string `yaml:"knownHostsPath"`
-	InsecureIgnoreHostKey bool   `yaml:"insecureIgnoreHostKey"`
-	UserKeyPath           string `yaml:"userKeyPath"`
-	PasswordPath          string `yaml:"passwordPath"`
-}
-
 //
 // ServiceConfig holds configuration for a service, like a Jenkins endpoint.
 //
@@ -62,7 +48,6 @@ type serviceNamespace struct {
 
 // AgentServiceConfig defines a service level configuration top-level list.
 type AgentServiceConfig struct {
-	Commands []CommandConfig `yaml:"commands,omitempty"`
 	Services []ServiceConfig `yaml:"services,omitempty"`
 }
 

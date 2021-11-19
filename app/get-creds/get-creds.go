@@ -35,7 +35,7 @@ var (
 	endpointName  = flag.String("name", "", "Item name")
 	agentIdentity = flag.String("agent", "", "agent name")
 	endpointType  = flag.String("type", "", "endpoint type")
-	action        = flag.String("action", "", "action, one of: agent, kubectl, agent-manifest, remote-command, control")
+	action        = flag.String("action", "", "action, one of: agent, kubectl, agent-manifest, control")
 )
 
 func usage(message string) {
@@ -46,7 +46,6 @@ func usage(message string) {
 	fmt.Fprintf(os.Stderr, "\n")
 	fmt.Fprintf(os.Stderr, "  'kubectl' requires: agent, endpointName.\n")
 	fmt.Fprintf(os.Stderr, "  'service' requires: agent, endpointType, endpointName.\n")
-	fmt.Fprintf(os.Stderr, "  'remote-command' requires: agent, endpointName.\n")
 	fmt.Fprintf(os.Stderr, "  'agent-manifest' requires: agent.\n")
 	fmt.Fprintf(os.Stderr, "  'control' requires no other options.\n")
 	os.Exit(-1)
@@ -175,10 +174,6 @@ func main() {
 		insist(endpointName, "name", false)
 		insist(endpointType, "type", false)
 		getAgentManifest()
-	case "remote-command":
-		insist(agentIdentity, "agent", true)
-		insist(endpointName, "name", true)
-		insist(endpointType, "type", false)
 	case "service":
 		insist(agentIdentity, "agent", true)
 		insist(endpointName, "name", true)

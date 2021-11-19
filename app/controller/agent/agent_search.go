@@ -25,7 +25,7 @@ import (
 // other than Session, which may be empty when "any session" is fine.
 type Search struct {
 	Name         string // The agent name
-	EndpointType string // the endpoint type, eg "jenkins", "kubernetes", "remote-command"
+	EndpointType string // the endpoint type, eg "jenkins", "kubernetes"
 	EndpointName string // the endpoint name, eg "jenkins1" or "kubernetes1"
 	Session      string // the session ID for a specific agent, used to cancel.
 }
