@@ -85,7 +85,7 @@ func (s *agentTunnelServer) handleHTTPRequests(session string, requestChan chan 
 		case *HTTPMessage:
 			s.addHTTPId(httpids, value.Cmd.Id, value.Out)
 			resp := &tunnel.MessageWrapper{
-				Event: tunnel.MakeHttpTunnelOpenTunnelRequest(value.Cmd),
+				Event: tunnel.MakeHTTPTunnelOpenTunnelRequest(value.Cmd),
 			}
 			if err := stream.Send(resp); err != nil {
 				log.Printf("Unable to send to agent %s for HTTP request %s", session, value.Cmd.Id)
@@ -111,7 +111,7 @@ func (s *agentTunnelServer) handleHTTPCancelRequest(session string, cancelChan c
 	for id := range cancelChan {
 		s.removeHTTPId(httpids, id)
 		resp := &tunnel.MessageWrapper{
-			Event: tunnel.MakeHttpTunnelCancelRequest(id),
+			Event: tunnel.MakeHTTPTunnelCancelRequest(id),
 		}
 		if err := stream.Send(resp); err != nil {
 			log.Printf("Unable to send to agent %s for cancel request %s", session, id)

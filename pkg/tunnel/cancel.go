@@ -27,18 +27,22 @@ var cancelRegistry = struct {
 	m map[string]context.CancelFunc
 }{m: make(map[string]context.CancelFunc)}
 
+// RegisterCancelFunction will associate a cancel function to be called by CallCancelFunction,
+// based on the provided id.
 func RegisterCancelFunction(id string, cancel context.CancelFunc) {
 	cancelRegistry.Lock()
 	defer cancelRegistry.Unlock()
 	cancelRegistry.m[id] = cancel
 }
 
+// UnregisterCancelFunction will remove a remembered cancel function.
 func UnregisterCancelFunction(id string) {
 	cancelRegistry.Lock()
 	defer cancelRegistry.Unlock()
 	delete(cancelRegistry.m, id)
 }
 
+// CallCancelFunction will call the function assoicated with the id, if any.
 func CallCancelFunction(id string) {
 	cancelRegistry.Lock()
 	defer cancelRegistry.Unlock()
