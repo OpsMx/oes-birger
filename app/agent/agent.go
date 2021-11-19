@@ -51,8 +51,6 @@ var (
 	caCertFile = flag.String("caCertFile", "/app/config/ca.pem", "The file containing the CA certificate we will use to verify the controller's cert")
 	configFile = flag.String("configFile", "/app/config/config.yaml", "The file with the controller config")
 
-	emptyBytes = []byte("")
-
 	config             *cfg.AgentConfig
 	agentServiceConfig *cfg.AgentServiceConfig
 
