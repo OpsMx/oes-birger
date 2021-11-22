@@ -38,6 +38,7 @@ import (
 
 	"github.com/opsmx/oes-birger/app/agent/cfg"
 	"github.com/opsmx/oes-birger/pkg/secrets"
+	"github.com/opsmx/oes-birger/pkg/serviceconfig"
 	"github.com/opsmx/oes-birger/pkg/tunnel"
 	"github.com/opsmx/oes-birger/pkg/updater"
 	"github.com/opsmx/oes-birger/pkg/util"
@@ -52,7 +53,7 @@ var (
 	configFile = flag.String("configFile", "/app/config/config.yaml", "The file with the controller config")
 
 	config             *cfg.AgentConfig
-	agentServiceConfig *cfg.AgentServiceConfig
+	agentServiceConfig *serviceconfig.AgentServiceConfig
 
 	hostname = getHostname()
 
@@ -316,7 +317,7 @@ func main() {
 	config = c
 	log.Printf("controller hostname: %s", config.ControllerHostname)
 
-	uc, err := cfg.LoadServiceConfig(config.ServicesConfigPath)
+	uc, err := serviceconfig.LoadServiceConfig(config.ServicesConfigPath)
 	if err != nil {
 		log.Fatalf("Error loading services config: %v", err)
 	}
