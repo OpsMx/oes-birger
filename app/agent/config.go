@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package cfg
+package main
 
 import (
 	"io/ioutil"
@@ -28,10 +28,10 @@ const (
 	defaultUserconfigPath = "/app/config/services.yaml"
 )
 
-// AgentConfig holds all the configuration for the agent.  The
+// agentConfig holds all the configuration for the agent.  The
 // configuration file is loaded from disk first, and then any
 // environment variables are applied.
-type AgentConfig struct {
+type agentConfig struct {
 	ControllerHostname string  `yaml:"controllerHostname,omitempty"`
 	CACert64           *string `yaml:"caCert64,omitempty"`
 	CertFile           string  `yaml:"certFile,omitempty"`
@@ -39,7 +39,7 @@ type AgentConfig struct {
 	ServicesConfigPath string  `yaml:"servicesConfigPath,omitempty"`
 }
 
-func (c *AgentConfig) applyDefaults() {
+func (c *agentConfig) applyDefaults() {
 	if len(c.ControllerHostname) == 0 {
 		c.ControllerHostname = "forwarder-controller:9001"
 	}
@@ -57,15 +57,15 @@ func (c *AgentConfig) applyDefaults() {
 	}
 }
 
-// Load will load YAML configuration from the provided filename, and then apply
+// loadConfig will load YAML configuration from the provided filename, and then apply
 // environment variables to override some subset of available options.
-func Load(filename string) (*AgentConfig, error) {
+func loadConfig(filename string) (*agentConfig, error) {
 	buf, err := ioutil.ReadFile(filename)
 	if err != nil {
 		return nil, err
 	}
 
-	config := &AgentConfig{}
+	config := &agentConfig{}
 	err = yaml.Unmarshal(buf, config)
 	if err != nil {
 		return nil, err

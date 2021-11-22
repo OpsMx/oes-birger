@@ -34,7 +34,6 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 
-	"github.com/opsmx/oes-birger/app/agent/cfg"
 	"github.com/opsmx/oes-birger/pkg/secrets"
 	"github.com/opsmx/oes-birger/pkg/serviceconfig"
 	"github.com/opsmx/oes-birger/pkg/tunnel"
@@ -50,7 +49,7 @@ var (
 	caCertFile = flag.String("caCertFile", "/app/config/ca.pem", "The file containing the CA certificate we will use to verify the controller's cert")
 	configFile = flag.String("configFile", "/app/config/config.yaml", "The file with the controller config")
 
-	config *cfg.AgentConfig
+	config *agentConfig
 
 	hostname = getHostname()
 
@@ -218,7 +217,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	c, err := cfg.Load(*configFile)
+	c, err := loadConfig(*configFile)
 	if err != nil {
 		log.Fatalf("Error loading config: %v", err)
 	}
