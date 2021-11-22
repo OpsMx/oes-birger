@@ -25,27 +25,27 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/opsmx/oes-birger/pkg/ca"
+	"github.com/opsmx/oes-birger/pkg/serviceconfig"
 )
 
 // ControllerConfig holds all the configuration for the controller.  The
 // configuration file is loaded from disk first, and then any
 // environment variables are applied.
 type ControllerConfig struct {
-	Agents               map[string]*agentConfig `yaml:"agents,omitempty"`
-	ServiceAuth          serviceAuthConfig       `yaml:"serviceAuth,omitempty"`
-	Webhook              string                  `yaml:"webhook,omitempty"`
-	ServerNames          []string                `yaml:"serverNames,omitempty"`
-	CAConfig             ca.Config               `yaml:"caConfig,omitempty"`
-	PrometheusListenPort uint16                  `yaml:"prometheusListenPort"`
-	ServiceHostname      *string                 `yaml:"serviceHostname"`
-	ServiceListenPort    uint16                  `yaml:"serviceListenPort"`
-	ControlHostname      *string                 `yaml:"controlHostname"`
-	ControlListenPort    uint16                  `yaml:"controlListenPort"`
-	AgentHostname        *string                 `yaml:"agentHostname"`
-	AgentListenPort      uint16                  `yaml:"agentListenPort"`
-	AgentAdvertisePort   uint16                  `yaml:"agentAdvertisePort"`
-	IncomingServices     []incomingServiceConfig `yaml:"incomingServices,omitempty"`
-	OutgoingServices     []outgoingServiceConfig `yaml:"outgoingServices,omitempty"`
+	Agents               map[string]*agentConfig       `yaml:"agents,omitempty"`
+	ServiceAuth          serviceAuthConfig             `yaml:"serviceAuth,omitempty"`
+	Webhook              string                        `yaml:"webhook,omitempty"`
+	ServerNames          []string                      `yaml:"serverNames,omitempty"`
+	CAConfig             ca.Config                     `yaml:"caConfig,omitempty"`
+	PrometheusListenPort uint16                        `yaml:"prometheusListenPort"`
+	ServiceHostname      *string                       `yaml:"serviceHostname"`
+	ServiceListenPort    uint16                        `yaml:"serviceListenPort"`
+	ControlHostname      *string                       `yaml:"controlHostname"`
+	ControlListenPort    uint16                        `yaml:"controlListenPort"`
+	AgentHostname        *string                       `yaml:"agentHostname"`
+	AgentListenPort      uint16                        `yaml:"agentListenPort"`
+	AgentAdvertisePort   uint16                        `yaml:"agentAdvertisePort"`
+	ServiceConfig        []serviceconfig.ServiceConfig `yaml:"services,omitempty"`
 }
 
 type agentConfig struct {
@@ -54,25 +54,6 @@ type agentConfig struct {
 
 type serviceAuthConfig struct {
 	CurrentKeyName string `yaml:"currentKeyName,omitempty"`
-}
-
-type incomingServiceConfig struct {
-	Name               string `yaml:"name,omitempty"`
-	Port               uint16 `yaml:"port,omitempty"`
-	ServiceType        string `yaml:"serviceType,omitempty"`
-	UseHTTP            bool   `yaml:"useHTTP,omitempty"`
-	DestinationAgent   string `yaml:"destinationAgent,omitempty"`
-	DestinationService string `yaml:"destinationService,omitempty"`
-}
-
-type outgoingServiceConfig struct {
-	Name            string   `yaml:"name,omitempty"`
-	DestinationHost string   `yaml:"destinationHost,omitempty"`
-	DestinationPort string   `yaml:"destinationPort,omitempty"`
-	ServiceType     string   `yaml:"serviceType,omitempty"`
-	Insecure        bool     `yaml:"insecure,omitempty"`
-	UseHTTP         bool     `yaml:"useHTTP,omitempty"`
-	AllowedAgents   []string `yaml:"allowedAgents,omitempty"`
 }
 
 // LoadConfig will load YAML configuration from the provided filename,

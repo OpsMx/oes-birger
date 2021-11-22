@@ -28,10 +28,16 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-//
-// ServiceConfig holds configuration for a service, like a Jenkins endpoint.
-//
-type ServiceConfig struct {
+type incomingServiceConfig struct {
+	Name               string `yaml:"name,omitempty"`
+	Port               uint16 `yaml:"port,omitempty"`
+	ServiceType        string `yaml:"serviceType,omitempty"`
+	UseHTTP            bool   `yaml:"useHTTP,omitempty"`
+	Destination        string `yaml:"destination,omitempty"`
+	DestinationService string `yaml:"destinationService,omitempty"`
+}
+
+type outgoingServiceConfig struct {
 	Enabled    bool                        `yaml:"enabled"`
 	Name       string                      `yaml:"name"`
 	Type       string                      `yaml:"type"`
@@ -46,19 +52,20 @@ type serviceNamespace struct {
 	Namespaces []string `yaml:"namespaces"`
 }
 
-// AgentServiceConfig defines a service level configuration top-level list.
-type AgentServiceConfig struct {
-	Services []ServiceConfig `yaml:"services,omitempty"`
+// ServiceConfig defines a service level configuration top-level list.
+type ServiceConfig struct {
+	OutgoingServices []outgoingServiceConfig `yaml:"outgoingServices,omitempty"`
+	IncomingServices []incomingServiceConfig `yaml:"incomingServices,omitempty"`
 }
 
 // LoadServiceConfig loads a service configuration YAML file.
-func LoadServiceConfig(filename string) (*AgentServiceConfig, error) {
+func LoadServiceConfig(filename string) (*ServiceConfig, error) {
 	buf, err := ioutil.ReadFile(filename)
 	if err != nil {
 		return nil, err
 	}
 
-	config := &AgentServiceConfig{}
+	config := &ServiceConfig{}
 	err = yaml.Unmarshal(buf, config)
 	if err != nil {
 		return nil, err

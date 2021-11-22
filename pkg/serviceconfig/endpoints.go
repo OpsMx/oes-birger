@@ -65,10 +65,10 @@ func EndpointsToPB(endpoints []ConfiguredEndpoint) []*tunnel.EndpointHealth {
 
 // ConfigureEndpoints will load services from the config, attach a processor, and return the configured
 // list.
-func ConfigureEndpoints(secretsLoader secrets.SecretLoader, serviceConfig *AgentServiceConfig) []ConfiguredEndpoint {
+func ConfigureEndpoints(secretsLoader secrets.SecretLoader, serviceConfig *ServiceConfig) []ConfiguredEndpoint {
 	// For each service, if it is enabled, find and create an instance.
 	endpoints := []ConfiguredEndpoint{}
-	for _, service := range serviceConfig.Services {
+	for _, service := range serviceConfig.OutgoingServices {
 		var instance httpRequestProcessor
 		var configured bool
 
