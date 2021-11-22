@@ -1,5 +1,3 @@
-package main
-
 /*
  * Copyright 2021 OpsMx, Inc.
  *
@@ -15,6 +13,8 @@ package main
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+package serviceconfig
 
 import (
 	"bytes"
@@ -110,7 +110,9 @@ func MakeAwsEndpoint(name string, configBytes []byte, secretsLoader secrets.Secr
 	return k, true, nil
 }
 
-func (a *AwsEndpoint) executeHTTPRequest(dataflow chan *tunnel.MessageWrapper, req *tunnel.OpenHTTPTunnelRequest) {
+// ExecuteHTTPRequest does the actual call to connect to HTTP, and will send the data back over the
+// tunnel.
+func (a *AwsEndpoint) ExecuteHTTPRequest(dataflow chan *tunnel.MessageWrapper, req *tunnel.OpenHTTPTunnelRequest) {
 	log.Printf("Running request %v", req)
 	tlsConfig := &tls.Config{
 		MinVersion: tls.VersionTLS12,

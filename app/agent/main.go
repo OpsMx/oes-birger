@@ -1,5 +1,3 @@
-package main
-
 /*
  * Copyright 2021 OpsMx, Inc.
  *
@@ -16,12 +14,13 @@ package main
  * limitations under the License.
  */
 
+package main
+
 import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/base64"
 	"flag"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
@@ -31,7 +30,6 @@ import (
 	"time"
 
 	"golang.org/x/net/context"
-	"gopkg.in/yaml.v3"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -52,52 +50,16 @@ var (
 	caCertFile = flag.String("caCertFile", "/app/config/ca.pem", "The file containing the CA certificate we will use to verify the controller's cert")
 	configFile = flag.String("configFile", "/app/config/config.yaml", "The file with the controller config")
 
-	config             *cfg.AgentConfig
-	agentServiceConfig *serviceconfig.AgentServiceConfig
+	config *cfg.AgentConfig
 
 	hostname = getHostname()
 
 	secretsLoader secrets.SecretLoader
 
-	endpoints []configuredEndpoint
+	endpoints []serviceconfig.ConfiguredEndpoint
 )
 
 type serverContext struct{}
-
-type configuredEndpoint struct {
-	Name       string   `json:"name,omitempty"`
-	Type       string   `json:"type,omitempty"`
-	Configured bool     `json:"configured,omitempty"`
-	Namespace  []string `json:"namespace,omitempty"`
-	AccountID  string   `json:"accountId,omitempty"`
-	AssumeRole string   `json:"assumeRole,omitempty"`
-
-	instance httpRequestProcessor
-}
-
-type httpRequestProcessor interface {
-	executeHTTPRequest(chan *tunnel.MessageWrapper, *tunnel.OpenHTTPTunnelRequest)
-}
-
-func (e *configuredEndpoint) String() string {
-	return fmt.Sprintf("(%s, %s, %v)", e.Type, e.Name, e.Configured)
-}
-
-func endpointsToPB(endpoints []configuredEndpoint) []*tunnel.EndpointHealth {
-	pbEndpoints := make([]*tunnel.EndpointHealth, len(endpoints))
-	for i, ep := range endpoints {
-		endp := &tunnel.EndpointHealth{
-			Name:       ep.Name,
-			Type:       ep.Type,
-			Configured: ep.Configured,
-			Namespaces: ep.Namespace,
-			AccountID:  ep.AccountID,
-			AssumeRole: ep.AssumeRole,
-		}
-		pbEndpoints[i] = endp
-	}
-	return pbEndpoints
-}
 
 func tickerPinger(stream tunnel.AgentTunnelService_EventTunnelClient) {
 	ticker := time.NewTicker(time.Duration(*tickTime) * time.Second)
@@ -123,7 +85,7 @@ func dataflowHandler(dataflow chan *tunnel.MessageWrapper, stream tunnel.AgentTu
 
 }
 
-func runTunnel(wg *sync.WaitGroup, sa *serverContext, conn *grpc.ClientConn, endpoints []configuredEndpoint) {
+func runTunnel(wg *sync.WaitGroup, sa *serverContext, conn *grpc.ClientConn, endpoints []serviceconfig.ConfiguredEndpoint) {
 	defer wg.Done()
 
 	client := tunnel.NewAgentTunnelServiceClient(conn)
@@ -133,7 +95,7 @@ func runTunnel(wg *sync.WaitGroup, sa *serverContext, conn *grpc.ClientConn, end
 	if err != nil {
 		log.Fatalf("%v.EventTunnel(_) = _, %v", client, err)
 	}
-	pbEndpoints := endpointsToPB(endpoints)
+	pbEndpoints := serviceconfig.EndpointsToPB(endpoints)
 	helloMsg := &tunnel.AgentHello{
 		Version:   version.String(),
 		Endpoints: pbEndpoints,
@@ -182,7 +144,7 @@ func runTunnel(wg *sync.WaitGroup, sa *serverContext, conn *grpc.ClientConn, end
 	_ = stream.CloseSend()
 }
 
-func handleTunnelCommand(tunnelControl *tunnel.HttpTunnelControl, endpoints []configuredEndpoint, dataflow chan *tunnel.MessageWrapper) {
+func handleTunnelCommand(tunnelControl *tunnel.HttpTunnelControl, endpoints []serviceconfig.ConfiguredEndpoint, dataflow chan *tunnel.MessageWrapper) {
 	switch controlMessage := tunnelControl.ControlType.(type) {
 	case *tunnel.HttpTunnelControl_CancelRequest:
 		tunnel.CallCancelFunction(controlMessage.CancelRequest.Id)
@@ -191,7 +153,7 @@ func handleTunnelCommand(tunnelControl *tunnel.HttpTunnelControl, endpoints []co
 		found := false
 		for _, endpoint := range endpoints {
 			if endpoint.Configured && endpoint.Type == req.Type && endpoint.Name == req.Name {
-				go endpoint.instance.executeHTTPRequest(dataflow, req)
+				go endpoint.Instance.ExecuteHTTPRequest(dataflow, req)
 				found = true
 				break
 			}
@@ -220,60 +182,6 @@ func loadCert() []byte {
 		log.Fatal("Unable to decode CA cert base64 from config")
 	}
 	return cert
-}
-
-func configureEndpoints(secretsLoader secrets.SecretLoader) {
-	// For each service, if it is enabled, find and create an instance.
-	endpoints = []configuredEndpoint{}
-	for _, service := range agentServiceConfig.Services {
-		var instance httpRequestProcessor
-		var configured bool
-
-		if service.Enabled {
-			config, err := yaml.Marshal(service.Config)
-			if err != nil {
-				log.Fatal(err)
-			}
-			switch service.Type {
-			case "kubernetes":
-				instance, configured, err = MakeKubernetesEndpoint(service.Name, config)
-			case "aws":
-				instance, configured, err = MakeAwsEndpoint(service.Name, config, secretsLoader)
-			default:
-				instance, configured, err = MakeGenericEndpoint(service.Type, service.Name, config, secretsLoader)
-			}
-
-			// If the instance-specific make method returns an error, catch it here.
-			if err != nil {
-				log.Fatal(err)
-			}
-
-			if len(service.Namespaces) == 0 {
-				// If it did not return an error, a nil instance means it is not fully configured.
-				log.Printf("Adding endpoint type %s, name %s, configured %v", service.Type, service.Name, configured)
-				endpoints = append(endpoints, configuredEndpoint{
-					Type:       service.Type,
-					Name:       service.Name,
-					Configured: configured,
-					instance:   instance,
-					AccountID:  service.AccountID,
-					AssumeRole: service.AssumeRole,
-				})
-			} else {
-				for _, ns := range service.Namespaces {
-					log.Printf("Adding endpoint type %s, name %s, configured %v, namespaces %v", service.Type, ns.Name, configured, ns.Namespaces)
-					newep := configuredEndpoint{
-						Type:       service.Type,
-						Name:       ns.Name,
-						Configured: configured,
-						instance:   instance,
-						Namespace:  ns.Namespaces,
-					}
-					endpoints = append(endpoints, newep)
-				}
-			}
-		}
-	}
 }
 
 func getHostname() string {
@@ -317,13 +225,12 @@ func main() {
 	config = c
 	log.Printf("controller hostname: %s", config.ControllerHostname)
 
-	uc, err := serviceconfig.LoadServiceConfig(config.ServicesConfigPath)
+	agentServiceConfig, err := serviceconfig.LoadServiceConfig(config.ServicesConfigPath)
 	if err != nil {
 		log.Fatalf("Error loading services config: %v", err)
 	}
-	agentServiceConfig = uc
 
-	configureEndpoints(secretsLoader)
+	endpoints = serviceconfig.ConfigureEndpoints(secretsLoader, agentServiceConfig)
 
 	// load client cert/key, cacert
 	clcert, err := tls.LoadX509KeyPair(config.CertFile, config.KeyFile)

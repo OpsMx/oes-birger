@@ -15,7 +15,7 @@
  */
 
 //
-// Package serviceConfig handles the top level agent configuration YAML handling.
+// Package serviceconfig handles the top level agent configuration YAML handling.
 //
 // The service-level "Config" element is handled by the Make() methods on
 // each service endpoint type.

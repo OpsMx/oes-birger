@@ -37,6 +37,7 @@ import (
 	"github.com/opsmx/oes-birger/app/controller/agent"
 	"github.com/opsmx/oes-birger/app/controller/cncserver"
 	"github.com/opsmx/oes-birger/pkg/ca"
+	"github.com/opsmx/oes-birger/pkg/secrets"
 	"github.com/opsmx/oes-birger/pkg/tunnel"
 	"github.com/opsmx/oes-birger/pkg/ulid"
 	"github.com/opsmx/oes-birger/pkg/util"
@@ -60,6 +61,8 @@ var (
 	jwtCurrentKey string
 
 	config *ControllerConfig
+
+	secretsLoader secrets.SecretLoader
 
 	authority *ca.CA
 
@@ -230,6 +233,15 @@ func main() {
 		log.Fatalf("%v", err)
 	}
 	config.Dump()
+
+	namespace, ok := os.LookupEnv("POD_NAMESPACE")
+	if !ok {
+		log.Fatalf("envar POD_NAMESPACE not set to the pod's namespace")
+	}
+	secretsLoader, err = secrets.MakeKubernetesSecretLoader(namespace)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	loadKeyset()
 
