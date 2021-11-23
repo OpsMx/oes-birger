@@ -24,10 +24,10 @@ import (
 // Search defines the parameters to narrow down an agent.  Each field is required
 // other than Session, which may be empty when "any session" is fine.
 type Search struct {
-	Name         string // The agent name
+	Name         string // The route (agent) name
 	EndpointType string // the endpoint type, eg "jenkins", "kubernetes"
 	EndpointName string // the endpoint name, eg "jenkins1" or "kubernetes1"
-	Session      string // the session ID for a specific agent, used to cancel.
+	Session      string // the sessionID for a specific transaction, used to cancel.
 }
 
 func (a Search) String() string {
@@ -46,7 +46,7 @@ func (a Search) String() string {
 	return fmt.Sprintf("(%s)", strings.Join(l, ", "))
 }
 
-// MatchesRoute returns true if a given agent matches the search criteria.
+// MatchesRoute returns true if a given route matches the search criteria.
 func (a *Search) MatchesRoute(t Route) bool {
 	return a.Name == t.GetName() && (len(a.Session) == 0 || a.Session == t.GetSession())
 }

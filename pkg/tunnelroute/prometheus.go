@@ -23,7 +23,7 @@ import (
 
 var (
 	connectedRoutesGauge = promauto.NewGaugeVec(prometheus.GaugeOpts{
-		Name: "agents_connected",
-		Help: "The currently connected agents",
-	}, []string{"agent"})
+		Name: "routess_connected",
+		Help: "The number of currently connected routes",
+	}, []string{"route"})
 )

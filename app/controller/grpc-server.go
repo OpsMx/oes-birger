@@ -130,7 +130,7 @@ func (s *agentTunnelServer) EventTunnel(stream tunnel.AgentTunnelService_EventTu
 	inCancelRequest := make(chan string, 1)
 	httpids := &sessionList{m: make(map[string]chan *tunnel.MessageWrapper)}
 
-	state := &tunnelroute.DirectlyConnectedAgent{
+	state := &tunnelroute.DirectlyConnectedRoute{
 		Name:            agentIdentity,
 		Session:         sessionIdentity,
 		InRequest:       inRequest,
@@ -205,7 +205,7 @@ func (s *agentTunnelServer) EventTunnel(stream tunnel.AgentTunnelService_EventTu
 	}
 }
 
-func handleHTTPControl(httpControl *tunnel.HttpTunnelControl, state *tunnelroute.DirectlyConnectedAgent, httpids *sessionList, in *tunnel.MessageWrapper, agentIdentity string) {
+func handleHTTPControl(httpControl *tunnel.HttpTunnelControl, state *tunnelroute.DirectlyConnectedRoute, httpids *sessionList, in *tunnel.MessageWrapper, agentIdentity string) {
 	switch controlMessage := httpControl.ControlType.(type) {
 	case *tunnel.HttpTunnelControl_HttpTunnelResponse:
 		resp := controlMessage.HttpTunnelResponse

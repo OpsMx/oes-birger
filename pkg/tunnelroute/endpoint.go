@@ -19,9 +19,9 @@ package tunnelroute
 import "fmt"
 
 // Endpoint defines the configuration and description provided by the
-// agent.  This describes a service endpoint of a specific type.
-// The tuple (Type, Name) must be unique per agent connection,
-// although multiple agents (even with the same agent name) may
+// route.  This describes a service endpoint of a specific type.
+// The tuple (Type, Name) must be unique per route connection,
+// although multiple routes (even with the same route name) may
 // provide the same endpoint.
 type Endpoint struct {
 	Name       string   `json:"name,omitempty"`

@@ -37,25 +37,25 @@ func TestAgentSearch_MatchesAgent(t *testing.T) {
 		{
 			"matching name and session",
 			fields{Identity: "a1", Session: "abc"},
-			args{t: &DirectlyConnectedAgent{Name: "a1", Session: "abc"}},
+			args{t: &DirectlyConnectedRoute{Name: "a1", Session: "abc"}},
 			true,
 		},
 		{
 			"matching name",
 			fields{Identity: "a1"},
-			args{t: &DirectlyConnectedAgent{Name: "a1", Session: "abc"}},
+			args{t: &DirectlyConnectedRoute{Name: "a1", Session: "abc"}},
 			true,
 		},
 		{
 			"non-matching name",
 			fields{Identity: "a2"},
-			args{t: &DirectlyConnectedAgent{Name: "a1", Session: "abc"}},
+			args{t: &DirectlyConnectedRoute{Name: "a1", Session: "abc"}},
 			false,
 		},
 		{
 			"matching name, non-matching session",
 			fields{Identity: "a1", Session: "cda"},
-			args{t: &DirectlyConnectedAgent{Name: "a1", Session: "abc"}},
+			args{t: &DirectlyConnectedRoute{Name: "a1", Session: "abc"}},
 			false,
 		},
 	}

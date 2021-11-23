@@ -18,8 +18,9 @@ package tunnelroute
 
 import "fmt"
 
-// DirectlyConnectedAgent holds all the magic needed to implement a directly connected agent.
-type DirectlyConnectedAgent struct {
+// DirectlyConnectedRoute holds all the magic needed to implement a directly connected route,
+// such as an agent.
+type DirectlyConnectedRoute struct {
 	Name            string
 	Session         string
 	Endpoints       []Endpoint
@@ -34,35 +35,35 @@ type DirectlyConnectedAgent struct {
 
 // GetSession returns the randomly assigned session ID.  This is assigned each time
 // an agent connects, and allows routing of cancellation and other messages to the
-// correct instance of an agent.
-func (s *DirectlyConnectedAgent) GetSession() string {
+// correct instance of a route.
+func (s *DirectlyConnectedRoute) GetSession() string {
 	return s.Session
 }
 
 // GetName returns the agent name.
-func (s *DirectlyConnectedAgent) GetName() string {
+func (s *DirectlyConnectedRoute) GetName() string {
 	return s.Name
 }
 
 // GetEndpoints returns the list of endpoints.
-func (s *DirectlyConnectedAgent) GetEndpoints() []Endpoint {
+func (s *DirectlyConnectedRoute) GetEndpoints() []Endpoint {
 	return s.Endpoints
 }
 
-func (s DirectlyConnectedAgent) String() string {
+func (s DirectlyConnectedRoute) String() string {
 	return fmt.Sprintf("(name=%s, session=%s)", s.Name, s.Session)
 }
 
 // Close will shut down an agent's requests channels.
-func (s *DirectlyConnectedAgent) Close() {
+func (s *DirectlyConnectedRoute) Close() {
 	close(s.InRequest)
 	close(s.InCancelRequest)
 }
 
 //
-// Send sends a message to a specific Agent
+// Send sends a message to a specific Route
 //
-func (s *DirectlyConnectedAgent) Send(message interface{}) string {
+func (s *DirectlyConnectedRoute) Send(message interface{}) string {
 	s.InRequest <- message
 	return s.Session
 }
@@ -70,14 +71,14 @@ func (s *DirectlyConnectedAgent) Send(message interface{}) string {
 //
 // Cancel cancels a specific stream
 //
-func (s *DirectlyConnectedAgent) Cancel(id string) {
+func (s *DirectlyConnectedRoute) Cancel(id string) {
 	s.InCancelRequest <- id
 }
 
 //
 // HasEndpoint returns true if the endpoint is presend and configured.
 //
-func (s *DirectlyConnectedAgent) HasEndpoint(endpointType string, endpointName string) bool {
+func (s *DirectlyConnectedRoute) HasEndpoint(endpointType string, endpointName string) bool {
 	for _, ep := range s.Endpoints {
 		if ep.Type == endpointType && ep.Name == endpointName {
 			return ep.Configured
@@ -87,9 +88,9 @@ func (s *DirectlyConnectedAgent) HasEndpoint(endpointType string, endpointName s
 }
 
 //
-// DirectlyConnectedAgentStatistics describes statistics for a directly connected agent.
+// DirectlyConnectedRouteStatistics describes statistics for a directly connected route.
 //
-type DirectlyConnectedAgentStatistics struct {
+type DirectlyConnectedRouteStatistics struct {
 	BaseStatistics
 	ConnectedAt uint64 `json:"connectedAt"`
 	LastPing    uint64 `json:"lastPing"`
@@ -97,10 +98,10 @@ type DirectlyConnectedAgentStatistics struct {
 }
 
 //
-// GetStatistics returns a set of stats for connected agents.
+// GetStatistics returns a set of stats for connected routes.
 //
-func (s *DirectlyConnectedAgent) GetStatistics() interface{} {
-	ret := &DirectlyConnectedAgentStatistics{
+func (s *DirectlyConnectedRoute) GetStatistics() interface{} {
+	ret := &DirectlyConnectedRouteStatistics{
 		ConnectedAt: s.ConnectedAt,
 		LastPing:    s.LastPing,
 		LastUse:     s.LastUse,
