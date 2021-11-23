@@ -28,16 +28,21 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-type incomingServiceConfig struct {
+// IncomingServiceConfig defines an incoming service port, where we may specify
+// "http" or "auto" for the service type, and lock the destination down to a
+// specific outgoing service on a specific agent.  If not specified, the
+// type, destination, service will be detected based on credentials provided.
+type IncomingServiceConfig struct {
 	Name               string `yaml:"name,omitempty"`
 	Port               uint16 `yaml:"port,omitempty"`
-	ServiceType        string `yaml:"serviceType,omitempty"`
 	UseHTTP            bool   `yaml:"useHTTP,omitempty"`
+	ServiceType        string `yaml:"serviceType,omitempty"`
 	Destination        string `yaml:"destination,omitempty"`
 	DestinationService string `yaml:"destinationService,omitempty"`
 }
 
-type outgoingServiceConfig struct {
+// OutgoingServiceConfig defines a way to reach out to another service, such as Jenkins.
+type OutgoingServiceConfig struct {
 	Enabled    bool                        `yaml:"enabled"`
 	Name       string                      `yaml:"name"`
 	Type       string                      `yaml:"type"`
@@ -54,8 +59,8 @@ type serviceNamespace struct {
 
 // ServiceConfig defines a service level configuration top-level list.
 type ServiceConfig struct {
-	OutgoingServices []outgoingServiceConfig `yaml:"outgoingServices,omitempty"`
-	IncomingServices []incomingServiceConfig `yaml:"incomingServices,omitempty"`
+	OutgoingServices []OutgoingServiceConfig `yaml:"outgoingServices,omitempty"`
+	IncomingServices []IncomingServiceConfig `yaml:"incomingServices,omitempty"`
 }
 
 // LoadServiceConfig loads a service configuration YAML file.

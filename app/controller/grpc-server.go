@@ -26,26 +26,26 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/opsmx/oes-birger/app/controller/agent"
 	"github.com/opsmx/oes-birger/pkg/tunnel"
+	"github.com/opsmx/oes-birger/pkg/tunnelroute"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 )
 
-func (s *agentTunnelServer) sendWebhook(state agent.Agent, endpoints []*tunnel.EndpointHealth) {
+func (s *agentTunnelServer) sendWebhook(state tunnelroute.Agent, endpoints []*tunnel.EndpointHealth) {
 	if hook == nil {
 		return
 	}
-	eh := make([]agent.Endpoint, len(endpoints))
+	eh := make([]tunnelroute.Endpoint, len(endpoints))
 	for i, ep := range endpoints {
-		eh[i] = agent.Endpoint{
+		eh[i] = tunnelroute.Endpoint{
 			Name:       ep.Name,
 			Type:       ep.Type,
 			Configured: ep.Configured,
 			Namespaces: ep.Namespaces,
 		}
 	}
-	req := &agent.BaseStatistics{
+	req := &tunnelroute.BaseStatistics{
 		Name:      state.GetName(),
 		Session:   state.GetSession(),
 		Endpoints: eh,
@@ -82,7 +82,7 @@ func (s *agentTunnelServer) addHTTPId(httpids *sessionList, id string, c chan *t
 func (s *agentTunnelServer) handleHTTPRequests(session string, requestChan chan interface{}, httpids *sessionList, stream tunnel.AgentTunnelService_EventTunnelServer) {
 	for interfacedRequest := range requestChan {
 		switch value := interfacedRequest.(type) {
-		case *HTTPMessage:
+		case *tunnelroute.HTTPMessage:
 			s.addHTTPId(httpids, value.Cmd.Id, value.Out)
 			resp := &tunnel.MessageWrapper{
 				Event: tunnel.MakeHTTPTunnelOpenTunnelRequest(value.Cmd),
@@ -130,7 +130,7 @@ func (s *agentTunnelServer) EventTunnel(stream tunnel.AgentTunnelService_EventTu
 	inCancelRequest := make(chan string, 1)
 	httpids := &sessionList{m: make(map[string]chan *tunnel.MessageWrapper)}
 
-	state := &agent.DirectlyConnectedAgent{
+	state := &tunnelroute.DirectlyConnectedAgent{
 		Name:            agentIdentity,
 		Session:         sessionIdentity,
 		InRequest:       inRequest,
@@ -149,7 +149,7 @@ func (s *agentTunnelServer) EventTunnel(stream tunnel.AgentTunnelService_EventTu
 		if err == io.EOF {
 			log.Printf("Closing %s", state)
 			s.closeAllHTTP(httpids)
-			err2 := agents.RemoveAgent(state)
+			err2 := routes.RemoveAgent(state)
 			if err2 != nil {
 				log.Printf("while removing agent: %v", err2)
 			}
@@ -158,7 +158,7 @@ func (s *agentTunnelServer) EventTunnel(stream tunnel.AgentTunnelService_EventTu
 		if err != nil {
 			log.Printf("Agent closed connection: %s", state)
 			s.closeAllHTTP(httpids)
-			err2 := agents.RemoveAgent(state)
+			err2 := routes.RemoveAgent(state)
 			if err2 != nil {
 				log.Printf("while removing agent: %v", err2)
 			}
@@ -171,7 +171,7 @@ func (s *agentTunnelServer) EventTunnel(stream tunnel.AgentTunnelService_EventTu
 			atomic.StoreUint64(&state.LastPing, tunnel.Now())
 			if err := stream.Send(s.makePingResponse(req)); err != nil {
 				log.Printf("Unable to respond to %s with ping response: %v", state, err)
-				err2 := agents.RemoveAgent(state)
+				err2 := routes.RemoveAgent(state)
 				if err2 != nil {
 					log.Printf("while removing agent: %v", err2)
 				}
@@ -179,9 +179,9 @@ func (s *agentTunnelServer) EventTunnel(stream tunnel.AgentTunnelService_EventTu
 			}
 		case *tunnel.MessageWrapper_AgentHello:
 			req := in.GetAgentHello()
-			endpoints := make([]agent.Endpoint, len(req.Endpoints))
+			endpoints := make([]tunnelroute.Endpoint, len(req.Endpoints))
 			for i, ep := range req.Endpoints {
-				endpoints[i] = agent.Endpoint{
+				endpoints[i] = tunnelroute.Endpoint{
 					Name:       ep.Name,
 					Type:       ep.Type,
 					Configured: ep.Configured,
@@ -193,7 +193,7 @@ func (s *agentTunnelServer) EventTunnel(stream tunnel.AgentTunnelService_EventTu
 			state.Endpoints = endpoints
 			state.Version = req.Version
 			state.Hostname = req.Hostname
-			agents.AddAgent(state)
+			routes.AddAgent(state)
 			s.sendWebhook(state, req.Endpoints)
 		case *tunnel.MessageWrapper_HttpTunnelControl:
 			handleHTTPControl(x.HttpTunnelControl, state, httpids, in, agentIdentity)
@@ -205,7 +205,7 @@ func (s *agentTunnelServer) EventTunnel(stream tunnel.AgentTunnelService_EventTu
 	}
 }
 
-func handleHTTPControl(httpControl *tunnel.HttpTunnelControl, state *agent.DirectlyConnectedAgent, httpids *sessionList, in *tunnel.MessageWrapper, agentIdentity string) {
+func handleHTTPControl(httpControl *tunnel.HttpTunnelControl, state *tunnelroute.DirectlyConnectedAgent, httpids *sessionList, in *tunnel.MessageWrapper, agentIdentity string) {
 	switch controlMessage := httpControl.ControlType.(type) {
 	case *tunnel.HttpTunnelControl_HttpTunnelResponse:
 		resp := controlMessage.HttpTunnelResponse

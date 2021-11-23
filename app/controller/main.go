@@ -34,11 +34,11 @@ import (
 
 	"github.com/lestrrat-go/jwx/jwa"
 	"github.com/lestrrat-go/jwx/jwk"
-	"github.com/opsmx/oes-birger/app/controller/agent"
 	"github.com/opsmx/oes-birger/app/controller/cncserver"
 	"github.com/opsmx/oes-birger/pkg/ca"
 	"github.com/opsmx/oes-birger/pkg/secrets"
-	"github.com/opsmx/oes-birger/pkg/tunnel"
+	"github.com/opsmx/oes-birger/pkg/serviceconfig"
+	"github.com/opsmx/oes-birger/pkg/tunnelroute"
 	"github.com/opsmx/oes-birger/pkg/ulid"
 	"github.com/opsmx/oes-birger/pkg/util"
 	"github.com/opsmx/oes-birger/pkg/webhook"
@@ -70,7 +70,7 @@ var (
 
 	hook *webhook.Runner
 
-	agents = agent.MakeAgents()
+	routes = tunnelroute.MakeAgents()
 
 	// metrics
 	apiRequestCounter = promauto.NewCounterVec(prometheus.CounterOpts{
@@ -101,16 +101,6 @@ func getAgentNameFromContext(ctx context.Context) (string, error) {
 	return names.Agent, nil
 }
 
-func makeHeaders(headers map[string][]string) []*tunnel.HttpHeader {
-	ret := make([]*tunnel.HttpHeader, 0)
-	for name, values := range headers {
-		if name != "Authorization" {
-			ret = append(ret, &tunnel.HttpHeader{Name: name, Values: values})
-		}
-	}
-	return ret
-}
-
 //
 // Flow:
 //  * API request comes in
@@ -132,12 +122,6 @@ func makeHeaders(headers map[string][]string) []*tunnel.HttpHeader {
 // to allow proxying through this controller.  If it closes, all endpoints handled by this
 // tunnel are closed.
 //
-
-// HTTPMessage holds the context of an incoming HTTP request.
-type HTTPMessage struct {
-	Out chan *tunnel.MessageWrapper
-	Cmd *tunnel.OpenHTTPTunnelRequest
-}
 
 func healthcheck(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("content-type", "application/json")
@@ -268,12 +252,21 @@ func main() {
 		log.Fatalf("Cannot make server certificate: %v", err)
 	}
 
-	go runHTTPSServer(*serverCert)
-
-	cnc := cncserver.MakeCNCServer(config, authority, agents, jwtKeyset, jwtCurrentKey, version.String())
+	cnc := cncserver.MakeCNCServer(config, authority, routes, jwtKeyset, jwtCurrentKey, version.String())
 	go cnc.RunServer(*serverCert)
 
 	go runAgentGRPCServer(*serverCert)
+
+	// Always listen on our well-known port.
+	go runHTTPSServer(*serverCert, serviceconfig.IncomingServiceConfig{
+		Name: "_services",
+		Port: config.ServiceListenPort,
+	})
+
+	// Now, add all the others defined by our config.
+	for _, service := range config.ServiceConfig.IncomingServices {
+		go runHTTPSServer(*serverCert, service)
+	}
 
 	runPrometheusHTTPServer(config.PrometheusListenPort)
 }

@@ -27,7 +27,8 @@ var (
 	emptyBytes = []byte("")
 )
 
-func makeHeaders(headers map[string][]string) []*HttpHeader {
+// MakeHeaders copies from http headers to protobuf's format
+func MakeHeaders(headers map[string][]string) []*HttpHeader {
 	ret := make([]*HttpHeader, 0)
 	for name, values := range headers {
 		if name != "Authorization" {
@@ -88,7 +89,7 @@ func makeResponse(id string, response *http.Response) *MessageWrapper {
 						Id:            id,
 						Status:        int32(response.StatusCode),
 						ContentLength: response.ContentLength,
-						Headers:       makeHeaders(response.Header),
+						Headers:       MakeHeaders(response.Header),
 					},
 				},
 			},

@@ -1,5 +1,3 @@
-package agent
-
 /*
  * Copyright 2021 OpsMx, Inc.
  *
@@ -16,14 +14,12 @@ package agent
  * limitations under the License.
  */
 
-import (
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promauto"
-)
+package tunnelroute
 
-var (
-	connectedAgentsGauge = promauto.NewGaugeVec(prometheus.GaugeOpts{
-		Name: "agents_connected",
-		Help: "The currently connected agents",
-	}, []string{"agent"})
-)
+import "github.com/opsmx/oes-birger/pkg/tunnel"
+
+// HTTPMessage holds the context of an incoming HTTP request.
+type HTTPMessage struct {
+	Out chan *tunnel.MessageWrapper
+	Cmd *tunnel.OpenHTTPTunnelRequest
+}

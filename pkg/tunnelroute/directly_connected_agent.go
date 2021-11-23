@@ -14,11 +14,7 @@
  * limitations under the License.
  */
 
-//
-// Package agent implements a directly-connected agent.  This is where the GRPC
-// connection is terminated inside this controller.
-//
-package agent
+package tunnelroute
 
 import "fmt"
 

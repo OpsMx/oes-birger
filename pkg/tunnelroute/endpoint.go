@@ -1,5 +1,3 @@
-package agent
-
 /*
  * Copyright 2021 OpsMx, Inc.
  *
@@ -15,6 +13,8 @@ package agent
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+package tunnelroute
 
 import "fmt"
 
