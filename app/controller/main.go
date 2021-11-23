@@ -70,7 +70,7 @@ var (
 
 	hook *webhook.Runner
 
-	routes = tunnelroute.MakeAgents()
+	routes = tunnelroute.MakeRoutes()
 
 	// metrics
 	apiRequestCounter = promauto.NewCounterVec(prometheus.CounterOpts{

@@ -26,7 +26,7 @@ func TestAgentSearch_MatchesAgent(t *testing.T) {
 		Session      string
 	}
 	type args struct {
-		t Agent
+		t Route
 	}
 	tests := []struct {
 		name   string
@@ -67,7 +67,7 @@ func TestAgentSearch_MatchesAgent(t *testing.T) {
 				EndpointName: tt.fields.EndpointName,
 				Session:      tt.fields.Session,
 			}
-			if got := a.MatchesAgent(tt.args.t); got != tt.want {
+			if got := a.MatchesRoute(tt.args.t); got != tt.want {
 				t.Errorf("AgentSearch.MatchesAgent() = %v, want %v", got, tt.want)
 			}
 		})

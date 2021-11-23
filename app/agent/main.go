@@ -37,6 +37,7 @@ import (
 	"github.com/opsmx/oes-birger/pkg/secrets"
 	"github.com/opsmx/oes-birger/pkg/serviceconfig"
 	"github.com/opsmx/oes-birger/pkg/tunnel"
+	"github.com/opsmx/oes-birger/pkg/tunnelroute"
 	"github.com/opsmx/oes-birger/pkg/updater"
 	"github.com/opsmx/oes-birger/pkg/util"
 )
@@ -56,6 +57,8 @@ var (
 	secretsLoader secrets.SecretLoader
 
 	endpoints []serviceconfig.ConfiguredEndpoint
+
+	routes = tunnelroute.MakeRoutes()
 )
 
 type serverContext struct{}

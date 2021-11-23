@@ -102,17 +102,17 @@ func (a *FakeAgent) GetEndpoints() []Endpoint {
 }
 
 func (s *MySuite) TestConnectedAgents(c *C) {
-	agents := MakeAgents()
+	agents := MakeRoutes()
 
 	///
 	/// AddAgent()
 	///
 
-	agents.AddAgent(agent1Session1)
+	agents.AddRoute(agent1Session1)
 	c.Assert(agents.m, HasLen, 1)
 	c.Assert(agents.m["agent1"], HasLen, 1)
 
-	agents.AddAgent(agent1Session2)
+	agents.AddRoute(agent1Session2)
 	c.Assert(agents.m, HasLen, 1)
 	c.Assert(agents.m["agent1"], HasLen, 2)
 
@@ -120,18 +120,18 @@ func (s *MySuite) TestConnectedAgents(c *C) {
 	/// RemoveAgent()
 	///
 
-	err := agents.RemoveAgent(agent1Session1)
+	err := agents.RemoveRoute(agent1Session1)
 	c.Assert(err, IsNil)
 	c.Assert(agents.m, HasLen, 1)
 	c.Assert(agents.m["agent1"], HasLen, 1)
 
 	// bogus agent, never was added
-	err = agents.RemoveAgent(bogusagent)
-	c.Assert(err, ErrorMatches, ".*no agents known by the name.*agent99.*")
+	err = agents.RemoveRoute(bogusagent)
+	c.Assert(err, ErrorMatches, ".*no routes known by the name.*agent99.*")
 
 	// agent name exists, session does not
-	err = agents.RemoveAgent(agent1Session1)
-	c.Assert(err, ErrorMatches, ".*attempt to remove unknown agent.*agent1.session1.*")
+	err = agents.RemoveRoute(agent1Session1)
+	c.Assert(err, ErrorMatches, ".*attempt to remove unknown route.*agent1.session1.*")
 
 	///
 	/// findService()
@@ -145,11 +145,11 @@ func (s *MySuite) TestConnectedAgents(c *C) {
 
 	// Try to find an agent that does not exist
 	_, err = agents.findService(Search{Name: "agent99", EndpointType: "type1", EndpointName: "ep1"})
-	c.Assert(err, ErrorMatches, "no agents connected for.*")
+	c.Assert(err, ErrorMatches, "no routes connected for.*")
 
 	// Try to find a service on an agent, where the agent exists but the service does not.
 	_, err = agents.findService(Search{Name: "agent1", EndpointType: "type99", EndpointName: "ep1"})
-	c.Assert(err, ErrorMatches, ".*no such path exists.*")
+	c.Assert(err, ErrorMatches, ".*no such route exists.*")
 
 	///
 	/// Send()
@@ -176,7 +176,7 @@ func (s *MySuite) TestConnectedAgents(c *C) {
 
 	// No agent
 	err = agents.Cancel(Search{Session: "nosession", Name: "agent99", EndpointType: "type1", EndpointName: "ep1"}, "abc123")
-	c.Assert(err, ErrorMatches, ".*no agents connected for.*")
+	c.Assert(err, ErrorMatches, ".*no routes connected for.*")
 
 	// Agent exists, session does not
 	err = agents.Cancel(Search{Session: "nosession", Name: "agent1", EndpointType: "type1", EndpointName: "ep1"}, "abc123")

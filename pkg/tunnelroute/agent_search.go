@@ -46,7 +46,7 @@ func (a Search) String() string {
 	return fmt.Sprintf("(%s)", strings.Join(l, ", "))
 }
 
-// MatchesAgent returns true if a given agent matches the search criteria.
-func (a *Search) MatchesAgent(t Agent) bool {
+// MatchesRoute returns true if a given agent matches the search criteria.
+func (a *Search) MatchesRoute(t Route) bool {
 	return a.Name == t.GetName() && (len(a.Session) == 0 || a.Session == t.GetSession())
 }

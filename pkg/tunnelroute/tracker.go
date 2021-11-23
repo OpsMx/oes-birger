@@ -30,8 +30,8 @@ var (
 
 //
 // BaseStatistics defines the standard statistics returned for every
-// agent type.  This should be included in the specific agent types,
-// such as "directly connected" or "on other controller" agent connections.
+// route type.  This should be included in the specific route types,
+// such as "directly connected" or "on other controller" route connections.
 //
 type BaseStatistics struct {
 	Name           string     `json:"name,omitempty"`
@@ -43,10 +43,10 @@ type BaseStatistics struct {
 }
 
 //
-// Agent is a thing that looks like a connected agent, either directly connected or
+// Route is a thing that looks like a connected route (agent), either directly connected or
 // through another controller.
 //
-type Agent interface {
+type Route interface {
 	Close()
 	Send(interface{}) string
 	Cancel(string)
@@ -59,37 +59,36 @@ type Agent interface {
 }
 
 //
-// ConnectedAgents holds a list of all currently connected or known agents
+// ConnectedRoutes holds a list of all currently connected or known routes (agents)
 //
-type ConnectedAgents struct {
+type ConnectedRoutes struct {
 	sync.RWMutex
-	m map[string][]Agent
+	m map[string][]Route
 }
 
 //
-// GetStatistics returns statistics for all agents currently connected.
-// The statistics returned is an opaque object, intended to be rendered to JSON or some
-// other output format using a system that uses introspection.
+// GetStatistics returns statistics for all routes currently connected.
+// The statistics returned is an opaque object, intended to be rendered to JSON.
 //
-func (s *ConnectedAgents) GetStatistics() interface{} {
+func (s *ConnectedRoutes) GetStatistics() interface{} {
 	ret := make([]interface{}, 0)
 	s.RLock()
 	defer s.RUnlock()
-	for _, agentList := range s.m {
-		for _, agent := range agentList {
-			ret = append(ret, agent.GetStatistics())
+	for _, routeList := range s.m {
+		for _, route := range routeList {
+			ret = append(ret, route.GetStatistics())
 		}
 	}
 	return ret
 }
 
 //
-// MakeAgents returns a new agent object which will manage (safely) agents
+// MakeRoutes returns a new Routes object which will manage (safely) routes, such as agents,
 // connected directly or indirectly.
 //
-func MakeAgents() *ConnectedAgents {
-	return &ConnectedAgents{
-		m: make(map[string][]Agent),
+func MakeRoutes() *ConnectedRoutes {
+	return &ConnectedRoutes{
+		m: make(map[string][]Route),
 	}
 }
 
@@ -103,93 +102,93 @@ func sliceIndex(limit int, predicate func(i int) bool) int {
 }
 
 //
-// AddAgent will add a new agent to our list.
+// AddRoute will add a new route to our list.
 //
-func (s *ConnectedAgents) AddAgent(state Agent) {
+func (s *ConnectedRoutes) AddRoute(state Route) {
 	s.Lock()
 	defer s.Unlock()
-	agentList, ok := s.m[state.GetName()]
+	routeList, ok := s.m[state.GetName()]
 	if !ok {
-		agentList = make([]Agent, 0)
+		routeList = make([]Route, 0)
 	}
-	agentList = append(agentList, state)
-	s.m[state.GetName()] = agentList
-	log.Printf("Agent %s added, now at %d paths, %d endpoints", state, len(agentList), len(state.GetEndpoints()))
+	routeList = append(routeList, state)
+	s.m[state.GetName()] = routeList
+	log.Printf("Route %s added, now at %d paths, %d endpoints", state, len(routeList), len(state.GetEndpoints()))
 	for _, endpoint := range state.GetEndpoints() {
-		log.Printf("  agent %s, endpoint: %s", state, &endpoint)
+		log.Printf("   destination: %s, endpoint: %s", state, &endpoint)
 	}
-	connectedAgentsGauge.WithLabelValues(state.GetName()).Inc()
+	connectedRoutesGauge.WithLabelValues(state.GetName()).Inc()
 }
 
 //
-// RemoveAgent will remove an agent and signal to it that closing down is started.
+// RemoveRoute will remove a route and signal to it that closing down is started.
 //
-func (s *ConnectedAgents) RemoveAgent(state Agent) error {
+func (s *ConnectedRoutes) RemoveRoute(state Route) error {
 	s.Lock()
 	defer s.Unlock()
 
 	state.Close()
 
-	agentList, ok := s.m[state.GetName()]
+	routeList, ok := s.m[state.GetName()]
 	if !ok {
 		// This should not be possible.
-		err := fmt.Errorf("no agents known by the name of %s", state)
+		err := fmt.Errorf("no routes known by the name of %s", state)
 		return err
 	}
 
 	// TODO: We should always find our entry...
-	i := sliceIndex(len(agentList), func(i int) bool { return agentList[i] == state })
+	i := sliceIndex(len(routeList), func(i int) bool { return routeList[i] == state })
 	if i == -1 {
-		err := fmt.Errorf("attempt to remove unknown agent %s", state)
+		err := fmt.Errorf("attempt to remove unknown route %s", state)
 		return err
 	}
-	agentList[i] = agentList[len(agentList)-1]
-	agentList[len(agentList)-1] = nil
-	agentList = agentList[:len(agentList)-1]
-	s.m[state.GetName()] = agentList
-	connectedAgentsGauge.WithLabelValues(state.GetName()).Dec()
-	log.Printf("agent %s removed, now at %d paths", state, len(agentList))
+	routeList[i] = routeList[len(routeList)-1]
+	routeList[len(routeList)-1] = nil
+	routeList = routeList[:len(routeList)-1]
+	s.m[state.GetName()] = routeList
+	connectedRoutesGauge.WithLabelValues(state.GetName()).Dec()
+	log.Printf("route %s removed, now at %d paths", state, len(routeList))
 	return nil
 }
 
-func (s *ConnectedAgents) findService(ep Search) (Agent, error) {
-	agentList, ok := s.m[ep.Name]
-	if !ok || len(agentList) == 0 {
-		return nil, fmt.Errorf("no agents connected for %s", ep)
+func (s *ConnectedRoutes) findService(ep Search) (Route, error) {
+	routeList, ok := s.m[ep.Name]
+	if !ok || len(routeList) == 0 {
+		return nil, fmt.Errorf("no routes connected for %s", ep)
 	}
-	possibleAgents := []int{}
-	for i, a := range agentList {
+	possibleRoutes := []int{}
+	for i, a := range routeList {
 		if a.HasEndpoint(ep.EndpointType, ep.EndpointName) {
-			possibleAgents = append(possibleAgents, i)
+			possibleRoutes = append(possibleRoutes, i)
 		}
 	}
-	if len(possibleAgents) == 0 {
-		return nil, fmt.Errorf("request for %s, no such path exists or all are unconfigured", ep)
+	if len(possibleRoutes) == 0 {
+		return nil, fmt.Errorf("request for %s, no such route exists or all are unconfigured", ep)
 	}
-	selected := possibleAgents[rnd.Intn(len(possibleAgents))]
-	return agentList[selected], nil
+	selected := possibleRoutes[rnd.Intn(len(possibleRoutes))]
+	return routeList[selected], nil
 }
 
 //
-// Send will search for the specific agent and endpoint. send a message to an agent, and return true if an agent
+// Send will search for the specific route and endpoint. send a message to an route, and return true if a route
 // was found.
 //
-func (s *ConnectedAgents) Send(ep Search, message interface{}) (string, bool) {
+func (s *ConnectedRoutes) Send(ep Search, message interface{}) (string, bool) {
 	s.RLock()
 	defer s.RUnlock()
-	agent, err := s.findService(ep)
+	route, err := s.findService(ep)
 	if err != nil {
 		log.Printf("%v", err)
 		return "", false
 	}
-	session := agent.Send(message)
+	session := route.Send(message)
 	return session, true
 }
 
 //
 // Cancel will cancel an ongoing request.
 //
-func (s *ConnectedAgents) Cancel(ep Search, id string) error {
+func (s *ConnectedRoutes) Cancel(ep Search, id string) error {
 	// The session must be set, if not this is an error.
 	if len(ep.Session) == 0 {
 		return fmt.Errorf("session is not set (coding error)")
@@ -197,17 +196,17 @@ func (s *ConnectedAgents) Cancel(ep Search, id string) error {
 
 	s.RLock()
 	defer s.RUnlock()
-	agentList, ok := s.m[ep.Name]
-	if !ok || len(agentList) == 0 {
-		return fmt.Errorf("no agents connected for: %s (likely coding error)", ep)
+	routeList, ok := s.m[ep.Name]
+	if !ok || len(routeList) == 0 {
+		return fmt.Errorf("no routes connected for: %s (likely coding error)", ep)
 	}
 
-	for _, a := range agentList {
-		if ep.MatchesAgent(a) {
+	for _, a := range routeList {
+		if ep.MatchesRoute(a) {
 			a.Cancel(id)
 			return nil
 		}
 	}
 
-	return fmt.Errorf("no agents with specific session exist for %s (likely coding error)", ep)
+	return fmt.Errorf("no routes with specific session exist for %s (likely coding error)", ep)
 }

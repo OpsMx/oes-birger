@@ -32,7 +32,7 @@ import (
 	"google.golang.org/grpc/credentials"
 )
 
-func (s *agentTunnelServer) sendWebhook(state tunnelroute.Agent, endpoints []*tunnel.EndpointHealth) {
+func (s *agentTunnelServer) sendWebhook(state tunnelroute.Route, endpoints []*tunnel.EndpointHealth) {
 	if hook == nil {
 		return
 	}
@@ -149,7 +149,7 @@ func (s *agentTunnelServer) EventTunnel(stream tunnel.AgentTunnelService_EventTu
 		if err == io.EOF {
 			log.Printf("Closing %s", state)
 			s.closeAllHTTP(httpids)
-			err2 := routes.RemoveAgent(state)
+			err2 := routes.RemoveRoute(state)
 			if err2 != nil {
 				log.Printf("while removing agent: %v", err2)
 			}
@@ -158,7 +158,7 @@ func (s *agentTunnelServer) EventTunnel(stream tunnel.AgentTunnelService_EventTu
 		if err != nil {
 			log.Printf("Agent closed connection: %s", state)
 			s.closeAllHTTP(httpids)
-			err2 := routes.RemoveAgent(state)
+			err2 := routes.RemoveRoute(state)
 			if err2 != nil {
 				log.Printf("while removing agent: %v", err2)
 			}
@@ -171,7 +171,7 @@ func (s *agentTunnelServer) EventTunnel(stream tunnel.AgentTunnelService_EventTu
 			atomic.StoreUint64(&state.LastPing, tunnel.Now())
 			if err := stream.Send(s.makePingResponse(req)); err != nil {
 				log.Printf("Unable to respond to %s with ping response: %v", state, err)
-				err2 := routes.RemoveAgent(state)
+				err2 := routes.RemoveRoute(state)
 				if err2 != nil {
 					log.Printf("while removing agent: %v", err2)
 				}
@@ -193,7 +193,7 @@ func (s *agentTunnelServer) EventTunnel(stream tunnel.AgentTunnelService_EventTu
 			state.Endpoints = endpoints
 			state.Version = req.Version
 			state.Hostname = req.Hostname
-			routes.AddAgent(state)
+			routes.AddRoute(state)
 			s.sendWebhook(state, req.Endpoints)
 		case *tunnel.MessageWrapper_HttpTunnelControl:
 			handleHTTPControl(x.HttpTunnelControl, state, httpids, in, agentIdentity)

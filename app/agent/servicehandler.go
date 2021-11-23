@@ -15,7 +15,6 @@ import (
 
 var (
 	ulidContext = ulid.NewContext()
-	routes      = tunnelroute.MakeAgents()
 )
 
 func runHTTPServer(service serviceconfig.IncomingServiceConfig) {
