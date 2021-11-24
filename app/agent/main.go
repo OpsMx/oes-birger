@@ -86,7 +86,6 @@ func dataflowHandler(dataflow chan *tunnel.MessageWrapper, stream tunnel.AgentTu
 			log.Fatalf("Unable to respond over GRPC: %v", err)
 		}
 	}
-
 }
 
 func runTunnel(wg *sync.WaitGroup, sa *serverContext, conn *grpc.ClientConn, endpoints []serviceconfig.ConfiguredEndpoint) {
