@@ -22,12 +22,12 @@ import (
 	"io"
 	"log"
 	"net"
-	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/opsmx/oes-birger/pkg/tunnel"
 	"github.com/opsmx/oes-birger/pkg/tunnelroute"
+	"github.com/opsmx/oes-birger/pkg/util"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 )
@@ -62,28 +62,11 @@ func (s *agentTunnelServer) makePingResponse(req *tunnel.PingRequest) *tunnel.Me
 	return resp
 }
 
-type sessionList struct {
-	sync.RWMutex
-	m map[string]chan *tunnel.MessageWrapper
-}
-
-func (s *agentTunnelServer) removeHTTPId(httpids *sessionList, id string) {
-	httpids.Lock()
-	defer httpids.Unlock()
-	delete(httpids.m, id)
-}
-
-func (s *agentTunnelServer) addHTTPId(httpids *sessionList, id string, c chan *tunnel.MessageWrapper) {
-	httpids.Lock()
-	defer httpids.Unlock()
-	httpids.m[id] = c
-}
-
-func (s *agentTunnelServer) handleHTTPRequests(session string, requestChan chan interface{}, httpids *sessionList, stream tunnel.AgentTunnelService_EventTunnelServer) {
+func (s *agentTunnelServer) handleHTTPRequests(session string, requestChan chan interface{}, httpids *util.SessionList, stream tunnel.AgentTunnelService_EventTunnelServer) {
 	for interfacedRequest := range requestChan {
 		switch value := interfacedRequest.(type) {
 		case *tunnelroute.HTTPMessage:
-			s.addHTTPId(httpids, value.Cmd.Id, value.Out)
+			httpids.Add(value.Cmd.Id, value.Out)
 			resp := &tunnel.MessageWrapper{
 				Event: tunnel.MakeHTTPTunnelOpenTunnelRequest(value.Cmd),
 			}
@@ -96,9 +79,9 @@ func (s *agentTunnelServer) handleHTTPRequests(session string, requestChan chan 
 	}
 }
 
-func (s *agentTunnelServer) handleHTTPCancelRequest(session string, cancelChan chan string, httpids *sessionList, stream tunnel.AgentTunnelService_EventTunnelServer) {
+func (s *agentTunnelServer) handleHTTPCancelRequest(session string, cancelChan chan string, httpids *util.SessionList, stream tunnel.AgentTunnelService_EventTunnelServer) {
 	for id := range cancelChan {
-		s.removeHTTPId(httpids, id)
+		httpids.Remove(id)
 		resp := &tunnel.MessageWrapper{
 			Event: tunnel.MakeHTTPTunnelCancelRequest(id),
 		}
@@ -107,14 +90,6 @@ func (s *agentTunnelServer) handleHTTPCancelRequest(session string, cancelChan c
 		}
 	}
 	log.Printf("cancel channel closed for agent %s", session)
-}
-
-func (s *agentTunnelServer) closeAllHTTP(httpids *sessionList) {
-	httpids.Lock()
-	defer httpids.Unlock()
-	for _, v := range httpids.m {
-		close(v)
-	}
 }
 
 // This runs in its own goroutine, one per GRPC connection from an agent.
@@ -128,7 +103,7 @@ func (s *agentTunnelServer) EventTunnel(stream tunnel.AgentTunnelService_EventTu
 
 	inRequest := make(chan interface{}, 1)
 	inCancelRequest := make(chan string, 1)
-	httpids := &sessionList{m: make(map[string]chan *tunnel.MessageWrapper)}
+	httpids := util.MakeSessionList()
 
 	state := &tunnelroute.DirectlyConnectedRoute{
 		Name:            agentIdentity,
@@ -148,7 +123,7 @@ func (s *agentTunnelServer) EventTunnel(stream tunnel.AgentTunnelService_EventTu
 		in, err := stream.Recv()
 		if err == io.EOF {
 			log.Printf("Closing %s", state)
-			s.closeAllHTTP(httpids)
+			httpids.CloseAll()
 			err2 := routes.RemoveRoute(state)
 			if err2 != nil {
 				log.Printf("while removing agent: %v", err2)
@@ -157,7 +132,7 @@ func (s *agentTunnelServer) EventTunnel(stream tunnel.AgentTunnelService_EventTu
 		}
 		if err != nil {
 			log.Printf("Agent closed connection: %s", state)
-			s.closeAllHTTP(httpids)
+			httpids.CloseAll()
 			err2 := routes.RemoveRoute(state)
 			if err2 != nil {
 				log.Printf("while removing agent: %v", err2)
@@ -205,17 +180,17 @@ func (s *agentTunnelServer) EventTunnel(stream tunnel.AgentTunnelService_EventTu
 	}
 }
 
-func handleHTTPControl(httpControl *tunnel.HttpTunnelControl, state *tunnelroute.DirectlyConnectedRoute, httpids *sessionList, in *tunnel.MessageWrapper, agentIdentity string) {
+func handleHTTPControl(httpControl *tunnel.HttpTunnelControl, state *tunnelroute.DirectlyConnectedRoute, httpids *util.SessionList, in *tunnel.MessageWrapper, agentIdentity string) {
 	switch controlMessage := httpControl.ControlType.(type) {
 	case *tunnel.HttpTunnelControl_HttpTunnelResponse:
 		resp := controlMessage.HttpTunnelResponse
 		atomic.StoreUint64(&state.LastUse, tunnel.Now())
 		httpids.Lock()
-		dest := httpids.m[resp.Id]
+		dest := httpids.Find(resp.Id)
 		if dest != nil {
 			dest <- in
 			if resp.ContentLength == 0 {
-				delete(httpids.m, resp.Id)
+				httpids.RemoveUnlocked(resp.Id)
 			}
 		} else {
 			log.Printf("Got response to unknown HTTP request id %s from %s", resp.Id, agentIdentity)
@@ -225,11 +200,11 @@ func handleHTTPControl(httpControl *tunnel.HttpTunnelControl, state *tunnelroute
 		resp := controlMessage.HttpTunnelChunkedResponse
 		atomic.StoreUint64(&state.LastUse, tunnel.Now())
 		httpids.Lock()
-		dest := httpids.m[resp.Id]
+		dest := httpids.Find(resp.Id)
 		if dest != nil {
 			dest <- in
 			if len(resp.Body) == 0 {
-				delete(httpids.m, resp.Id)
+				httpids.RemoveUnlocked(resp.Id)
 			}
 		} else {
 			log.Printf("Got response to unknown HTTP request id %s from %s", resp.Id, state)

@@ -1,5 +1,3 @@
-package main
-
 /*
  * Copyright 2021 OpsMx, Inc.
  *
@@ -16,6 +14,8 @@ package main
  * limitations under the License.
  */
 
+package main
+
 import (
 	"crypto/tls"
 	"fmt"
@@ -28,8 +28,20 @@ import (
 	"github.com/opsmx/oes-birger/pkg/serviceconfig"
 	"github.com/opsmx/oes-birger/pkg/tunnel"
 	"github.com/opsmx/oes-birger/pkg/tunnelroute"
+	"github.com/opsmx/oes-birger/pkg/ulid"
 	"github.com/opsmx/oes-birger/pkg/util"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/tevino/abool"
+)
+
+var (
+	ulidContext = ulid.NewContext()
+	// metrics
+	apiRequestCounter = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "controller_api_requests_total",
+		Help: "The total number of API requests",
+	}, []string{"route"})
 )
 
 func runHTTPSServer(serverCert tls.Certificate, service serviceconfig.IncomingServiceConfig) {

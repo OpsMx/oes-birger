@@ -39,11 +39,8 @@ import (
 	"github.com/opsmx/oes-birger/pkg/secrets"
 	"github.com/opsmx/oes-birger/pkg/serviceconfig"
 	"github.com/opsmx/oes-birger/pkg/tunnelroute"
-	"github.com/opsmx/oes-birger/pkg/ulid"
 	"github.com/opsmx/oes-birger/pkg/util"
 	"github.com/opsmx/oes-birger/pkg/webhook"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
@@ -66,17 +63,9 @@ var (
 
 	authority *ca.CA
 
-	ulidContext = ulid.NewContext()
-
 	hook *webhook.Runner
 
 	routes = tunnelroute.MakeRoutes()
-
-	// metrics
-	apiRequestCounter = promauto.NewCounterVec(prometheus.CounterOpts{
-		Name: "controller_api_requests_total",
-		Help: "The total numbe of API requests",
-	}, []string{"agent"})
 )
 
 func getAgentNameFromContext(ctx context.Context) (string, error) {
