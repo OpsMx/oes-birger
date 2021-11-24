@@ -102,9 +102,9 @@ func sliceIndex(limit int, predicate func(i int) bool) int {
 }
 
 //
-// AddRoute will add a new route to our list.
+// Add will add a new route to our list.
 //
-func (s *ConnectedRoutes) AddRoute(state Route) {
+func (s *ConnectedRoutes) Add(state Route) {
 	s.Lock()
 	defer s.Unlock()
 	routeList, ok := s.m[state.GetName()]
@@ -121,9 +121,9 @@ func (s *ConnectedRoutes) AddRoute(state Route) {
 }
 
 //
-// RemoveRoute will remove a route and signal to it that closing down is started.
+// Remove will remove a route and signal to it that closing down is started.
 //
-func (s *ConnectedRoutes) RemoveRoute(state Route) error {
+func (s *ConnectedRoutes) Remove(state Route) error {
 	s.Lock()
 	defer s.Unlock()
 
