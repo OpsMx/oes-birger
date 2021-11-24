@@ -35,7 +35,7 @@ var (
 	endpointName  = flag.String("name", "", "Item name")
 	agentIdentity = flag.String("agent", "", "agent name")
 	endpointType  = flag.String("type", "", "endpoint type")
-	action        = flag.String("action", "", "action, one of: agent, kubectl, agent-manifest, control")
+	action        = flag.String("action", "", "action, one of: kubectl, agent-manifest, service, or control")
 )
 
 func usage(message string) {
