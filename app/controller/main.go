@@ -39,7 +39,6 @@ import (
 	"github.com/opsmx/oes-birger/pkg/secrets"
 	"github.com/opsmx/oes-birger/pkg/serviceconfig"
 	"github.com/opsmx/oes-birger/pkg/tunnelroute"
-	"github.com/opsmx/oes-birger/pkg/ulid"
 	"github.com/opsmx/oes-birger/pkg/util"
 	"github.com/opsmx/oes-birger/pkg/webhook"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -67,8 +66,6 @@ var (
 	hook *webhook.Runner
 
 	routes = tunnelroute.MakeRoutes()
-
-	ulidContext = ulid.NewContext()
 )
 
 func getAgentNameFromContext(ctx context.Context) (string, error) {

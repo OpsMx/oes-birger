@@ -36,6 +36,11 @@ type Context struct {
 	entropy *ulid.MonotonicEntropy
 }
 
+// GlobalContext can be used across the code without needing to make a new context
+// for every case.  This is not efficient and will cause a lock to be obtained,
+// but generally this is OK unless IDs are being generated very, very quickly.
+var GlobalContext = NewContext()
+
 // NewContext returns the context needed for subsequent calls.
 func NewContext() *Context {
 	entropy := ulid.Monotonic(cryptorand.Reader, 0)

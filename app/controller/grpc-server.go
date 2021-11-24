@@ -23,10 +23,10 @@ import (
 	"log"
 	"net"
 	"sync/atomic"
-	"time"
 
 	"github.com/opsmx/oes-birger/pkg/tunnel"
 	"github.com/opsmx/oes-birger/pkg/tunnelroute"
+	"github.com/opsmx/oes-birger/pkg/ulid"
 	"github.com/opsmx/oes-birger/pkg/util"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -51,15 +51,6 @@ func (s *agentTunnelServer) sendWebhook(state tunnelroute.Route, endpoints []*tu
 		Endpoints: eh,
 	}
 	hook.Send(req)
-}
-
-func (s *agentTunnelServer) makePingResponse(req *tunnel.PingRequest) *tunnel.MessageWrapper {
-	resp := &tunnel.MessageWrapper{
-		Event: &tunnel.MessageWrapper_PingResponse{
-			PingResponse: &tunnel.PingResponse{Ts: uint64(time.Now().UnixNano()), EchoedTs: req.Ts},
-		},
-	}
-	return resp
 }
 
 func (s *agentTunnelServer) handleHTTPRequests(session string, requestChan chan interface{}, httpids *util.SessionList, stream tunnel.AgentTunnelService_EventTunnelServer) {
@@ -99,7 +90,7 @@ func (s *agentTunnelServer) EventTunnel(stream tunnel.AgentTunnelService_EventTu
 		return err
 	}
 
-	sessionIdentity := ulidContext.Ulid()
+	sessionIdentity := ulid.GlobalContext.Ulid()
 
 	inRequest := make(chan interface{}, 1)
 	inCancelRequest := make(chan string, 1)
@@ -144,7 +135,7 @@ func (s *agentTunnelServer) EventTunnel(stream tunnel.AgentTunnelService_EventTu
 		case *tunnel.MessageWrapper_PingRequest:
 			req := in.GetPingRequest()
 			atomic.StoreUint64(&state.LastPing, tunnel.Now())
-			if err := stream.Send(s.makePingResponse(req)); err != nil {
+			if err := stream.Send(tunnel.MakePingResponse(req)); err != nil {
 				log.Printf("Unable to respond to %s with ping response: %v", state, err)
 				err2 := routes.RemoveRoute(state)
 				if err2 != nil {

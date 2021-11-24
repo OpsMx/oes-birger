@@ -27,6 +27,7 @@ import (
 	"os"
 	"runtime"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"golang.org/x/net/context"
@@ -38,6 +39,7 @@ import (
 	"github.com/opsmx/oes-birger/pkg/serviceconfig"
 	"github.com/opsmx/oes-birger/pkg/tunnel"
 	"github.com/opsmx/oes-birger/pkg/tunnelroute"
+	"github.com/opsmx/oes-birger/pkg/ulid"
 	"github.com/opsmx/oes-birger/pkg/updater"
 	"github.com/opsmx/oes-birger/pkg/util"
 )
@@ -98,14 +100,13 @@ func runTunnel(wg *sync.WaitGroup, sa *serverContext, conn *grpc.ClientConn, end
 		log.Fatalf("%v.EventTunnel(_) = _, %v", client, err)
 	}
 	pbEndpoints := serviceconfig.EndpointsToPB(endpoints)
-	helloMsg := &tunnel.AgentHello{
-		Version:   version.String(),
-		Endpoints: pbEndpoints,
-		Hostname:  hostname,
-	}
 	hello := &tunnel.MessageWrapper{
 		Event: &tunnel.MessageWrapper_AgentHello{
-			AgentHello: helloMsg,
+			AgentHello: &tunnel.AgentHello{
+				Version:   version.String(),
+				Endpoints: pbEndpoints,
+				Hostname:  hostname,
+			},
 		},
 	}
 	if err = stream.Send(hello); err != nil {
@@ -116,6 +117,24 @@ func runTunnel(wg *sync.WaitGroup, sa *serverContext, conn *grpc.ClientConn, end
 
 	go tickerPinger(stream)
 	go dataflowHandler(dataflow, stream)
+
+	sessionIdentity := ulid.GlobalContext.Ulid()
+
+	inRequest := make(chan interface{}, 1)
+	inCancelRequest := make(chan string, 1)
+	//httpids := util.MakeSessionList()
+
+	//go s.handleHTTPRequests(sessionIdentity, inRequest, httpids, stream)
+
+	//go s.handleHTTPCancelRequest(sessionIdentity, inCancelRequest, httpids, stream)
+
+	state := &tunnelroute.DirectlyConnectedRoute{
+		Name:            "controller",
+		Session:         sessionIdentity,
+		InRequest:       inRequest,
+		InCancelRequest: inCancelRequest,
+		ConnectedAt:     tunnel.Now(),
+	}
 
 	waitc := make(chan struct{})
 	go func() {
@@ -130,6 +149,35 @@ func runTunnel(wg *sync.WaitGroup, sa *serverContext, conn *grpc.ClientConn, end
 				log.Fatalf("Failed to receive a message: %T: %v", err, err)
 			}
 			switch x := in.Event.(type) {
+			case *tunnel.MessageWrapper_PingRequest:
+				req := in.GetPingRequest()
+				atomic.StoreUint64(&state.LastPing, tunnel.Now())
+				if err := stream.Send(tunnel.MakePingResponse(req)); err != nil {
+					log.Printf("Unable to respond to %s with ping response: %v", state, err)
+					err2 := routes.RemoveRoute(state)
+					if err2 != nil {
+						log.Printf("while removing agent: %v", err2)
+					}
+					close(waitc)
+					return
+				}
+			case *tunnel.MessageWrapper_AgentHello:
+				req := in.GetAgentHello()
+				endpoints := make([]tunnelroute.Endpoint, len(req.Endpoints))
+				for i, ep := range req.Endpoints {
+					endpoints[i] = tunnelroute.Endpoint{
+						Name:       ep.Name,
+						Type:       ep.Type,
+						Configured: ep.Configured,
+						Namespaces: ep.Namespaces,
+						AccountID:  ep.AccountID,
+						AssumeRole: ep.AssumeRole,
+					}
+				}
+				state.Endpoints = endpoints
+				state.Version = req.Version
+				state.Hostname = req.Hostname
+				routes.AddRoute(state)
 			case *tunnel.MessageWrapper_PingResponse:
 				continue
 			case *tunnel.MessageWrapper_HttpTunnelControl:

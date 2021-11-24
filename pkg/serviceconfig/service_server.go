@@ -28,6 +28,7 @@ import (
 	"github.com/opsmx/oes-birger/pkg/jwtutil"
 	"github.com/opsmx/oes-birger/pkg/tunnel"
 	"github.com/opsmx/oes-birger/pkg/tunnelroute"
+	"github.com/opsmx/oes-birger/pkg/ulid"
 	"github.com/opsmx/oes-birger/pkg/util"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
@@ -198,7 +199,7 @@ type apiHandlerState struct {
 
 func runAPIHandler(routes *tunnelroute.ConnectedRoutes, ep tunnelroute.Search, w http.ResponseWriter, r *http.Request) {
 	apiRequestCounter.WithLabelValues(ep.Name, ep.EndpointName).Inc()
-	transactionID := ulidContext.Ulid()
+	transactionID := ulid.GlobalContext.Ulid()
 
 	body, _ := ioutil.ReadAll(r.Body)
 	req := &tunnel.OpenHTTPTunnelRequest{

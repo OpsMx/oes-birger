@@ -14,8 +14,17 @@
  * limitations under the License.
  */
 
-package serviceconfig
+package tunnel
 
-import "github.com/opsmx/oes-birger/pkg/ulid"
+import "time"
 
-var ulidContext = ulid.NewContext()
+// MakePingResponse will format a response to a PingRequest, able to be sent directly over
+// the tunnel.
+func MakePingResponse(req *PingRequest) *MessageWrapper {
+	resp := &MessageWrapper{
+		Event: &MessageWrapper_PingResponse{
+			PingResponse: &PingResponse{Ts: uint64(time.Now().UnixNano()), EchoedTs: req.Ts},
+		},
+	}
+	return resp
+}
