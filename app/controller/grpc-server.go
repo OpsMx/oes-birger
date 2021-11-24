@@ -24,6 +24,7 @@ import (
 	"net"
 	"sync/atomic"
 
+	"github.com/opsmx/oes-birger/pkg/serviceconfig"
 	"github.com/opsmx/oes-birger/pkg/tunnel"
 	"github.com/opsmx/oes-birger/pkg/tunnelroute"
 	"github.com/opsmx/oes-birger/pkg/ulid"
@@ -53,7 +54,7 @@ func (s *agentTunnelServer) sendWebhook(state tunnelroute.Route, endpoints []*tu
 	hook.Send(req)
 }
 
-func (s *agentTunnelServer) handleHTTPRequests(session string, requestChan chan interface{}, httpids *util.SessionList, stream tunnel.AgentTunnelService_EventTunnelServer) {
+func handleHTTPRequests(session string, requestChan chan interface{}, httpids *util.SessionList, stream tunnel.GRPCEventStream) {
 	for interfacedRequest := range requestChan {
 		switch value := interfacedRequest.(type) {
 		case *tunnelroute.HTTPMessage:
@@ -62,7 +63,7 @@ func (s *agentTunnelServer) handleHTTPRequests(session string, requestChan chan 
 				Event: tunnel.MakeHTTPTunnelOpenTunnelRequest(value.Cmd),
 			}
 			if err := stream.Send(resp); err != nil {
-				log.Printf("Unable to send to agent %s for HTTP request %s", session, value.Cmd.Id)
+				log.Printf("Unable to send to route %s for HTTP request %s", session, value.Cmd.Id)
 			}
 		default:
 			log.Printf("Got unexpected message type: %T", interfacedRequest)
@@ -70,17 +71,25 @@ func (s *agentTunnelServer) handleHTTPRequests(session string, requestChan chan 
 	}
 }
 
-func (s *agentTunnelServer) handleHTTPCancelRequest(session string, cancelChan chan string, httpids *util.SessionList, stream tunnel.AgentTunnelService_EventTunnelServer) {
+func handleHTTPCancelRequest(session string, cancelChan chan string, httpids *util.SessionList, stream tunnel.GRPCEventStream) {
 	for id := range cancelChan {
 		httpids.Remove(id)
 		resp := &tunnel.MessageWrapper{
 			Event: tunnel.MakeHTTPTunnelCancelRequest(id),
 		}
 		if err := stream.Send(resp); err != nil {
-			log.Printf("Unable to send to agent %s for cancel request %s", session, id)
+			log.Printf("Unable to send to route %s for cancel request %s", session, id)
 		}
 	}
-	log.Printf("cancel channel closed for agent %s", session)
+	log.Printf("cancel channel closed for route %s", session)
+}
+
+func dataflowHandler(dataflow chan *tunnel.MessageWrapper, stream tunnel.GRPCEventStream) {
+	for ew := range dataflow {
+		if err := stream.Send(ew); err != nil {
+			log.Fatalf("Unable to respond over GRPC: %v", err)
+		}
+	}
 }
 
 // This runs in its own goroutine, one per GRPC connection from an agent.
@@ -89,6 +98,10 @@ func (s *agentTunnelServer) EventTunnel(stream tunnel.AgentTunnelService_EventTu
 	if err != nil {
 		return err
 	}
+
+	dataflow := make(chan *tunnel.MessageWrapper, 20)
+
+	go dataflowHandler(dataflow, stream)
 
 	sessionIdentity := ulid.GlobalContext.Ulid()
 
@@ -104,30 +117,24 @@ func (s *agentTunnelServer) EventTunnel(stream tunnel.AgentTunnelService_EventTu
 		ConnectedAt:     tunnel.Now(),
 	}
 
-	log.Printf("Agent %s connected, awaiting hello message", state)
+	log.Printf("Route %s connected, awaiting hello message", state)
 
-	go s.handleHTTPRequests(sessionIdentity, inRequest, httpids, stream)
+	go handleHTTPRequests(sessionIdentity, inRequest, httpids, stream)
 
-	go s.handleHTTPCancelRequest(sessionIdentity, inCancelRequest, httpids, stream)
+	go handleHTTPCancelRequest(sessionIdentity, inCancelRequest, httpids, stream)
 
 	for {
 		in, err := stream.Recv()
 		if err == io.EOF {
 			log.Printf("Closing %s", state)
 			httpids.CloseAll()
-			err2 := routes.Remove(state)
-			if err2 != nil {
-				log.Printf("while removing agent: %v", err2)
-			}
+			routes.Remove(state)
 			return nil
 		}
 		if err != nil {
 			log.Printf("Agent closed connection: %s", state)
 			httpids.CloseAll()
-			err2 := routes.Remove(state)
-			if err2 != nil {
-				log.Printf("while removing agent: %v", err2)
-			}
+			routes.Remove(state)
 			return err
 		}
 
@@ -137,10 +144,7 @@ func (s *agentTunnelServer) EventTunnel(stream tunnel.AgentTunnelService_EventTu
 			atomic.StoreUint64(&state.LastPing, tunnel.Now())
 			if err := stream.Send(tunnel.MakePingResponse(req)); err != nil {
 				log.Printf("Unable to respond to %s with ping response: %v", state, err)
-				err2 := routes.Remove(state)
-				if err2 != nil {
-					log.Printf("while removing agent: %v", err2)
-				}
+				routes.Remove(state)
 				return err
 			}
 		case *tunnel.MessageWrapper_AgentHello:
@@ -162,7 +166,7 @@ func (s *agentTunnelServer) EventTunnel(stream tunnel.AgentTunnelService_EventTu
 			routes.Add(state)
 			s.sendWebhook(state, req.Endpoints)
 		case *tunnel.MessageWrapper_HttpTunnelControl:
-			handleHTTPControl(x.HttpTunnelControl, state, httpids, in, agentIdentity)
+			handleHTTPControl(in, httpids, s.endpoints, dataflow)
 		case nil:
 			// ignore for now
 		default:
@@ -171,11 +175,27 @@ func (s *agentTunnelServer) EventTunnel(stream tunnel.AgentTunnelService_EventTu
 	}
 }
 
-func handleHTTPControl(httpControl *tunnel.HttpTunnelControl, state *tunnelroute.DirectlyConnectedRoute, httpids *util.SessionList, in *tunnel.MessageWrapper, agentIdentity string) {
-	switch controlMessage := httpControl.ControlType.(type) {
+func handleHTTPControl(in *tunnel.MessageWrapper, httpids *util.SessionList, endpoints []serviceconfig.ConfiguredEndpoint, dataflow chan *tunnel.MessageWrapper) {
+	tunnelControl := in.GetHttpTunnelControl() // caller ensures this will work
+	switch controlMessage := tunnelControl.ControlType.(type) {
+	case *tunnel.HttpTunnelControl_CancelRequest:
+		tunnel.CallCancelFunction(controlMessage.CancelRequest.Id)
+	case *tunnel.HttpTunnelControl_OpenHTTPTunnelRequest:
+		req := controlMessage.OpenHTTPTunnelRequest
+		found := false
+		for _, endpoint := range endpoints {
+			if endpoint.Configured && endpoint.Type == req.Type && endpoint.Name == req.Name {
+				go endpoint.Instance.ExecuteHTTPRequest(dataflow, req)
+				found = true
+				break
+			}
+		}
+		if !found {
+			log.Printf("Request for unsupported HTTP tunnel type=%s name=%s", req.Type, req.Name)
+			dataflow <- tunnel.MakeBadGatewayResponse(req.Id)
+		}
 	case *tunnel.HttpTunnelControl_HttpTunnelResponse:
 		resp := controlMessage.HttpTunnelResponse
-		atomic.StoreUint64(&state.LastUse, tunnel.Now())
 		httpids.Lock()
 		dest := httpids.Find(resp.Id)
 		if dest != nil {
@@ -184,12 +204,11 @@ func handleHTTPControl(httpControl *tunnel.HttpTunnelControl, state *tunnelroute
 				httpids.RemoveUnlocked(resp.Id)
 			}
 		} else {
-			log.Printf("Got response to unknown HTTP request id %s from %s", resp.Id, agentIdentity)
+			log.Printf("Got response to unknown HTTP request id %s", resp.Id)
 		}
 		httpids.Unlock()
 	case *tunnel.HttpTunnelControl_HttpTunnelChunkedResponse:
 		resp := controlMessage.HttpTunnelChunkedResponse
-		atomic.StoreUint64(&state.LastUse, tunnel.Now())
 		httpids.Lock()
 		dest := httpids.Find(resp.Id)
 		if dest != nil {
@@ -198,15 +217,19 @@ func handleHTTPControl(httpControl *tunnel.HttpTunnelControl, state *tunnelroute
 				httpids.RemoveUnlocked(resp.Id)
 			}
 		} else {
-			log.Printf("Got response to unknown HTTP request id %s from %s", resp.Id, state)
+			log.Printf("Got response to unknown HTTP request id %s", resp.Id)
 		}
 		httpids.Unlock()
+	case nil:
+		return
+	default:
+		log.Printf("Received unknown HttpControl type: %T", controlMessage)
 	}
-
 }
 
 type agentTunnelServer struct {
 	tunnel.UnimplementedAgentTunnelServiceServer
+	endpoints []serviceconfig.ConfiguredEndpoint
 }
 
 func newAgentServer() *agentTunnelServer {
@@ -231,6 +254,8 @@ func runAgentGRPCServer(serverCert tls.Certificate) {
 		MinVersion:   tls.VersionTLS13,
 	})
 	grpcServer := grpc.NewServer(grpc.Creds(creds))
+	server := newAgentServer()
+	server.endpoints = endpoints
 	tunnel.RegisterAgentTunnelServiceServer(grpcServer, newAgentServer())
 	if err := grpcServer.Serve(lis); err != nil {
 		log.Fatalf("Failed to start Agent GRPC server: %v", err)

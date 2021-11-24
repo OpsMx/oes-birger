@@ -18,6 +18,14 @@ package tunnel
 
 import "time"
 
+// GRPCEventStream is a generic placeholder for either a GRPC client or server which
+// handles the MessageWrapper type.  This allows generically defining a "send message of
+// subtype X" without caring if it's a client or server.
+type GRPCEventStream interface {
+	Send(*MessageWrapper) error
+	Recv() (*MessageWrapper, error)
+}
+
 // MakePingResponse will format a response to a PingRequest, able to be sent directly over
 // the tunnel.
 func MakePingResponse(req *PingRequest) *MessageWrapper {

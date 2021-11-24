@@ -66,6 +66,8 @@ var (
 	hook *webhook.Runner
 
 	routes = tunnelroute.MakeRoutes()
+
+	endpoints []serviceconfig.ConfiguredEndpoint
 )
 
 func getAgentNameFromContext(ctx context.Context) (string, error) {
@@ -240,6 +242,8 @@ func main() {
 	if err != nil {
 		log.Fatalf("Cannot make server certificate: %v", err)
 	}
+
+	endpoints = serviceconfig.ConfigureEndpoints(secretsLoader, &config.ServiceConfig)
 
 	cnc := cncserver.MakeCNCServer(config, authority, routes, jwtKeyset, jwtCurrentKey, version.String())
 	go cnc.RunServer(*serverCert)

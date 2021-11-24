@@ -108,20 +108,17 @@ func RunHTTPRequest(client *http.Client, req *OpenHTTPTunnelRequest, httpRequest
 	}
 
 	// First, send the headers.
-	resp := makeResponse(req.Id, httpResponse)
-	dataflow <- resp
+	dataflow <- makeResponse(req.Id, httpResponse)
 
 	// Now, send one or more data packet.
 	for {
 		buf := make([]byte, 10240)
 		n, err := httpResponse.Body.Read(buf)
 		if n > 0 {
-			resp := makeChunkedResponse(req.Id, buf[:n])
-			dataflow <- resp
+			dataflow <- makeChunkedResponse(req.Id, buf[:n])
 		}
 		if err == io.EOF {
-			resp := makeChunkedResponse(req.Id, emptyBytes)
-			dataflow <- resp
+			dataflow <- makeChunkedResponse(req.Id, emptyBytes)
 			return
 		}
 		if err == context.Canceled {
@@ -131,14 +128,13 @@ func RunHTTPRequest(client *http.Client, req *OpenHTTPTunnelRequest, httpRequest
 		if err != nil {
 			log.Printf("Got error on HTTP read: %v", err)
 			// todo: send an error message somehow.  For now, just send EOF
-			resp := makeChunkedResponse(req.Id, emptyBytes)
-			dataflow <- resp
+			dataflow <- makeChunkedResponse(req.Id, emptyBytes)
 			return
 		}
 	}
 }
 
-// MakeHTTPTunnelCancelRequest will make a wrapped request to cancel a specific
+// MakeHTTPTunnelCancelRequest will make a wrapped request to cancel a specific transaction id
 func MakeHTTPTunnelCancelRequest(id string) *MessageWrapper_HttpTunnelControl {
 	return &MessageWrapper_HttpTunnelControl{
 		HttpTunnelControl: &HttpTunnelControl{
