@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package main
+package serviceconfig
 
 import (
 	"crypto/tls"
@@ -23,12 +23,11 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/lestrrat-go/jwx/jwk"
 	"github.com/opsmx/oes-birger/pkg/ca"
 	"github.com/opsmx/oes-birger/pkg/jwtutil"
-	"github.com/opsmx/oes-birger/pkg/serviceconfig"
 	"github.com/opsmx/oes-birger/pkg/tunnel"
 	"github.com/opsmx/oes-birger/pkg/tunnelroute"
-	"github.com/opsmx/oes-birger/pkg/ulid"
 	"github.com/opsmx/oes-birger/pkg/util"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
@@ -36,19 +35,19 @@ import (
 )
 
 var (
-	ulidContext = ulid.NewContext()
-
 	// metrics
 	apiRequestCounter = promauto.NewCounterVec(prometheus.CounterOpts{
-		Name: "controller_api_requests_total",
+		Name: "api_requests_total",
 		Help: "The total number of API requests",
-	}, []string{"route"})
+	}, []string{"route", "service"})
 )
 
-func runHTTPSServer(serverCert tls.Certificate, service serviceconfig.IncomingServiceConfig) {
+// RunHTTPSServer will listen for incoming service requests on a provided port, and
+// currently will use certificates or JWT to identify the destination.
+func RunHTTPSServer(routes *tunnelroute.ConnectedRoutes, ca *ca.CA, serverCert tls.Certificate, keyset jwk.Set, service IncomingServiceConfig) {
 	log.Printf("Running service HTTPS listener on port %d", service.Port)
 
-	certPool, err := authority.MakeCertPool()
+	certPool, err := ca.MakeCertPool()
 	if err != nil {
 		log.Fatalf("While making certpool: %v", err)
 	}
@@ -62,7 +61,7 @@ func runHTTPSServer(serverCert tls.Certificate, service serviceconfig.IncomingSe
 
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("/", serviceAPIHandler)
+	mux.HandleFunc("/", secureAPIHandlerMaker(routes, service, keyset))
 
 	server := &http.Server{
 		Addr:      fmt.Sprintf(":%d", service.Port),
@@ -73,12 +72,14 @@ func runHTTPSServer(serverCert tls.Certificate, service serviceconfig.IncomingSe
 	log.Fatal(server.ListenAndServeTLS("", ""))
 }
 
-func runHTTPServer(service serviceconfig.IncomingServiceConfig) {
+// RunHTTPServer will listen on an unencrypted HTTP only port, and will always forward
+// incoming requests to the hard-coded configured destination.
+func RunHTTPServer(routes *tunnelroute.ConnectedRoutes, service IncomingServiceConfig) {
 	log.Printf("Running service HTTP listener on port %d", service.Port)
 
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("/", serviceAPIHandler)
+	mux.HandleFunc("/", fixedIdentityAPIHandlerMaker(routes, service))
 
 	server := &http.Server{
 		Addr:    fmt.Sprintf(":%d", service.Port),
@@ -86,6 +87,17 @@ func runHTTPServer(service serviceconfig.IncomingServiceConfig) {
 	}
 
 	log.Fatal(server.ListenAndServe())
+}
+
+func fixedIdentityAPIHandlerMaker(routes *tunnelroute.ConnectedRoutes, service IncomingServiceConfig) func(http.ResponseWriter, *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ep := tunnelroute.Search{
+			Name:         service.Destination,
+			EndpointType: service.ServiceType,
+			EndpointName: service.DestinationService,
+		}
+		runAPIHandler(routes, ep, w, r)
+	}
 }
 
 func extractEndpointFromCert(r *http.Request) (agentIdentity string, endpointType string, endpointName string, validated bool) {
@@ -106,7 +118,7 @@ func extractEndpointFromCert(r *http.Request) (agentIdentity string, endpointTyp
 	return names.Agent, names.Type, names.Name, true
 }
 
-func extractEndpointFromJWT(r *http.Request) (agentIdentity string, endpointType string, endpointName string, validated bool) {
+func extractEndpointFromJWT(r *http.Request, keyset jwk.Set) (agentIdentity string, endpointType string, endpointName string, validated bool) {
 	authPassword := r.Header.Get("X-Opsmx-Token")
 	r.Header.Del("X-Opsmx-Token")
 
@@ -117,7 +129,7 @@ func extractEndpointFromJWT(r *http.Request) (agentIdentity string, endpointType
 		}
 	}
 
-	endpointType, endpointName, agentIdentity, err := jwtutil.ValidateJWT(jwtKeyset, authPassword)
+	endpointType, endpointName, agentIdentity, err := jwtutil.ValidateJWT(keyset, authPassword)
 	if err != nil {
 		log.Printf("%v", err)
 		return "", "", "", false
@@ -126,13 +138,13 @@ func extractEndpointFromJWT(r *http.Request) (agentIdentity string, endpointType
 	return agentIdentity, endpointType, endpointName, true
 }
 
-func extractEndpoint(r *http.Request) (agentIdentity string, endpointType string, endpointName string, err error) {
+func extractEndpoint(r *http.Request, keyset jwk.Set) (agentIdentity string, endpointType string, endpointName string, err error) {
 	agentIdentity, endpointType, endpointName, found := extractEndpointFromCert(r)
 	if found {
 		return agentIdentity, endpointType, endpointName, nil
 	}
 
-	agentIdentity, endpointType, endpointName, found = extractEndpointFromJWT(r)
+	agentIdentity, endpointType, endpointName, found = extractEndpointFromJWT(r, keyset)
 	if found {
 		return agentIdentity, endpointType, endpointName, nil
 	}
@@ -140,18 +152,20 @@ func extractEndpoint(r *http.Request) (agentIdentity string, endpointType string
 	return "", "", "", fmt.Errorf("no valid credentials or JWT found")
 }
 
-func serviceAPIHandler(w http.ResponseWriter, r *http.Request) {
-	agentIdentity, endpointType, endpointName, err := extractEndpoint(r)
-	if err != nil {
-		util.FailRequest(w, err, http.StatusBadRequest)
-		return
+func secureAPIHandlerMaker(routes *tunnelroute.ConnectedRoutes, service IncomingServiceConfig, keyset jwk.Set) func(http.ResponseWriter, *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		agentIdentity, endpointType, endpointName, err := extractEndpoint(r, keyset)
+		if err != nil {
+			util.FailRequest(w, err, http.StatusBadRequest)
+			return
+		}
+		ep := tunnelroute.Search{
+			Name:         agentIdentity,
+			EndpointType: endpointType,
+			EndpointName: endpointName,
+		}
+		runAPIHandler(routes, ep, w, r)
 	}
-	ep := tunnelroute.Search{
-		Name:         agentIdentity,
-		EndpointType: endpointType,
-		EndpointName: endpointName,
-	}
-	runAPIHandler(ep, w, r)
 }
 
 func copyHeaders(resp *tunnel.HttpTunnelResponse, w http.ResponseWriter) {
@@ -165,7 +179,7 @@ func copyHeaders(resp *tunnel.HttpTunnelResponse, w http.ResponseWriter) {
 	}
 }
 
-func handleDone(n <-chan struct{}, state apiHandlerState, target tunnelroute.Search, id string) {
+func handleDone(n <-chan struct{}, routes *tunnelroute.ConnectedRoutes, state apiHandlerState, target tunnelroute.Search, id string) {
 	<-n
 	if state.cleanClose.IsNotSet() {
 		err := routes.Cancel(target, id)
@@ -182,9 +196,8 @@ type apiHandlerState struct {
 	cleanClose abool.AtomicBool
 }
 
-func runAPIHandler(ep tunnelroute.Search, w http.ResponseWriter, r *http.Request) {
-	apiRequestCounter.WithLabelValues(ep.Name).Inc()
-
+func runAPIHandler(routes *tunnelroute.ConnectedRoutes, ep tunnelroute.Search, w http.ResponseWriter, r *http.Request) {
+	apiRequestCounter.WithLabelValues(ep.Name, ep.EndpointName).Inc()
 	transactionID := ulidContext.Ulid()
 
 	body, _ := ioutil.ReadAll(r.Body)
@@ -207,7 +220,7 @@ func runAPIHandler(ep tunnelroute.Search, w http.ResponseWriter, r *http.Request
 
 	var handlerState apiHandlerState
 	notify := r.Context().Done()
-	go handleDone(notify, handlerState, ep, transactionID)
+	go handleDone(notify, routes, handlerState, ep, transactionID)
 
 	handlerState.flusher = w.(http.Flusher)
 	for {

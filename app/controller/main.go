@@ -39,6 +39,7 @@ import (
 	"github.com/opsmx/oes-birger/pkg/secrets"
 	"github.com/opsmx/oes-birger/pkg/serviceconfig"
 	"github.com/opsmx/oes-birger/pkg/tunnelroute"
+	"github.com/opsmx/oes-birger/pkg/ulid"
 	"github.com/opsmx/oes-birger/pkg/util"
 	"github.com/opsmx/oes-birger/pkg/webhook"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -66,6 +67,8 @@ var (
 	hook *webhook.Runner
 
 	routes = tunnelroute.MakeRoutes()
+
+	ulidContext = ulid.NewContext()
 )
 
 func getAgentNameFromContext(ctx context.Context) (string, error) {
@@ -247,7 +250,7 @@ func main() {
 	go runAgentGRPCServer(*serverCert)
 
 	// Always listen on our well-known port, and always use HTTPS for this one.
-	go runHTTPSServer(*serverCert, serviceconfig.IncomingServiceConfig{
+	go serviceconfig.RunHTTPSServer(routes, authority, *serverCert, jwtKeyset, serviceconfig.IncomingServiceConfig{
 		Name: "_services",
 		Port: config.ServiceListenPort,
 	})
@@ -255,9 +258,9 @@ func main() {
 	// Now, add all the others defined by our config.
 	for _, service := range config.ServiceConfig.IncomingServices {
 		if service.UseHTTP {
-			go runHTTPServer(service)
+			go serviceconfig.RunHTTPServer(routes, service)
 		} else {
-			go runHTTPSServer(*serverCert, service)
+			go serviceconfig.RunHTTPSServer(routes, authority, *serverCert, jwtKeyset, service)
 		}
 	}
 
