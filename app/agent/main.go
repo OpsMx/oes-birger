@@ -272,7 +272,7 @@ func main() {
 	wg.Add(1)
 	go runTunnel(&wg, sa, conn, endpoints)
 
-	log.Printf("Starting any local service listeners.")
+	log.Printf("Starting any local HTTP service listeners.")
 	for _, service := range agentServiceConfig.IncomingServices {
 		go runHTTPServer(service)
 	}

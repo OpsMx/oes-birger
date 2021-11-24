@@ -246,7 +246,7 @@ func main() {
 
 	go runAgentGRPCServer(*serverCert)
 
-	// Always listen on our well-known port.
+	// Always listen on our well-known port, and always use HTTPS for this one.
 	go runHTTPSServer(*serverCert, serviceconfig.IncomingServiceConfig{
 		Name: "_services",
 		Port: config.ServiceListenPort,
@@ -254,7 +254,11 @@ func main() {
 
 	// Now, add all the others defined by our config.
 	for _, service := range config.ServiceConfig.IncomingServices {
-		go runHTTPSServer(*serverCert, service)
+		if service.UseHTTP {
+			go runHTTPServer(service)
+		} else {
+			go runHTTPSServer(*serverCert, service)
+		}
 	}
 
 	runPrometheusHTTPServer(config.PrometheusListenPort)

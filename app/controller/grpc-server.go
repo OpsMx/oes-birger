@@ -223,9 +223,6 @@ func newAgentServer() *agentTunnelServer {
 }
 
 func runAgentGRPCServer(serverCert tls.Certificate) {
-	//
-	// Set up GRPC server
-	//
 	log.Printf("Starting Agent GRPC server on port %d...", config.AgentListenPort)
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", config.AgentListenPort))
 	if err != nil {

@@ -37,6 +37,7 @@ import (
 
 var (
 	ulidContext = ulid.NewContext()
+
 	// metrics
 	apiRequestCounter = promauto.NewCounterVec(prometheus.CounterOpts{
 		Name: "controller_api_requests_total",
@@ -70,6 +71,21 @@ func runHTTPSServer(serverCert tls.Certificate, service serviceconfig.IncomingSe
 	}
 
 	log.Fatal(server.ListenAndServeTLS("", ""))
+}
+
+func runHTTPServer(service serviceconfig.IncomingServiceConfig) {
+	log.Printf("Running service HTTP listener on port %d", service.Port)
+
+	mux := http.NewServeMux()
+
+	mux.HandleFunc("/", serviceAPIHandler)
+
+	server := &http.Server{
+		Addr:    fmt.Sprintf(":%d", service.Port),
+		Handler: mux,
+	}
+
+	log.Fatal(server.ListenAndServe())
 }
 
 func extractEndpointFromCert(r *http.Request) (agentIdentity string, endpointType string, endpointName string, validated bool) {
