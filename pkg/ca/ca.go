@@ -37,9 +37,6 @@ import (
 const (
 	defaultTLSCertificatePath = "/app/secrets/ca/tls.crt"
 	defaultTLSKeyPath         = "/app/secrets/ca/tls.key"
-
-	// OpsMxOIDValue is the name OID ending we add to store our JSON "claims"
-	OpsMxOIDValue = 0x6f706d78 // 31-bit max
 )
 
 // CertificateIssuer implements a generic CA
@@ -255,21 +252,16 @@ const (
 // GetCertificateNameFromCert extracts the CertificateName from the certificate, or returns
 // an error if not found.
 func GetCertificateNameFromCert(cert *x509.Certificate) (*CertificateName, error) {
-	for _, atv := range cert.Subject.Names {
-		if atv.Type.Equal([]int{2, 5, 4, OpsMxOIDValue}) {
-			var name CertificateName
-			value, ok := atv.Value.(string)
-			if !ok {
-				return nil, fmt.Errorf("cannot extract custom name from cert, unable to csast to string")
-			}
-			err := json.Unmarshal([]byte(value), &name)
-			if err != nil {
-				return nil, err
-			}
-			return &name, nil
-		}
+	if len(cert.Subject.OrganizationalUnit) < 1 {
+		return nil, fmt.Errorf("Subject OrganizationalUnit does not appear to be a JSON token")
 	}
-	return nil, fmt.Errorf("did not find custom name in cert")
+	ou := cert.Subject.OrganizationalUnit[0]
+	var name CertificateName
+	err := json.Unmarshal([]byte(ou), &name)
+	if err != nil {
+		return nil, err
+	}
+	return &name, nil
 }
 
 //
@@ -282,15 +274,12 @@ func (c *CA) GenerateCertificate(name CertificateName) (string, string, string, 
 	if err != nil {
 		return "", "", "", err
 	}
+	json := string(jsonName)
 	cert := &x509.Certificate{
 		SerialNumber: big.NewInt(now.UnixNano()),
 		Subject: pkix.Name{
-			ExtraNames: []pkix.AttributeTypeAndValue{
-				{
-					Type:  []int{2, 5, 4, OpsMxOIDValue},
-					Value: string(jsonName),
-				},
-			},
+			CommonName:         "OpsMX Tunnel",
+			OrganizationalUnit: []string{json},
 		},
 		NotBefore:   now,
 		NotAfter:    now.AddDate(1, 0, 0),

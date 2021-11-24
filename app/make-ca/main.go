@@ -67,7 +67,7 @@ func main() {
 	}
 
 	log.Printf("Writing controller-secrets.yaml")
-	f, err := os.OpenFile("controller-secrets.yaml", os.O_WRONLY|os.O_CREATE, 0600)
+	f, err := os.OpenFile("controller-secrets.yaml", os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
 		log.Panicf("%v", err)
 	}
@@ -108,13 +108,13 @@ func main() {
 	}
 
 	log.Printf("Writing control secret to control-cert.pem")
-	err = os.WriteFile("control-cert.pem", []byte(cert), 0600)
+	err = os.WriteFile("control-cert.pem", cert, 0600)
 	if err != nil {
 		log.Panicf("%v", err)
 	}
 
 	log.Printf("Writing control key to control-key.pem")
-	err = os.WriteFile("control-key.pem", []byte(key), 0600)
+	err = os.WriteFile("control-key.pem", key, 0600)
 	if err != nil {
 		log.Panicf("%v", err)
 	}

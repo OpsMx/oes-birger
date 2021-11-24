@@ -114,23 +114,13 @@ func stringEquals(t *testing.T, msg string, got string, want string) {
 var (
 	goodCert = x509.Certificate{
 		Subject: pkix.Name{
-			Names: []pkix.AttributeTypeAndValue{
-				{
-					Type:  []int{2, 5, 4, ca.OpsMxOIDValue},
-					Value: `{"purpose":"control"}`,
-				},
-			},
+			OrganizationalUnit: []string{`{"purpose":"control"}`},
 		},
 	}
 
 	wrongTypeCert = x509.Certificate{
 		Subject: pkix.Name{
-			Names: []pkix.AttributeTypeAndValue{
-				{
-					Type:  []int{2, 5, 4, ca.OpsMxOIDValue},
-					Value: `{"purpose":"xxx"}`,
-				},
-			},
+			OrganizationalUnit: []string{`{"purpose":"xxx"}`},
 		},
 	}
 
@@ -144,7 +134,7 @@ func TestCNCServer_authenticate(t *testing.T) {
 		cert   *x509.Certificate
 		want   bool
 	}{
-		{"GET", "GET", &invalidCert, false},   // missing special OID
+		{"GET", "GET", &invalidCert, false},   // missing special OU JSON
 		{"GET", "GET", &wrongTypeCert, false}, // wrong purpose
 		{"GET", "POST", &goodCert, false},     // method missmatch
 		{"GET", "GET", &goodCert, true},       // good!
