@@ -54,6 +54,7 @@ type agentConfig struct {
 
 type serviceAuthConfig struct {
 	CurrentKeyName string `yaml:"currentKeyName,omitempty"`
+	SecretsPath    string `yaml:"secretsPath,omitempty"`
 }
 
 // LoadConfig will load YAML configuration from the provided filename,
@@ -97,6 +98,10 @@ func LoadConfig(f io.Reader) (*ControllerConfig, error) {
 
 	if config.PrometheusListenPort == 0 {
 		config.PrometheusListenPort = 9102
+	}
+
+	if len(config.ServiceAuth.SecretsPath) == 0 {
+		config.ServiceAuth.SecretsPath = "/app/secrets/serviceAuth"
 	}
 
 	config.addAllHostnames()

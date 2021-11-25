@@ -68,6 +68,7 @@ func dataflowHandler(dataflow chan *tunnel.MessageWrapper, stream tunnel.GRPCEve
 		if err := stream.Send(ew); err != nil {
 			log.Fatalf("Unable to respond over GRPC: %v", err)
 		}
+		util.Debug("GRPC-SEND: %v", ew)
 	}
 }
 
@@ -134,6 +135,9 @@ func runTunnel(wg *sync.WaitGroup, sa *serverContext, conn *grpc.ClientConn, end
 				routes.Remove(state)
 				log.Fatalf("Failed to receive a message: %T: %v", err, err)
 			}
+
+			util.Debug("GRPC-RECV: %v", in)
+
 			switch x := in.Event.(type) {
 			case *tunnel.MessageWrapper_PingRequest:
 				req := in.GetPingRequest()

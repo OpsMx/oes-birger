@@ -45,15 +45,12 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
-const (
-	serviceAuthPath = "/app/secrets/serviceAuth"
-)
-
 var (
 	versionBuild = -1
 	version      = util.Versions{Major: 2, Minor: 2, Patch: 1, Build: versionBuild}
 
 	configFile = flag.String("configFile", "/app/config/config.yaml", "The file with the controller config")
+	debug      = flag.Bool("debug", false, "enable debugging")
 
 	jwtKeyset     = jwk.NewSet()
 	jwtCurrentKey string
@@ -149,7 +146,7 @@ func loadKeyset() {
 	}
 	jwtCurrentKey = config.ServiceAuth.CurrentKeyName
 
-	err := filepath.WalkDir(serviceAuthPath, func(path string, info fs.DirEntry, err error) error {
+	err := filepath.WalkDir(config.ServiceAuth.SecretsPath, func(path string, info fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -198,11 +195,12 @@ func parseConfig(filename string) (*ControllerConfig, error) {
 }
 
 func main() {
+	flag.Parse()
+
 	grpc.EnableTracing = true
+	util.Debugging = *debug
 
 	log.Printf("Controller version %s starting", version.String())
-
-	flag.Parse()
 
 	var err error
 
@@ -213,12 +211,13 @@ func main() {
 	config.Dump()
 
 	namespace, ok := os.LookupEnv("POD_NAMESPACE")
-	if !ok {
-		log.Fatalf("envar POD_NAMESPACE not set to the pod's namespace")
-	}
-	secretsLoader, err = secrets.MakeKubernetesSecretLoader(namespace)
-	if err != nil {
-		log.Fatal(err)
+	if ok {
+		secretsLoader, err = secrets.MakeKubernetesSecretLoader(namespace)
+		if err != nil {
+			log.Fatal(err)
+		}
+	} else {
+		log.Printf("POD_NAMESPACE not set.  Disabling Kubeernetes secret handling.")
 	}
 
 	loadKeyset()

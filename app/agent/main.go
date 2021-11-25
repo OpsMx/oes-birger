@@ -47,6 +47,7 @@ var (
 	tickTime   = flag.Int("tickTime", 30, "Time between sending Ping messages")
 	caCertFile = flag.String("caCertFile", "/app/config/ca.pem", "The file containing the CA certificate we will use to verify the controller's cert")
 	configFile = flag.String("configFile", "/app/config/config.yaml", "The file with the controller config")
+	debug      = flag.Bool("debug", false, "enable debugging")
 
 	config *agentConfig
 
@@ -84,7 +85,10 @@ func getHostname() string {
 }
 
 func main() {
+	flag.Parse()
+
 	grpc.EnableTracing = true
+	util.Debugging = *debug
 
 	log.Printf("Agent version %s starting", version.String())
 
@@ -96,8 +100,6 @@ func main() {
 		arg0hash = "unknown"
 	}
 	log.Printf("Binary hash: %s\n", arg0hash)
-
-	flag.Parse()
 
 	log.Printf("OS type: %s, CPU: %s, cores: %d", runtime.GOOS, runtime.GOARCH, runtime.NumCPU())
 

@@ -89,6 +89,7 @@ func dataflowHandler(dataflow chan *tunnel.MessageWrapper, stream tunnel.GRPCEve
 		if err := stream.Send(ew); err != nil {
 			log.Fatalf("Unable to respond over GRPC: %v", err)
 		}
+		util.Debug("GRPC-SEND: %v", ew)
 	}
 }
 
@@ -137,6 +138,8 @@ func (s *agentTunnelServer) EventTunnel(stream tunnel.AgentTunnelService_EventTu
 			routes.Remove(state)
 			return err
 		}
+
+		util.Debug("GRPC-RECV: %v", in)
 
 		switch x := in.Event.(type) {
 		case *tunnel.MessageWrapper_PingRequest:
