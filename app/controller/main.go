@@ -27,6 +27,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/peer"
@@ -197,6 +198,8 @@ func parseConfig(filename string) (*ControllerConfig, error) {
 }
 
 func main() {
+	grpc.EnableTracing = true
+
 	log.Printf("Controller version %s starting", version.String())
 
 	flag.Parse()

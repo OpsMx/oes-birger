@@ -84,6 +84,8 @@ func getHostname() string {
 }
 
 func main() {
+	grpc.EnableTracing = true
+
 	log.Printf("Agent version %s starting", version.String())
 
 	var err error
@@ -100,12 +102,13 @@ func main() {
 	log.Printf("OS type: %s, CPU: %s, cores: %d", runtime.GOOS, runtime.GOARCH, runtime.NumCPU())
 
 	namespace, ok := os.LookupEnv("POD_NAMESPACE")
-	if !ok {
-		log.Fatalf("envar POD_NAMESPACE not set to the pod's namespace")
-	}
-	secretsLoader, err = secrets.MakeKubernetesSecretLoader(namespace)
-	if err != nil {
-		log.Fatal(err)
+	if ok {
+		secretsLoader, err = secrets.MakeKubernetesSecretLoader(namespace)
+		if err != nil {
+			log.Fatal(err)
+		}
+	} else {
+		log.Printf("POD_NAMESPACE not set.  Disabling Kubeernetes secret handling.")
 	}
 
 	c, err := loadConfig(*configFile)

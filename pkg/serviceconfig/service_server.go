@@ -180,7 +180,7 @@ func copyHeaders(resp *tunnel.HttpTunnelResponse, w http.ResponseWriter) {
 	}
 }
 
-func handleDone(n <-chan struct{}, routes *tunnelroute.ConnectedRoutes, state apiHandlerState, target tunnelroute.Search, id string) {
+func handleDone(n <-chan struct{}, routes *tunnelroute.ConnectedRoutes, state *apiHandlerState, target tunnelroute.Search, id string) {
 	<-n
 	if state.cleanClose.IsNotSet() {
 		err := routes.Cancel(target, id)
@@ -219,7 +219,7 @@ func runAPIHandler(routes *tunnelroute.ConnectedRoutes, ep tunnelroute.Search, w
 	}
 	ep.Session = sessionID
 
-	var handlerState apiHandlerState
+	var handlerState *apiHandlerState = &apiHandlerState{}
 	notify := r.Context().Done()
 	go handleDone(notify, routes, handlerState, ep, transactionID)
 
@@ -246,7 +246,7 @@ func runAPIHandler(routes *tunnelroute.ConnectedRoutes, ep tunnelroute.Search, w
 	}
 }
 
-func handleTunnelControl(state apiHandlerState, tunnelControl *tunnel.HttpTunnelControl, w http.ResponseWriter, r *http.Request) {
+func handleTunnelControl(state *apiHandlerState, tunnelControl *tunnel.HttpTunnelControl, w http.ResponseWriter, r *http.Request) {
 	switch controlMessage := tunnelControl.ControlType.(type) {
 	case *tunnel.HttpTunnelControl_HttpTunnelResponse:
 		resp := controlMessage.HttpTunnelResponse

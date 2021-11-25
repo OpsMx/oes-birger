@@ -18,6 +18,7 @@ package serviceconfig
 
 import (
 	"fmt"
+	"log"
 	"strings"
 	"testing"
 )
@@ -193,6 +194,7 @@ func TestGenericEndpoint_loadKubernetesSecrets(t *testing.T) {
 	loader := &FakeSecretLoader{}
 
 	tests := []struct {
+		loader          *FakeSecretLoader
 		name            string
 		creds           genericEndpointCredentials
 		wantRawUsername string
@@ -201,6 +203,7 @@ func TestGenericEndpoint_loadKubernetesSecrets(t *testing.T) {
 		wantErr         string
 	}{
 		{
+			loader,
 			"credential type bogus",
 			genericEndpointCredentials{Type: "X", SecretName: "__t"},
 			"", "", "",
@@ -209,6 +212,7 @@ func TestGenericEndpoint_loadKubernetesSecrets(t *testing.T) {
 
 		// Type 'none'
 		{
+			loader,
 			"credential type none, secretName set",
 			genericEndpointCredentials{Type: "none", SecretName: "u__"},
 			"", "", "",
@@ -217,24 +221,28 @@ func TestGenericEndpoint_loadKubernetesSecrets(t *testing.T) {
 
 		// Type 'basic
 		{
+			loader,
 			"credential type basic, secretName missing",
 			genericEndpointCredentials{Type: "basic", SecretName: "missing"},
 			"", "", "",
 			"secret key not found",
 		},
 		{
+			loader,
 			"credential type basic, secretName has username",
 			genericEndpointCredentials{Type: "basic", SecretName: "u__"},
 			"", "", "",
 			"basic: password missing",
 		},
 		{
+			loader,
 			"credential type basic, secretName has password",
 			genericEndpointCredentials{Type: "basic", SecretName: "_p_"},
 			"", "", "",
 			"basic: username missing",
 		},
 		{
+			loader,
 			"credential type basic, secretName has username password",
 			genericEndpointCredentials{Type: "basic", SecretName: "up_"},
 			"foo", "bar", "",
@@ -243,16 +251,27 @@ func TestGenericEndpoint_loadKubernetesSecrets(t *testing.T) {
 
 		// Type 'bearer'
 		{
+			loader,
 			"credential type bearer, secretName has token",
 			genericEndpointCredentials{Type: "bearer", SecretName: "__t"},
 			"", "", "baz",
 			"",
 		},
 		{
+			loader,
 			"credential type bearer, secretName has no token",
 			genericEndpointCredentials{Type: "bearer", SecretName: "___"},
 			"", "", "",
 			"bearer: token missing in secret",
+		},
+
+		// nil loader
+		{
+			nil,
+			"nil loader",
+			genericEndpointCredentials{Type: "basic", SecretName: "up_"},
+			"", "", "",
+			"cannot load Kubernetes secrets from outside the cluster",
 		},
 	}
 	for _, tt := range tests {
@@ -265,7 +284,16 @@ func TestGenericEndpoint_loadKubernetesSecrets(t *testing.T) {
 					Credentials: tt.creds,
 				},
 			}
-			err := ep.loadKubernetesSecrets(loader)
+			log.Printf("loader: %v", loader)
+
+			// Without this dance, it seems Go will create an empty struct for us...
+			var err error
+			if tt.loader == nil {
+				err = ep.loadKubernetesSecrets(nil)
+			} else {
+				err = ep.loadKubernetesSecrets(tt.loader)
+			}
+
 			if tt.wantErr != "" {
 				if err == nil {
 					t.Errorf("GenericEndpoint.loadKubernetesSecrets() error = %v, wantErr %v", err, tt.wantErr)

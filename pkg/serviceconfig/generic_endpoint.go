@@ -109,6 +109,10 @@ func getItem(m *map[string][]byte, key string) ([]byte, bool) {
 }
 
 func (ep *GenericEndpoint) loadKubernetesSecrets(secretsLoader secrets.SecretLoader) error {
+	if secretsLoader == nil {
+		return fmt.Errorf("cannot load Kubernetes secrets from outside the cluster")
+	}
+
 	if ep.config.Credentials.Type == "none" || ep.config.Credentials.Type == "" {
 		return fmt.Errorf("none: secretName should not be set")
 	}

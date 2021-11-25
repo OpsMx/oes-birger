@@ -79,6 +79,9 @@ func ConfigureEndpoints(secretsLoader secrets.SecretLoader, serviceConfig *Servi
 			}
 			switch service.Type {
 			case "kubernetes":
+				if secretsLoader == nil {
+					log.Fatalf("kuberenetes is disabled, but a kubernetes service is configured.")
+				}
 				instance, configured, err = MakeKubernetesEndpoint(service.Name, config)
 			case "aws":
 				instance, configured, err = MakeAwsEndpoint(service.Name, config, secretsLoader)
