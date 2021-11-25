@@ -219,7 +219,7 @@ func runAPIHandler(routes *tunnelroute.ConnectedRoutes, ep tunnelroute.Search, w
 	}
 	ep.Session = sessionID
 
-	var handlerState *apiHandlerState = &apiHandlerState{}
+	var handlerState = &apiHandlerState{}
 	notify := r.Context().Done()
 	go handleDone(notify, routes, handlerState, ep, transactionID)
 
@@ -237,7 +237,9 @@ func runAPIHandler(routes *tunnelroute.ConnectedRoutes, ep tunnelroute.Search, w
 
 		switch x := in.Event.(type) {
 		case *tunnel.MessageWrapper_HttpTunnelControl:
-			handleTunnelControl(handlerState, x.HttpTunnelControl, w, r)
+			if handleTunnelControl(handlerState, x.HttpTunnelControl, w, r) {
+				return
+			}
 		case nil:
 			// ignore for now
 		default:
@@ -246,7 +248,7 @@ func runAPIHandler(routes *tunnelroute.ConnectedRoutes, ep tunnelroute.Search, w
 	}
 }
 
-func handleTunnelControl(state *apiHandlerState, tunnelControl *tunnel.HttpTunnelControl, w http.ResponseWriter, r *http.Request) {
+func handleTunnelControl(state *apiHandlerState, tunnelControl *tunnel.HttpTunnelControl, w http.ResponseWriter, r *http.Request) bool {
 	switch controlMessage := tunnelControl.ControlType.(type) {
 	case *tunnel.HttpTunnelControl_HttpTunnelResponse:
 		resp := controlMessage.HttpTunnelResponse
@@ -256,18 +258,18 @@ func handleTunnelControl(state *apiHandlerState, tunnelControl *tunnel.HttpTunne
 		w.WriteHeader(int(resp.Status))
 		if resp.ContentLength == 0 {
 			state.cleanClose.Set()
-			return
+			return true
 		}
 	case *tunnel.HttpTunnelControl_HttpTunnelChunkedResponse:
 		resp := controlMessage.HttpTunnelChunkedResponse
 		if !state.seenHeader {
 			log.Printf("Error: got ChunkedResponse before HttpResponse")
 			w.WriteHeader(http.StatusBadGateway)
-			return
+			return true
 		}
 		if len(resp.Body) == 0 {
 			state.cleanClose.Set()
-			return
+			return true
 		}
 		n, err := w.Write(resp.Body)
 		if err != nil {
@@ -275,14 +277,14 @@ func handleTunnelControl(state *apiHandlerState, tunnelControl *tunnel.HttpTunne
 			if !state.seenHeader {
 				w.WriteHeader(http.StatusBadGateway)
 			}
-			return
+			return true
 		}
 		if n != len(resp.Body) {
 			log.Printf("Error: did not write full message: %d of %d written", n, len(resp.Body))
 			if !state.seenHeader {
 				w.WriteHeader(http.StatusBadGateway)
 			}
-			return
+			return true
 		}
 		if state.isChunked {
 			state.flusher.Flush()
@@ -292,4 +294,5 @@ func handleTunnelControl(state *apiHandlerState, tunnelControl *tunnel.HttpTunne
 	default:
 		log.Printf("Received unknown HTTP control message: %T", controlMessage)
 	}
+	return false
 }

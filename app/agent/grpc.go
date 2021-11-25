@@ -203,7 +203,7 @@ func handleHTTPControl(in *tunnel.MessageWrapper, httpids *util.SessionList, end
 	case *tunnel.HttpTunnelControl_HttpTunnelResponse:
 		resp := controlMessage.HttpTunnelResponse
 		httpids.Lock()
-		dest := httpids.Find(resp.Id)
+		dest := httpids.FindUnlocked(resp.Id)
 		if dest != nil {
 			dest <- in
 			if resp.ContentLength == 0 {
@@ -216,7 +216,7 @@ func handleHTTPControl(in *tunnel.MessageWrapper, httpids *util.SessionList, end
 	case *tunnel.HttpTunnelControl_HttpTunnelChunkedResponse:
 		resp := controlMessage.HttpTunnelChunkedResponse
 		httpids.Lock()
-		dest := httpids.Find(resp.Id)
+		dest := httpids.FindUnlocked(resp.Id)
 		if dest != nil {
 			dest <- in
 			if len(resp.Body) == 0 {
