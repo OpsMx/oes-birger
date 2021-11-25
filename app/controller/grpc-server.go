@@ -168,6 +168,22 @@ func (s *agentTunnelServer) EventTunnel(stream tunnel.AgentTunnelService_EventTu
 			state.Hostname = req.Hostname
 			routes.Add(state)
 			s.sendWebhook(state, req.Endpoints)
+
+			// now, send our response hello
+			pbEndpoints := serviceconfig.EndpointsToPB(s.endpoints)
+			hello := &tunnel.MessageWrapper{
+				Event: &tunnel.MessageWrapper_AgentHello{
+					AgentHello: &tunnel.AgentHello{
+						Version:   version.String(),
+						Endpoints: pbEndpoints,
+						Hostname:  "controller",
+					},
+				},
+			}
+			if err = stream.Send(hello); err != nil {
+				log.Fatalf("Unable to send hello packet: %v", err)
+			}
+
 		case *tunnel.MessageWrapper_HttpTunnelControl:
 			handleHTTPControl(in, httpids, s.endpoints, dataflow)
 		case nil:
@@ -259,7 +275,7 @@ func runAgentGRPCServer(serverCert tls.Certificate) {
 	grpcServer := grpc.NewServer(grpc.Creds(creds))
 	server := newAgentServer()
 	server.endpoints = endpoints
-	tunnel.RegisterAgentTunnelServiceServer(grpcServer, newAgentServer())
+	tunnel.RegisterAgentTunnelServiceServer(grpcServer, server)
 	if err := grpcServer.Serve(lis); err != nil {
 		log.Fatalf("Failed to start Agent GRPC server: %v", err)
 	}
