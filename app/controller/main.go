@@ -18,6 +18,7 @@ package main
 
 import (
 	"context"
+	"crypto/x509"
 	"flag"
 	"fmt"
 	"io/fs"
@@ -47,7 +48,7 @@ import (
 
 var (
 	versionBuild = -1
-	version      = util.Versions{Major: 3, Minor: 0, Patch: 0, Build: versionBuild}
+	version      = util.Versions{Major: 3, Minor: 1, Patch: 0, Build: versionBuild}
 
 	configFile = flag.String("configFile", "/app/config/config.yaml", "The file with the controller config")
 	debug      = flag.Bool("debug", false, "enable debugging")
@@ -81,6 +82,18 @@ func getAgentNameFromContext(ctx context.Context) (string, error) {
 		return "", status.Error(codes.Unauthenticated, "could not verify peer certificate")
 	}
 	names, err := ca.GetCertificateNameFromCert(tlsAuth.State.VerifiedChains[0][0])
+	if err != nil {
+		return "", err
+	}
+	if names.Purpose != ca.CertificatePurposeAgent {
+		return "", fmt.Errorf("not an agent certificate")
+	}
+	return names.Agent, nil
+}
+
+func getAgentNameFromCertificate(cert *x509.Certificate) (string, error) {
+	// TODO: should verify the certificate here...
+	names, err := ca.GetCertificateNameFromCert(cert)
 	if err != nil {
 		return "", err
 	}
@@ -250,7 +263,7 @@ func main() {
 	cnc := cncserver.MakeCNCServer(config, authority, routes, jwtKeyset, jwtCurrentKey, version.String())
 	go cnc.RunServer(*serverCert)
 
-	go runAgentGRPCServer(*serverCert)
+	go runAgentGRPCServer(config.InsecureAgentConnections, *serverCert)
 
 	// Always listen on our well-known port, and always use HTTPS for this one.
 	go serviceconfig.RunHTTPSServer(routes, authority, *serverCert, jwtKeyset, serviceconfig.IncomingServiceConfig{

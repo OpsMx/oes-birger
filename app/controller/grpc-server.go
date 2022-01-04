@@ -18,6 +18,7 @@ package main
 
 import (
 	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"io"
 	"log"
@@ -29,6 +30,7 @@ import (
 	"github.com/opsmx/oes-birger/pkg/tunnelroute"
 	"github.com/opsmx/oes-birger/pkg/ulid"
 	"github.com/opsmx/oes-birger/pkg/util"
+	"github.com/soheilhy/cmux"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 )
@@ -95,9 +97,14 @@ func dataflowHandler(dataflow chan *tunnel.MessageWrapper, stream tunnel.GRPCEve
 
 // This runs in its own goroutine, one per GRPC connection from an agent.
 func (s *agentTunnelServer) EventTunnel(stream tunnel.AgentTunnelService_EventTunnelServer) error {
-	agentIdentity, err := getAgentNameFromContext(stream.Context())
-	if err != nil {
-		return err
+	var agentIdentity string
+
+	if !s.insecure {
+		var err error
+		agentIdentity, err = getAgentNameFromContext(stream.Context())
+		if err != nil {
+			return err
+		}
 	}
 
 	dataflow := make(chan *tunnel.MessageWrapper, 20)
@@ -150,8 +157,20 @@ func (s *agentTunnelServer) EventTunnel(stream tunnel.AgentTunnelService_EventTu
 				routes.Remove(state)
 				return err
 			}
-		case *tunnel.MessageWrapper_AgentHello:
-			req := in.GetAgentHello()
+		case *tunnel.MessageWrapper_Hello:
+			req := in.GetHello()
+			if s.insecure {
+				cert, err := x509.ParseCertificate(req.ClientCertificate)
+				if err != nil {
+					return err
+				}
+				agentIdentity, err = getAgentNameFromCertificate(cert)
+				if err != nil {
+					return err
+				}
+			}
+			// TODO: check if a client certificate is presented here, and if so, open it up and
+			// examine it.
 			endpoints := make([]tunnelroute.Endpoint, len(req.Endpoints))
 			for i, ep := range req.Endpoints {
 				endpoints[i] = tunnelroute.Endpoint{
@@ -172,8 +191,8 @@ func (s *agentTunnelServer) EventTunnel(stream tunnel.AgentTunnelService_EventTu
 			// now, send our response hello
 			pbEndpoints := serviceconfig.EndpointsToPB(s.endpoints)
 			hello := &tunnel.MessageWrapper{
-				Event: &tunnel.MessageWrapper_AgentHello{
-					AgentHello: &tunnel.AgentHello{
+				Event: &tunnel.MessageWrapper_Hello{
+					Hello: &tunnel.Hello{
 						Version:   version.String(),
 						Endpoints: pbEndpoints,
 						Hostname:  "controller",
@@ -249,34 +268,50 @@ func handleHTTPControl(in *tunnel.MessageWrapper, httpids *util.SessionList, end
 type agentTunnelServer struct {
 	tunnel.UnimplementedAgentTunnelServiceServer
 	endpoints []serviceconfig.ConfiguredEndpoint
+	insecure  bool
 }
 
-func newAgentServer() *agentTunnelServer {
-	return &agentTunnelServer{}
+func newAgentServer(insecure bool) *agentTunnelServer {
+	return &agentTunnelServer{insecure: insecure}
 }
 
-func runAgentGRPCServer(serverCert tls.Certificate) {
+func runAgentGRPCServer(insecureAgents bool, serverCert tls.Certificate) {
 	log.Printf("Starting Agent GRPC server on port %d...", config.AgentListenPort)
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", config.AgentListenPort))
 	if err != nil {
 		log.Fatalf("Failed to listen: %v", err)
 	}
 
-	certPool, err := authority.MakeCertPool()
-	if err != nil {
-		log.Fatalf("While making certpool: %v", err)
-	}
-	creds := credentials.NewTLS(&tls.Config{
-		ClientCAs:    certPool,
-		ClientAuth:   tls.RequireAndVerifyClientCert,
-		Certificates: []tls.Certificate{serverCert},
-		MinVersion:   tls.VersionTLS13,
-	})
-	grpcServer := grpc.NewServer(grpc.Creds(creds))
-	server := newAgentServer()
-	server.endpoints = endpoints
-	tunnel.RegisterAgentTunnelServiceServer(grpcServer, server)
-	if err := grpcServer.Serve(lis); err != nil {
-		log.Fatalf("Failed to start Agent GRPC server: %v", err)
+	if insecureAgents {
+		m := cmux.New(lis)
+		grpcL := m.MatchWithWriters(cmux.HTTP2MatchHeaderFieldSendSettings("content-type", "application/grpc"))
+
+		grpcServer := grpc.NewServer()
+		server := newAgentServer(insecureAgents)
+		server.endpoints = endpoints
+		tunnel.RegisterAgentTunnelServiceServer(grpcServer, server)
+
+		go grpcServer.Serve(grpcL)
+
+		m.Serve()
+	} else {
+		certPool, err := authority.MakeCertPool()
+		if err != nil {
+			log.Fatalf("While making certpool: %v", err)
+		}
+		creds := credentials.NewTLS(&tls.Config{
+			ClientCAs:    certPool,
+			ClientAuth:   tls.RequireAndVerifyClientCert,
+			Certificates: []tls.Certificate{serverCert},
+			MinVersion:   tls.VersionTLS13,
+		})
+		opts := []grpc.ServerOption{grpc.Creds(creds)}
+		grpcServer := grpc.NewServer(opts...)
+		server := newAgentServer(insecureAgents)
+		server.endpoints = endpoints
+		tunnel.RegisterAgentTunnelServiceServer(grpcServer, server)
+		if err := grpcServer.Serve(lis); err != nil {
+			log.Fatalf("Failed to start Agent GRPC server: %v", err)
+		}
 	}
 }

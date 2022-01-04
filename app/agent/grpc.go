@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/tls"
 	"io"
 	"log"
 	"sync"
@@ -72,7 +73,7 @@ func dataflowHandler(dataflow chan *tunnel.MessageWrapper, stream tunnel.GRPCEve
 	}
 }
 
-func runTunnel(wg *sync.WaitGroup, sa *serverContext, conn *grpc.ClientConn, endpoints []serviceconfig.ConfiguredEndpoint) {
+func runTunnel(wg *sync.WaitGroup, sa *serverContext, conn *grpc.ClientConn, endpoints []serviceconfig.ConfiguredEndpoint, insecure bool, clcert tls.Certificate) {
 	defer wg.Done()
 
 	client := tunnel.NewAgentTunnelServiceClient(conn)
@@ -84,11 +85,12 @@ func runTunnel(wg *sync.WaitGroup, sa *serverContext, conn *grpc.ClientConn, end
 	}
 	pbEndpoints := serviceconfig.EndpointsToPB(endpoints)
 	hello := &tunnel.MessageWrapper{
-		Event: &tunnel.MessageWrapper_AgentHello{
-			AgentHello: &tunnel.AgentHello{
-				Version:   version.String(),
-				Endpoints: pbEndpoints,
-				Hostname:  hostname,
+		Event: &tunnel.MessageWrapper_Hello{
+			Hello: &tunnel.Hello{
+				Version:           version.String(),
+				Endpoints:         pbEndpoints,
+				Hostname:          hostname,
+				ClientCertificate: clcert.Certificate[0],
 			},
 		},
 	}
@@ -148,8 +150,8 @@ func runTunnel(wg *sync.WaitGroup, sa *serverContext, conn *grpc.ClientConn, end
 					close(waitc)
 					return
 				}
-			case *tunnel.MessageWrapper_AgentHello:
-				req := in.GetAgentHello()
+			case *tunnel.MessageWrapper_Hello:
+				req := in.GetHello()
 				endpoints := make([]tunnelroute.Endpoint, len(req.Endpoints))
 				for i, ep := range req.Endpoints {
 					endpoints[i] = tunnelroute.Endpoint{

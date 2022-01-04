@@ -72,10 +72,11 @@ message EndpointHealth {
     string assumeRole = 6; // AWS
 }
 
-message AgentHello {
+message Hello {
     repeated EndpointHealth endpoints = 1;
     string version = 2;
     string hostname = 3;
+    bytes clientCertificate = 4; // used when we can't terminate SSL directly
 }
 
 message HttpTunnelControl {
@@ -92,7 +93,7 @@ message MessageWrapper {
     oneof event {
         PingRequest pingRequest = 1;
         PingResponse pingResponse = 2;
-        AgentHello agentHello = 3;
+        Hello hello = 3;
         HttpTunnelControl httpTunnelControl = 4;
     }
 }

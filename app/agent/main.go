@@ -42,7 +42,7 @@ import (
 
 var (
 	versionBuild = -1
-	version      = util.Versions{Major: 3, Minor: 0, Patch: 0, Build: versionBuild}
+	version      = util.Versions{Major: 3, Minor: 1, Patch: 0, Build: versionBuild}
 
 	tickTime   = flag.Int("tickTime", 30, "Time between sending Ping messages")
 	caCertFile = flag.String("caCertFile", "/app/config/ca.pem", "The file containing the CA certificate we will use to verify the controller's cert")
@@ -150,6 +150,10 @@ func main() {
 		grpc.WithBlock(),
 	}
 
+	if config.InsecureControllerAllowed {
+		opts = append(opts, grpc.WithInsecure())
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -163,7 +167,7 @@ func main() {
 
 	log.Printf("Starting GRPC tunnel.")
 	wg.Add(1)
-	go runTunnel(&wg, sa, conn, endpoints)
+	go runTunnel(&wg, sa, conn, endpoints, config.InsecureControllerAllowed, clcert)
 
 	log.Printf("Starting any local HTTP service listeners.")
 	for _, service := range agentServiceConfig.IncomingServices {

@@ -32,11 +32,12 @@ const (
 // configuration file is loaded from disk first, and then any
 // environment variables are applied.
 type agentConfig struct {
-	ControllerHostname string  `yaml:"controllerHostname,omitempty"`
-	CACert64           *string `yaml:"caCert64,omitempty"`
-	CertFile           string  `yaml:"certFile,omitempty"`
-	KeyFile            string  `yaml:"keyFile,omitempty"`
-	ServicesConfigPath string  `yaml:"servicesConfigPath,omitempty"`
+	ControllerHostname        string  `yaml:"controllerHostname,omitempty"`
+	CACert64                  *string `yaml:"caCert64,omitempty"`
+	CertFile                  string  `yaml:"certFile,omitempty"`
+	KeyFile                   string  `yaml:"keyFile,omitempty"`
+	ServicesConfigPath        string  `yaml:"servicesConfigPath,omitempty"`
+	InsecureControllerAllowed bool    `yaml:"insecureControllerAllowed,omitempty"`
 }
 
 func (c *agentConfig) applyDefaults() {

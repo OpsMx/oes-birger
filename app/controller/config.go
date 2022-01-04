@@ -32,20 +32,21 @@ import (
 // configuration file is loaded from disk first, and then any
 // environment variables are applied.
 type ControllerConfig struct {
-	Agents               map[string]*agentConfig     `yaml:"agents,omitempty"`
-	ServiceAuth          serviceAuthConfig           `yaml:"serviceAuth,omitempty"`
-	Webhook              string                      `yaml:"webhook,omitempty"`
-	ServerNames          []string                    `yaml:"serverNames,omitempty"`
-	CAConfig             ca.Config                   `yaml:"caConfig,omitempty"`
-	PrometheusListenPort uint16                      `yaml:"prometheusListenPort"`
-	ServiceHostname      *string                     `yaml:"serviceHostname"`
-	ServiceListenPort    uint16                      `yaml:"serviceListenPort"`
-	ControlHostname      *string                     `yaml:"controlHostname"`
-	ControlListenPort    uint16                      `yaml:"controlListenPort"`
-	AgentHostname        *string                     `yaml:"agentHostname"`
-	AgentListenPort      uint16                      `yaml:"agentListenPort"`
-	AgentAdvertisePort   uint16                      `yaml:"agentAdvertisePort"`
-	ServiceConfig        serviceconfig.ServiceConfig `yaml:"services,omitempty"`
+	Agents                   map[string]*agentConfig     `yaml:"agents,omitempty"`
+	ServiceAuth              serviceAuthConfig           `yaml:"serviceAuth,omitempty"`
+	Webhook                  string                      `yaml:"webhook,omitempty"`
+	ServerNames              []string                    `yaml:"serverNames,omitempty"`
+	CAConfig                 ca.Config                   `yaml:"caConfig,omitempty"`
+	PrometheusListenPort     uint16                      `yaml:"prometheusListenPort"`
+	ServiceHostname          *string                     `yaml:"serviceHostname"`
+	ServiceListenPort        uint16                      `yaml:"serviceListenPort"`
+	ControlHostname          *string                     `yaml:"controlHostname"`
+	ControlListenPort        uint16                      `yaml:"controlListenPort"`
+	AgentHostname            *string                     `yaml:"agentHostname"`
+	AgentListenPort          uint16                      `yaml:"agentListenPort"`
+	AgentAdvertisePort       uint16                      `yaml:"agentAdvertisePort"`
+	ServiceConfig            serviceconfig.ServiceConfig `yaml:"services,omitempty"`
+	InsecureAgentConnections bool                        `yanl:"insecureAgentConnections,omitempty"`
 }
 
 type agentConfig struct {
