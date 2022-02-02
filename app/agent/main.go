@@ -110,7 +110,7 @@ func main() {
 			log.Fatal(err)
 		}
 	} else {
-		log.Printf("POD_NAMESPACE not set.  Disabling Kubeernetes secret handling.")
+		log.Printf("POD_NAMESPACE not set.  Disabling Kubernetes secret handling.")
 	}
 
 	c, err := loadConfig(*configFile)
