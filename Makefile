@@ -98,7 +98,7 @@ buildtime/%-ma.ts:: ${all_deps} Dockerfile.multi
 images: $(addsuffix .ts, $(addprefix buildtime/,$(IMAGE_TARGETS)))
 
 buildtime/%.ts:: buildtime ${all_deps} Dockerfile
-	docker build \
+	docker build --pull \
 		--tag ${IMAGE_PREFIX}forwarder-$(patsubst %.ts,%,$(@F)):latest \
 		--tag ${IMAGE_PREFIX}forwarder-$(patsubst %.ts,%,$(@F)):v${now} \
 		--target $(patsubst %.ts,%,$(@F))-image \
