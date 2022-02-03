@@ -221,6 +221,13 @@ func (s *CNCServer) generateServiceCredentials() http.HandlerFunc {
 			util.FailRequest(w, err, http.StatusBadRequest)
 			return
 		}
+		// TODO: remove in a future version, once sapor updates to using the proper capitalization.
+		if len(req.Type) == 0 {
+			req.Type = req.OldType
+		}
+		if len(req.Name) == 0 {
+			req.Name = req.OldName
+		}
 
 		err = req.Validate()
 		if err != nil {

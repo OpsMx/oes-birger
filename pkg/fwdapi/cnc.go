@@ -84,6 +84,8 @@ type ServiceCredentialRequest struct {
 	AgentName string `json:"agentName,omitempty"`
 	Type      string `json:"type,omitempty"`
 	Name      string `json:"name,omitempty"`
+	OldType   string `json:"Type,omitempty"` // depricated
+	OldName   string `json:"Name,omitempty"` // depricated
 }
 
 //
