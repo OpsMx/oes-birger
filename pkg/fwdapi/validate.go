@@ -27,9 +27,9 @@ func namePresent(n string) bool {
 	return n != ""
 }
 
-// TypeValid ensures type is valid, that is, lowercase alpha only
+// TypeValid ensures type is valid, that is, lowercase alphanumeric only
 func typeValid(n string) bool {
-	matched, err := regexp.MatchString("^[a-z]+$", n)
+	matched, err := regexp.MatchString("^[a-z0-9]+$", n)
 	if err != nil {
 		// TODO: handle this better
 		log.Printf("matching service type: %v", err)
