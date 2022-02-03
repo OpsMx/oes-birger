@@ -131,15 +131,15 @@ func ValidateCACert(certbytes []byte) error {
 	if err != nil {
 		return fmt.Errorf("failed to parse certificate: %v", err)
 	}
-	log.Printf("CA loaded, CommonName %s, expires %v", pc.Subject.CommonName, pc.NotAfter)
+	log.Printf("CA loaded, Issuer %s, expires %v", pc.Issuer.CommonName, pc.NotAfter)
 	if !pc.IsCA {
 		return fmt.Errorf("CA certificate does not appear to be a proper CA (!IsCA)")
 	}
 	now := time.Now()
-	if pc.NotAfter.After(now) {
+	if pc.NotAfter.Before(now) {
 		return fmt.Errorf("CA certificate has expired (NotAfter %v)", pc.NotAfter)
 	}
-	if pc.NotBefore.Before(now) {
+	if pc.NotBefore.After(now) {
 		return fmt.Errorf("CA certificate has not started yet (NotBefore %v)", pc.NotBefore)
 	}
 	return nil
