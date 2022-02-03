@@ -158,7 +158,6 @@ func (s *ConnectedRoutes) findService(ep Search) (Route, error) {
 	}
 	possibleRoutes := []int{}
 	for i, a := range routeList {
-		log.Printf("Looking at: %v", a.GetEndpoints())
 		if a.HasEndpoint(ep.EndpointType, ep.EndpointName) {
 			possibleRoutes = append(possibleRoutes, i)
 		}
