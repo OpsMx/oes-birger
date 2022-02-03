@@ -165,6 +165,7 @@ func main() {
 
 	opts := []grpc.DialOption{
 		grpc.WithBlock(),
+		grpc.WithReturnConnectionError(),
 	}
 
 	if config.InsecureControllerAllowed {

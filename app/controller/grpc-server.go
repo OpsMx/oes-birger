@@ -293,7 +293,9 @@ func runAgentGRPCServer(insecureAgents bool, serverCert tls.Certificate) {
 
 		go grpcServer.Serve(grpcL)
 
-		m.Serve()
+		if err := m.Serve(); err != nil {
+			log.Fatalf("Failed to run m.Serve(): %v", err)
+		}
 	} else {
 		certPool, err := authority.MakeCertPool()
 		if err != nil {
