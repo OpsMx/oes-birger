@@ -42,7 +42,7 @@ type httpRequestProcessor interface {
 }
 
 func (e *ConfiguredEndpoint) String() string {
-	return fmt.Sprintf("(%s, %s, %v)", e.Type, e.Name, e.Configured)
+	return fmt.Sprintf("(type=%s, name=%s, configured=%v)", e.Type, e.Name, e.Configured)
 }
 
 // EndpointsToPB builds the protobuf component of the "hello" message to advertise the
