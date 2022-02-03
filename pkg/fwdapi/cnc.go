@@ -82,8 +82,8 @@ type StatisticsResponse struct {
 //
 type ServiceCredentialRequest struct {
 	AgentName string `json:"agentName,omitempty"`
-	Type      string `json:"Type,omitempty"`
-	Name      string `json:"Name,omitempty"`
+	Type      string `json:"type,omitempty"`
+	Name      string `json:"name,omitempty"`
 }
 
 //
