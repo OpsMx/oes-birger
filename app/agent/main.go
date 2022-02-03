@@ -156,10 +156,10 @@ func main() {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-
-	conn, err := grpc.DialContext(ctx, config.ControllerHostname, opts...)
+	grpcTarget := "dns://" + config.ControllerHostname
+	conn, err := grpc.DialContext(ctx, grpcTarget, opts...)
 	if err != nil {
-		log.Fatalf("Could not connect: %v", err)
+		log.Fatalf("Could not establish GRPC connection to %s: %v", grpcTarget, err)
 	}
 	defer conn.Close()
 
