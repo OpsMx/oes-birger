@@ -24,6 +24,7 @@ import "log"
 // Debugging set to true will cause additional logging.
 var Debugging = false
 
+// Debug will print what it's passed, but only if Debugging is true.
 func Debug(f string, v ...interface{}) {
 	if Debugging {
 		log.Printf(f, v...)
