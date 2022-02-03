@@ -131,7 +131,9 @@ func ValidateCACert(certbytes []byte) error {
 	if err != nil {
 		return fmt.Errorf("failed to parse certificate: %v", err)
 	}
-	log.Printf("CA loaded, Issuer %s, expires %v", pc.Issuer.CommonName, pc.NotAfter)
+	if len(pc.Subject.Organization) > 0 {
+		log.Printf("CA loaded, %s, expires %v", pc.Subject.Organization[0], pc.NotAfter)
+	}
 	if !pc.IsCA {
 		return fmt.Errorf("CA certificate does not appear to be a proper CA (!IsCA)")
 	}
@@ -172,8 +174,8 @@ func MakeCertificateAuthority() ([]byte, []byte, error) {
 	rootTemplate := &x509.Certificate{
 		SerialNumber: big.NewInt(now.UnixNano()),
 		Subject: pkix.Name{
-			Organization: []string{"OpsMX API Forwarder CA"},
-			Country:      []string{"DF"},
+			Organization: []string{"OpsMx API Forwarder CA"},
+			Country:      []string{"US"},
 		},
 		NotBefore:             now.Add(-10 * time.Second),
 		NotAfter:              now.AddDate(10, 0, 0),
@@ -228,8 +230,8 @@ func (c *CA) MakeServerCert(names []string) (*tls.Certificate, error) {
 	certTemplate := &x509.Certificate{
 		SerialNumber: big.NewInt(now.UnixNano()),
 		Subject: pkix.Name{
-			Organization: []string{"OpsMX API Forwarder"},
-			Country:      []string{"DF"},
+			Organization: []string{"OpsMx API Forwarder Server Certificate"},
+			Country:      []string{"US"},
 		},
 		NotBefore:   now.Add(-10 * time.Second),
 		NotAfter:    now.AddDate(1, 0, 0),
@@ -305,10 +307,12 @@ func (c *CA) GenerateCertificate(name CertificateName) (string, string, string, 
 		return "", "", "", err
 	}
 	json := string(jsonName)
+	orgName := fmt.Sprintf("OpsMx Tunnel Certificate: %s-%s-%s", name.Agent, name.Name, name.Type)
 	cert := &x509.Certificate{
 		SerialNumber: big.NewInt(now.UnixNano()),
 		Subject: pkix.Name{
-			CommonName:         "OpsMX Tunnel",
+			CommonName:         orgName,
+			Organization:       []string{orgName},
 			OrganizationalUnit: []string{json},
 		},
 		NotBefore:   now,
