@@ -48,7 +48,7 @@ import (
 
 var (
 	versionBuild = -1
-	version      = util.Versions{Major: 3, Minor: 1, Patch: 0, Build: versionBuild}
+	version      = util.Versions{Major: 3, Minor: 1, Patch: 1, Build: versionBuild}
 
 	configFile = flag.String("configFile", "/app/config/config.yaml", "The file with the controller config")
 	debug      = flag.Bool("debug", false, "enable debugging")
