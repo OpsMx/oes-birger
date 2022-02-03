@@ -20,6 +20,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/base64"
+	"encoding/pem"
 	"flag"
 	"io/ioutil"
 	"log"
@@ -33,6 +34,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 
+	"github.com/opsmx/oes-birger/pkg/ca"
 	"github.com/opsmx/oes-birger/pkg/secrets"
 	"github.com/opsmx/oes-birger/pkg/serviceconfig"
 	"github.com/opsmx/oes-birger/pkg/tunnelroute"
@@ -60,7 +62,7 @@ var (
 	routes = tunnelroute.MakeRoutes()
 )
 
-func loadCert() []byte {
+func loadCACertPEM() []byte {
 	cert, err := ioutil.ReadFile(*caCertFile)
 	if err == nil {
 		return cert
@@ -73,6 +75,22 @@ func loadCert() []byte {
 		log.Fatal("Unable to decode CA cert base64 from config")
 	}
 	return cert
+}
+
+func loadCACert() []byte {
+	certPEM := loadCACertPEM()
+
+	block, _ := pem.Decode([]byte(certPEM))
+	if block == nil {
+		log.Fatal("failed to parse certificate PEM")
+	}
+
+	err := ca.ValidateCACert(block.Bytes)
+	if err != nil {
+		log.Fatalf("Bad CA cert: %v", err)
+	}
+
+	return certPEM
 }
 
 func getHostname() string {
@@ -133,8 +151,8 @@ func main() {
 		log.Fatalf("Unable to load agent certificate or key: %v", err)
 	}
 	caCertPool := x509.NewCertPool()
-	srvcert := loadCert()
-	if ok := caCertPool.AppendCertsFromPEM(srvcert); !ok {
+	cacert := loadCACert()
+	if ok := caCertPool.AppendCertsFromPEM(cacert); !ok {
 		log.Fatalf("Unable to append certificate to pool: %v", err)
 	}
 
@@ -146,20 +164,20 @@ func main() {
 	sa := &serverContext{}
 
 	opts := []grpc.DialOption{
-		grpc.WithTransportCredentials(ta),
 		grpc.WithBlock(),
 	}
 
 	if config.InsecureControllerAllowed {
 		opts = append(opts, grpc.WithInsecure())
+	} else {
+		opts = append(opts, grpc.WithTransportCredentials(ta))
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	grpcTarget := "dns://" + config.ControllerHostname
-	conn, err := grpc.DialContext(ctx, grpcTarget, opts...)
+	conn, err := grpc.DialContext(ctx, config.ControllerHostname, opts...)
 	if err != nil {
-		log.Fatalf("Could not establish GRPC connection to %s: %v", grpcTarget, err)
+		log.Fatalf("Could not establish GRPC connection to %s: %v", config.ControllerHostname, err)
 	}
 	defer conn.Close()
 

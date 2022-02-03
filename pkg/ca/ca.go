@@ -30,6 +30,7 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
+	"log"
 	"math/big"
 	"time"
 )
@@ -99,11 +100,15 @@ func LoadCAFromFile(c Config) (*CA, error) {
 	if err != nil {
 		return nil, err
 	}
+	err = ValidateCACert(ca.caCert.Certificate[0])
+	if err != nil {
+		return nil, err
+	}
 	return ca, nil
 }
 
 //
-// MakeCAFromData does approximately the same thing as MakeCA() except the CA
+// MakeCAFromData does approximately the same thing as LoadCAFromFile() except the CA
 // contents are loaded from PEM strings.
 //
 func MakeCAFromData(certPEM []byte, certPrivKeyPEM []byte) (*CA, error) {
@@ -112,7 +117,32 @@ func MakeCAFromData(certPEM []byte, certPrivKeyPEM []byte) (*CA, error) {
 		return nil, err
 	}
 	ca := &CA{caCert: caCert}
+	err = ValidateCACert(ca.caCert.Certificate[0])
+	if err != nil {
+		return nil, err
+	}
 	return ca, nil
+}
+
+// ValidateCACert performs some basic checks on the CA cert, like validity
+// period and that it can sign certs.
+func ValidateCACert(certbytes []byte) error {
+	pc, err := x509.ParseCertificate(certbytes)
+	if err != nil {
+		return fmt.Errorf("failed to parse certificate: %v", err)
+	}
+	log.Printf("CA loaded, CommonName %s, expires %v", pc.Subject.CommonName, pc.NotAfter)
+	if !pc.IsCA {
+		return fmt.Errorf("CA certificate does not appear to be a proper CA (!IsCA)")
+	}
+	now := time.Now()
+	if pc.NotAfter.After(now) {
+		return fmt.Errorf("CA certificate has expired (NotAfter %v)", pc.NotAfter)
+	}
+	if pc.NotBefore.Before(now) {
+		return fmt.Errorf("CA certificate has not started yet (NotBefore %v)", pc.NotBefore)
+	}
+	return nil
 }
 
 //
