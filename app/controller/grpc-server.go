@@ -291,7 +291,11 @@ func runAgentGRPCServer(insecureAgents bool, serverCert tls.Certificate) {
 		server.endpoints = endpoints
 		tunnel.RegisterAgentTunnelServiceServer(grpcServer, server)
 
-		go grpcServer.Serve(grpcL)
+		go func() {
+			if err := grpcServer.Serve(grpcL); err != nil {
+				log.Fatalf("Failed to start Agent GRPC server: %v", err)
+			}
+		}()
 
 		if err := m.Serve(); err != nil {
 			log.Fatalf("Failed to run m.Serve(): %v", err)

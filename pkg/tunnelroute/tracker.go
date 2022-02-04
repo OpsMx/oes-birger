@@ -123,7 +123,11 @@ func (s *ConnectedRoutes) Add(state Route) {
 //
 // Remove will remove a route and signal to it that closing down is started.
 //
-func (s *ConnectedRoutes) Remove(state Route) error {
+// Rather than return an error here, we will just log it.  This is because we
+// won't likely care in the caller, so there's no need to burden them with
+// an if statement just to check it.
+//
+func (s *ConnectedRoutes) Remove(state Route) {
 	s.Lock()
 	defer s.Unlock()
 
@@ -132,15 +136,15 @@ func (s *ConnectedRoutes) Remove(state Route) error {
 	routeList, ok := s.m[state.GetName()]
 	if !ok {
 		// This should not be possible.
-		err := fmt.Errorf("no routes known by the name of %s", state)
-		return err
+		log.Printf("no routes known by the name of %s", state)
+		return
 	}
 
 	// TODO: We should always find our entry...
 	i := sliceIndex(len(routeList), func(i int) bool { return routeList[i] == state })
 	if i == -1 {
-		err := fmt.Errorf("attempt to remove unknown route %s", state)
-		return err
+		log.Printf("attempt to remove unknown route %s", state)
+		return
 	}
 	routeList[i] = routeList[len(routeList)-1]
 	routeList[len(routeList)-1] = nil
@@ -148,7 +152,7 @@ func (s *ConnectedRoutes) Remove(state Route) error {
 	s.m[state.GetName()] = routeList
 	connectedRoutesGauge.WithLabelValues(state.GetName()).Dec()
 	log.Printf("route %s removed, now at %d paths", state, len(routeList))
-	return nil
+	return
 }
 
 func (s *ConnectedRoutes) findService(ep Search) (Route, error) {

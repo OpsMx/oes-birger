@@ -32,7 +32,7 @@ func TestEndpoint_String(t *testing.T) {
 		{
 			"test1",
 			fields{Name: "name1", Type: "type1", Configured: true},
-			"(type1, name1, true)",
+			"(type=type1, name=name1, configured=true)",
 		},
 	}
 	for _, tt := range tests {

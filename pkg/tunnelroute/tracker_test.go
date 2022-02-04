@@ -120,18 +120,15 @@ func (s *MySuite) TestConnectedAgents(c *C) {
 	/// RemoveAgent()
 	///
 
-	err := agents.Remove(agent1Session1)
-	c.Assert(err, IsNil)
+	agents.Remove(agent1Session1)
 	c.Assert(agents.m, HasLen, 1)
 	c.Assert(agents.m["agent1"], HasLen, 1)
 
 	// bogus agent, never was added
-	err = agents.Remove(bogusagent)
-	c.Assert(err, ErrorMatches, ".*no routes known by the name.*agent99.*")
+	agents.Remove(bogusagent)
 
 	// agent name exists, session does not
-	err = agents.Remove(agent1Session1)
-	c.Assert(err, ErrorMatches, ".*attempt to remove unknown route.*agent1.session1.*")
+	agents.Remove(agent1Session1)
 
 	///
 	/// findService()
