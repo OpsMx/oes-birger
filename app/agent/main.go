@@ -38,7 +38,6 @@ import (
 	"github.com/opsmx/oes-birger/pkg/secrets"
 	"github.com/opsmx/oes-birger/pkg/serviceconfig"
 	"github.com/opsmx/oes-birger/pkg/tunnelroute"
-	"github.com/opsmx/oes-birger/pkg/updater"
 	"github.com/opsmx/oes-birger/pkg/util"
 )
 
@@ -111,14 +110,6 @@ func main() {
 	log.Printf("Agent version %s starting", version.String())
 
 	var err error
-
-	arg0hash, err := updater.HashSelf()
-	if err != nil {
-		log.Printf("Could not hash self: %v", err)
-		arg0hash = "unknown"
-	}
-	log.Printf("Binary hash: %s\n", arg0hash)
-
 	log.Printf("OS type: %s, CPU: %s, cores: %d", runtime.GOOS, runtime.GOARCH, runtime.NumCPU())
 
 	namespace, ok := os.LookupEnv("POD_NAMESPACE")
