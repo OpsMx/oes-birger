@@ -168,9 +168,8 @@ func (s *agentTunnelServer) EventTunnel(stream tunnel.AgentTunnelService_EventTu
 				if err != nil {
 					return err
 				}
+				state.Name = agentIdentity
 			}
-			// TODO: check if a client certificate is presented here, and if so, open it up and
-			// examine it.
 			endpoints := make([]tunnelroute.Endpoint, len(req.Endpoints))
 			for i, ep := range req.Endpoints {
 				endpoints[i] = tunnelroute.Endpoint{
