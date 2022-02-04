@@ -152,7 +152,6 @@ func (s *ConnectedRoutes) Remove(state Route) {
 	s.m[state.GetName()] = routeList
 	connectedRoutesGauge.WithLabelValues(state.GetName()).Dec()
 	log.Printf("route %s removed, now at %d paths", state, len(routeList))
-	return
 }
 
 func (s *ConnectedRoutes) findService(ep Search) (Route, error) {
