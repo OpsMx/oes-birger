@@ -31,13 +31,14 @@ const (
 	jwtEndpointTypeKey = "t"
 	jwtEndpointNameKey = "n"
 	jwtAgentKey        = "a"
+	opsmxIssuerString  = "opsmx"
 )
 
 // MakeJWT will return a token with provided type, name, and agent name embedded in the claims.
 func MakeJWT(key jwk.Key, epType string, epName string, agent string) (string, error) {
 	t := jwt.New()
 
-	err := t.Set(jwt.IssuerKey, "opsmx")
+	err := t.Set(jwt.IssuerKey, opsmxIssuerString)
 	if err != nil {
 		return "", err
 	}
@@ -76,6 +77,7 @@ func ValidateJWT(keyset jwk.Set, tokenString string) (epType string, epName stri
 	token, err := jwt.Parse(
 		[]byte(tokenString),
 		jwt.WithValidate(true),
+		jwt.WithIssuer(opsmxIssuerString),
 		jwt.WithKeySet(keyset),
 	)
 	if err != nil {
