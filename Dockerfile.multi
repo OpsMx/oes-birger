@@ -38,9 +38,6 @@ RUN mkdir /out /out/agent-binaries
 RUN GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="-s -w" -o /out/agent app/agent/*.go
 RUN GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="-s -w" -o /out/controller app/controller/*.go
 RUN GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="-s -w" -o /out/make-ca app/make-ca/*.go
-# Also build the different OS versions here, so we can publish them.
-RUN GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o /out/agent-binaries/agent.amd64.latest app/agent/*.go
-RUN GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o /out/agent-binaries/agent.arm64.latest app/agent/*.go
 
 #
 # Establish a base OS image used by all the applications.
