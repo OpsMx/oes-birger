@@ -55,6 +55,7 @@ var (
 
 	jwtKeyset     = jwk.NewSet()
 	jwtCurrentKey string
+	mutateKey     jwk.Key
 
 	config *ControllerConfig
 
@@ -157,7 +158,6 @@ func loadKeyset() {
 	if config.ServiceAuth.CurrentKeyName == "" {
 		log.Fatalf("No primary serviceAuth key name provided")
 	}
-	jwtCurrentKey = config.ServiceAuth.CurrentKeyName
 
 	err := filepath.WalkDir(config.ServiceAuth.SecretsPath, func(path string, info fs.DirEntry, err error) error {
 		if err != nil {
@@ -188,6 +188,22 @@ func loadKeyset() {
 	})
 	if err != nil {
 		log.Fatalf("cannot load key serviceAuth keys: %v", err)
+	}
+
+	jwtCurrentKey = config.ServiceAuth.CurrentKeyName
+	if len(jwtCurrentKey) == 0 {
+		log.Fatal("serviceAuth.currentKeyName is not set")
+	}
+	if _, found := jwtKeyset.LookupKeyID(jwtCurrentKey); !found {
+		log.Fatal("serviceAuth.currentKeyName is not in the loaded list of keys")
+	}
+
+	if len(config.ServiceAuth.HeaderMutationKeyName) == 0 {
+		log.Fatal("serviceAuth.headerMutationKeyName is not set")
+	}
+	var found bool
+	if mutateKey, found = jwtKeyset.LookupKeyID(config.ServiceAuth.HeaderMutationKeyName); !found {
+		log.Fatal("serviceAuth.headerMutationKeyName is not in the loaded list of keys")
 	}
 
 	log.Printf("Loaded %d serviceKeys", jwtKeyset.Len())
@@ -266,7 +282,7 @@ func main() {
 	go runAgentGRPCServer(config.InsecureAgentConnections, *serverCert)
 
 	// Always listen on our well-known port, and always use HTTPS for this one.
-	go serviceconfig.RunHTTPSServer(routes, authority, *serverCert, jwtKeyset, serviceconfig.IncomingServiceConfig{
+	go serviceconfig.RunHTTPSServer(routes, authority, *serverCert, jwtKeyset, mutateKey, serviceconfig.IncomingServiceConfig{
 		Name: "_services",
 		Port: config.ServiceListenPort,
 	})
@@ -274,9 +290,9 @@ func main() {
 	// Now, add all the others defined by our config.
 	for _, service := range config.ServiceConfig.IncomingServices {
 		if service.UseHTTP {
-			go serviceconfig.RunHTTPServer(routes, service)
+			go serviceconfig.RunHTTPServer(routes, jwtKeyset, mutateKey, service)
 		} else {
-			go serviceconfig.RunHTTPSServer(routes, authority, *serverCert, jwtKeyset, service)
+			go serviceconfig.RunHTTPSServer(routes, authority, *serverCert, jwtKeyset, mutateKey, service)
 		}
 	}
 

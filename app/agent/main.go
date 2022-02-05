@@ -181,7 +181,7 @@ func main() {
 
 	log.Printf("Starting any local HTTP service listeners.")
 	for _, service := range agentServiceConfig.IncomingServices {
-		go serviceconfig.RunHTTPServer(routes, service)
+		go serviceconfig.RunHTTPServer(routes, nil, nil, service)
 	}
 
 	wg.Wait()

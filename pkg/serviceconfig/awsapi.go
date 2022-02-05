@@ -176,5 +176,5 @@ func (a *AwsEndpoint) ExecuteHTTPRequest(dataflow chan *tunnel.MessageWrapper, r
 		return
 	}
 
-	tunnel.RunHTTPRequest(client, req, httpRequest, dataflow, baseURL)
+	tunnel.RunHTTPRequest(client, req, httpRequest, dataflow, baseURL, nil)
 }

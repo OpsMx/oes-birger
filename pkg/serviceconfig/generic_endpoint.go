@@ -220,5 +220,5 @@ func (ep *GenericEndpoint) ExecuteHTTPRequest(dataflow chan *tunnel.MessageWrapp
 		httpRequest.Header.Set("Authorization", "Token "+creds.rawToken)
 	}
 
-	tunnel.RunHTTPRequest(client, req, httpRequest, dataflow, ep.config.URL)
+	tunnel.RunHTTPRequest(client, req, httpRequest, dataflow, ep.config.URL, nil)
 }

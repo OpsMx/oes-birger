@@ -257,7 +257,7 @@ func (ke *KubernetesEndpoint) ExecuteHTTPRequest(dataflow chan *tunnel.MessageWr
 		httpRequest.Header.Set("Authorization", "Bearer "+c.token)
 	}
 
-	tunnel.RunHTTPRequest(client, req, httpRequest, dataflow, c.serverURL)
+	tunnel.RunHTTPRequest(client, req, httpRequest, dataflow, c.serverURL, nil)
 }
 
 func (ke *KubernetesEndpoint) loadKubernetesSecurity() *kubeContext {
