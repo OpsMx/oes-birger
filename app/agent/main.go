@@ -177,7 +177,7 @@ func main() {
 
 	log.Printf("Starting GRPC tunnel.")
 	wg.Add(1)
-	go runTunnel(&wg, sa, conn, endpoints, config.InsecureControllerAllowed, clcert)
+	go runTunnel(&wg, sa, conn, endpoints, config.InsecureControllerAllowed, clcert, nil, nil)
 
 	log.Printf("Starting any local HTTP service listeners.")
 	for _, service := range agentServiceConfig.IncomingServices {

@@ -279,7 +279,7 @@ func main() {
 	cnc := cncserver.MakeCNCServer(config, authority, routes, jwtKeyset, jwtCurrentKey, version.String())
 	go cnc.RunServer(*serverCert)
 
-	go runAgentGRPCServer(config.InsecureAgentConnections, *serverCert)
+	go runAgentGRPCServer(config.InsecureAgentConnections, *serverCert, jwtKeyset, mutateKey)
 
 	// Always listen on our well-known port, and always use HTTPS for this one.
 	go serviceconfig.RunHTTPSServer(routes, authority, *serverCert, jwtKeyset, mutateKey, serviceconfig.IncomingServiceConfig{

@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/lestrrat-go/jwx/jwk"
 	"github.com/opsmx/oes-birger/pkg/secrets"
 	"github.com/opsmx/oes-birger/pkg/tunnel"
 	"gopkg.in/yaml.v2"
@@ -38,7 +39,7 @@ type ConfiguredEndpoint struct {
 }
 
 type httpRequestProcessor interface {
-	ExecuteHTTPRequest(chan *tunnel.MessageWrapper, *tunnel.OpenHTTPTunnelRequest)
+	ExecuteHTTPRequest(chan *tunnel.MessageWrapper, *tunnel.OpenHTTPTunnelRequest, jwk.Set, jwk.Key)
 }
 
 func (e *ConfiguredEndpoint) String() string {

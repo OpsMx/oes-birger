@@ -169,13 +169,12 @@ func secureAPIHandlerMaker(routes *tunnelroute.ConnectedRoutes, service Incoming
 	}
 }
 
-func copyHeaders(resp *tunnel.HttpTunnelResponse, w http.ResponseWriter, keywet jwk.Set) {
+func copyHeaders(resp *tunnel.HttpTunnelResponse, w http.ResponseWriter, keyset jwk.Set) {
 	for name := range w.Header() {
 		w.Header().Del(name)
 	}
 	for _, header := range resp.Headers {
 		for _, value := range header.Values {
-			// TODO: unmutate here
 			w.Header().Add(header.Name, value)
 		}
 	}
@@ -238,7 +237,7 @@ func runAPIHandler(routes *tunnelroute.ConnectedRoutes, keyset jwk.Set, mutateKe
 
 		switch x := in.Event.(type) {
 		case *tunnel.MessageWrapper_HttpTunnelControl:
-			if handleTunnelControl(handlerState, keyset, mutateKey, x.HttpTunnelControl, w, r) {
+			if handleTunnelControl(handlerState, keyset, x.HttpTunnelControl, w, r) {
 				return
 			}
 		case nil:
@@ -249,7 +248,7 @@ func runAPIHandler(routes *tunnelroute.ConnectedRoutes, keyset jwk.Set, mutateKe
 	}
 }
 
-func handleTunnelControl(state *apiHandlerState, keyset jwk.Set, mutateKey jwk.Key, tunnelControl *tunnel.HttpTunnelControl, w http.ResponseWriter, r *http.Request) bool {
+func handleTunnelControl(state *apiHandlerState, keyset jwk.Set, tunnelControl *tunnel.HttpTunnelControl, w http.ResponseWriter, r *http.Request) bool {
 	switch controlMessage := tunnelControl.ControlType.(type) {
 	case *tunnel.HttpTunnelControl_HttpTunnelResponse:
 		resp := controlMessage.HttpTunnelResponse
