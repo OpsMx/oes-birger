@@ -8,7 +8,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/lestrrat-go/jwx/jwk"
 	"github.com/opsmx/oes-birger/pkg/serviceconfig"
 	"github.com/opsmx/oes-birger/pkg/tunnel"
 	"github.com/opsmx/oes-birger/pkg/tunnelroute"
@@ -74,7 +73,7 @@ func dataflowHandler(dataflow chan *tunnel.MessageWrapper, stream tunnel.GRPCEve
 	}
 }
 
-func runTunnel(wg *sync.WaitGroup, sa *serverContext, conn *grpc.ClientConn, endpoints []serviceconfig.ConfiguredEndpoint, insecure bool, clcert tls.Certificate, keyset jwk.Set, mutateKey jwk.Key) {
+func runTunnel(wg *sync.WaitGroup, sa *serverContext, conn *grpc.ClientConn, endpoints []serviceconfig.ConfiguredEndpoint, insecure bool, clcert tls.Certificate) {
 	defer wg.Done()
 
 	client := tunnel.NewAgentTunnelServiceClient(conn)
@@ -171,7 +170,7 @@ func runTunnel(wg *sync.WaitGroup, sa *serverContext, conn *grpc.ClientConn, end
 			case *tunnel.MessageWrapper_PingResponse:
 				continue
 			case *tunnel.MessageWrapper_HttpTunnelControl:
-				handleHTTPControl(in, httpids, endpoints, dataflow, keyset, mutateKey)
+				handleHTTPControl(in, httpids, endpoints, dataflow)
 			case nil:
 				continue
 			default:
@@ -184,7 +183,7 @@ func runTunnel(wg *sync.WaitGroup, sa *serverContext, conn *grpc.ClientConn, end
 	_ = stream.CloseSend()
 }
 
-func handleHTTPControl(in *tunnel.MessageWrapper, httpids *util.SessionList, endpoints []serviceconfig.ConfiguredEndpoint, dataflow chan *tunnel.MessageWrapper, keyset jwk.Set, mutateKey jwk.Key) {
+func handleHTTPControl(in *tunnel.MessageWrapper, httpids *util.SessionList, endpoints []serviceconfig.ConfiguredEndpoint, dataflow chan *tunnel.MessageWrapper) {
 	tunnelControl := in.GetHttpTunnelControl() // caller ensures this will work
 	switch controlMessage := tunnelControl.ControlType.(type) {
 	case *tunnel.HttpTunnelControl_CancelRequest:
@@ -194,7 +193,7 @@ func handleHTTPControl(in *tunnel.MessageWrapper, httpids *util.SessionList, end
 		found := false
 		for _, endpoint := range endpoints {
 			if endpoint.Configured && endpoint.Type == req.Type && endpoint.Name == req.Name {
-				go endpoint.Instance.ExecuteHTTPRequest(dataflow, req, keyset, mutateKey)
+				go endpoint.Instance.ExecuteHTTPRequest(dataflow, req)
 				found = true
 				break
 			}

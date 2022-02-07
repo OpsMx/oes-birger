@@ -17,11 +17,11 @@
 package jwtutil
 
 import (
-	"time"
+	"fmt"
 
-	"github.com/lestrrat-go/jwx/jwa"
-	"github.com/lestrrat-go/jwx/jwk"
 	"github.com/lestrrat-go/jwx/jwt"
+
+	"github.com/skandragon/jwtregistry"
 )
 
 // Process header mutation.  This is currently only done on X-Spinnaker-User header
@@ -44,47 +44,26 @@ import (
 // This allows splitting Clouddrivers off to remote locations while still ensuring
 // they only contact our internal, secure components with requests sent to them.
 
+// RegistryName is the name we expect to be used in jwtregistry.Register() by
+// someone prior to calling us.
+const RegistryName = "header-mutation"
+
 // MutateHeader will take a header value (as a string) and return a JWT which we
 // can later use in UnmutateHeader to recover the original string value.
-func MutateHeader(key jwk.Key, inception time.Time, expirty time.Time, data string) (signed string, err error) {
-	t := jwt.New()
-
-	if err = t.Set(jwt.IssuerKey, opsmxIssuerString); err != nil {
-		return
-	}
-
-	if err = t.Set(jwt.IssuedAtKey, inception.Unix()); err != nil {
-		return
-	}
-	if err = t.Set(jwt.ExpirationKey, expirty.Unix()); err != nil {
-		return
-	}
-
-	if err = t.Set("u", data); err != nil {
-		return
-	}
-
-	signedBytes, err := jwt.Sign(t, jwa.HS256, key)
-	if err != nil {
-		return "", err
-	}
-	return string(signedBytes), nil
+func MutateHeader(data string, clock jwt.Clock) (signed []byte, err error) {
+	signed, err = jwtregistry.Sign(RegistryName, map[string]string{"u": data}, clock)
+	return
 }
 
 // UnmutateHeader checks the mutated data and returns the unmutated original content.
-func UnmutateHeader(keyset jwk.Set, tokenString string, clock jwt.Clock) (username string, err error) {
-	token, err := jwt.Parse(
-		[]byte(tokenString),
-		jwt.WithValidate(true),
-		jwt.WithIssuer(opsmxIssuerString),
-		jwt.WithKeySet(keyset),
-		jwt.WithRequiredClaim("u"),
-		jwt.WithClock(clock),
-	)
+func UnmutateHeader(tokenString []byte, clock jwt.Clock) (username string, err error) {
+	claims, err := jwtregistry.Validate(RegistryName, tokenString, clock)
 	if err != nil {
 		return
 	}
-	if username, err = getField(token, "u"); err != nil {
+	username, ok := claims["u"]
+	if !ok {
+		err = fmt.Errorf("u field not found in claims")
 		return
 	}
 	return

@@ -45,7 +45,7 @@ var (
 
 // RunHTTPSServer will listen for incoming service requests on a provided port, and
 // currently will use certificates or JWT to identify the destination.
-func RunHTTPSServer(routes *tunnelroute.ConnectedRoutes, ca *ca.CA, serverCert tls.Certificate, keyset jwk.Set, mutateKey jwk.Key, service IncomingServiceConfig) {
+func RunHTTPSServer(routes *tunnelroute.ConnectedRoutes, ca *ca.CA, serverCert tls.Certificate, keyset jwk.Set, service IncomingServiceConfig) {
 	log.Printf("Running service HTTPS listener on port %d", service.Port)
 
 	certPool, err := ca.MakeCertPool()
@@ -62,7 +62,7 @@ func RunHTTPSServer(routes *tunnelroute.ConnectedRoutes, ca *ca.CA, serverCert t
 
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("/", secureAPIHandlerMaker(routes, service, keyset, mutateKey))
+	mux.HandleFunc("/", secureAPIHandlerMaker(routes, service, keyset))
 
 	server := &http.Server{
 		Addr:      fmt.Sprintf(":%d", service.Port),
@@ -75,12 +75,12 @@ func RunHTTPSServer(routes *tunnelroute.ConnectedRoutes, ca *ca.CA, serverCert t
 
 // RunHTTPServer will listen on an unencrypted HTTP only port, and will always forward
 // incoming requests to the hard-coded configured destination.
-func RunHTTPServer(routes *tunnelroute.ConnectedRoutes, keyset jwk.Set, mutateKey jwk.Key, service IncomingServiceConfig) {
+func RunHTTPServer(routes *tunnelroute.ConnectedRoutes, service IncomingServiceConfig) {
 	log.Printf("Running service HTTP listener on port %d", service.Port)
 
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("/", fixedIdentityAPIHandlerMaker(routes, keyset, mutateKey, service))
+	mux.HandleFunc("/", fixedIdentityAPIHandlerMaker(routes, service))
 
 	server := &http.Server{
 		Addr:    fmt.Sprintf(":%d", service.Port),
@@ -90,14 +90,14 @@ func RunHTTPServer(routes *tunnelroute.ConnectedRoutes, keyset jwk.Set, mutateKe
 	log.Fatal(server.ListenAndServe())
 }
 
-func fixedIdentityAPIHandlerMaker(routes *tunnelroute.ConnectedRoutes, keyset jwk.Set, mutateKey jwk.Key, service IncomingServiceConfig) func(http.ResponseWriter, *http.Request) {
+func fixedIdentityAPIHandlerMaker(routes *tunnelroute.ConnectedRoutes, service IncomingServiceConfig) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ep := tunnelroute.Search{
 			Name:         service.Destination,
 			EndpointType: service.ServiceType,
 			EndpointName: service.DestinationService,
 		}
-		runAPIHandler(routes, keyset, mutateKey, ep, w, r)
+		runAPIHandler(routes, ep, w, r)
 	}
 }
 
@@ -153,7 +153,7 @@ func extractEndpoint(r *http.Request, keyset jwk.Set) (agentIdentity string, end
 	return "", "", "", fmt.Errorf("no valid credentials or JWT found")
 }
 
-func secureAPIHandlerMaker(routes *tunnelroute.ConnectedRoutes, service IncomingServiceConfig, keyset jwk.Set, mutateKey jwk.Key) func(http.ResponseWriter, *http.Request) {
+func secureAPIHandlerMaker(routes *tunnelroute.ConnectedRoutes, service IncomingServiceConfig, keyset jwk.Set) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		agentIdentity, endpointType, endpointName, err := extractEndpoint(r, keyset)
 		if err != nil {
@@ -165,11 +165,11 @@ func secureAPIHandlerMaker(routes *tunnelroute.ConnectedRoutes, service Incoming
 			EndpointType: endpointType,
 			EndpointName: endpointName,
 		}
-		runAPIHandler(routes, keyset, mutateKey, ep, w, r)
+		runAPIHandler(routes, ep, w, r)
 	}
 }
 
-func copyHeaders(resp *tunnel.HttpTunnelResponse, w http.ResponseWriter, keyset jwk.Set) {
+func copyHeaders(resp *tunnel.HttpTunnelResponse, w http.ResponseWriter) {
 	for name := range w.Header() {
 		w.Header().Del(name)
 	}
@@ -197,18 +197,31 @@ type apiHandlerState struct {
 	cleanClose abool.AtomicBool
 }
 
-func runAPIHandler(routes *tunnelroute.ConnectedRoutes, keyset jwk.Set, mutateKey jwk.Key, ep tunnelroute.Search, w http.ResponseWriter, r *http.Request) {
+func runAPIHandler(routes *tunnelroute.ConnectedRoutes, ep tunnelroute.Search, w http.ResponseWriter, r *http.Request) {
 	apiRequestCounter.WithLabelValues(ep.Name, ep.EndpointName).Inc()
 	transactionID := ulid.GlobalContext.Ulid()
 
-	body, _ := ioutil.ReadAll(r.Body)
+	body, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		log.Printf("unable to read entire message body")
+		w.WriteHeader(http.StatusServiceUnavailable)
+		return
+	}
+
+	headers, err := tunnel.MakeHeaders(r.Header)
+	if err != nil {
+		log.Printf("unable to convert headers")
+		w.WriteHeader(http.StatusServiceUnavailable)
+		return
+	}
+
 	req := &tunnel.OpenHTTPTunnelRequest{
 		Id:      transactionID,
 		Type:    ep.EndpointType,
 		Name:    ep.EndpointName,
 		Method:  r.Method,
 		URI:     r.RequestURI,
-		Headers: tunnel.MakeHeaders(r.Header, mutateKey),
+		Headers: headers,
 		Body:    body,
 	}
 	message := &tunnelroute.HTTPMessage{Out: make(chan *tunnel.MessageWrapper), Cmd: req}
@@ -237,7 +250,7 @@ func runAPIHandler(routes *tunnelroute.ConnectedRoutes, keyset jwk.Set, mutateKe
 
 		switch x := in.Event.(type) {
 		case *tunnel.MessageWrapper_HttpTunnelControl:
-			if handleTunnelControl(handlerState, keyset, x.HttpTunnelControl, w, r) {
+			if handleTunnelControl(handlerState, x.HttpTunnelControl, w, r) {
 				return
 			}
 		case nil:
@@ -248,13 +261,13 @@ func runAPIHandler(routes *tunnelroute.ConnectedRoutes, keyset jwk.Set, mutateKe
 	}
 }
 
-func handleTunnelControl(state *apiHandlerState, keyset jwk.Set, tunnelControl *tunnel.HttpTunnelControl, w http.ResponseWriter, r *http.Request) bool {
+func handleTunnelControl(state *apiHandlerState, tunnelControl *tunnel.HttpTunnelControl, w http.ResponseWriter, r *http.Request) bool {
 	switch controlMessage := tunnelControl.ControlType.(type) {
 	case *tunnel.HttpTunnelControl_HttpTunnelResponse:
 		resp := controlMessage.HttpTunnelResponse
 		state.seenHeader = true
 		state.isChunked = resp.ContentLength < 0
-		copyHeaders(resp, w, keyset)
+		copyHeaders(resp, w)
 		// TODO: unmutate headers
 		w.WriteHeader(int(resp.Status))
 		if resp.ContentLength == 0 {

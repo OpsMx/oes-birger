@@ -18,73 +18,58 @@ package jwtutil
 
 import (
 	"testing"
-	"time"
 
-	"github.com/lestrrat-go/jwx/jwk"
 	"github.com/lestrrat-go/jwx/jwt"
+	"github.com/skandragon/jwtregistry"
+	"github.com/stretchr/testify/assert"
 )
 
 func Test_MutateHeader(t *testing.T) {
-	keyset := loadkeys(t)
+	jwtregistry.Clear()
+	jwtregistry.Register(RegistryName, "opsmx-clouddriver-proxy",
+		jwtregistry.WithKeyset(loadkeys(t)),
+		jwtregistry.WithSigningKeyName("key1"),
+	)
 	type args struct {
-		keyid     string
-		inception time.Time
-		expiry    time.Time
-		data      string
+		data  string
+		clock jwt.Clock
 	}
 	tests := []struct {
 		name    string
 		args    args
-		want    string
+		want    []byte
 		wantErr bool
 	}{
 		{
 			"simpleTest",
-			args{"key1",
-				time.Unix(1234, 0),
-				time.Unix(99999, 0),
+			args{
 				"alice",
+				&jwtregistry.TimeClock{NowTime: 1111},
 			},
-			"eyJhbGciOiJIUzI1NiIsImtpZCI6ImtleTEiLCJ0eXAiOiJKV1QifQ.eyJleHAiOjk5OTk5LCJpYXQiOjEyMzQsImlzcyI6Im9wc214IiwidSI6ImFsaWNlIn0.Sz9tP7CKNGSrrovn3zEv5bO3eMivTAPXnp_AYLtUtvE",
+			[]byte("eyJhbGciOiJIUzI1NiIsImtpZCI6ImtleTEiLCJ0eXAiOiJKV1QifQ.eyJpYXQiOjExMTEsImlzcyI6Im9wc214LWNsb3VkZHJpdmVyLXByb3h5IiwidSI6ImFsaWNlIn0.Vl1-Dtwj5O2lzOSkZFmBjSwatTHxko0RmS16d3oqfz4"),
 			false,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var key jwk.Key
-			var ok bool
-			if key, ok = keyset.LookupKeyID(tt.args.keyid); !ok {
-				t.Errorf("key not found: %s", tt.args.keyid)
-				t.FailNow()
-			}
-			got, err := MutateHeader(key, tt.args.inception, tt.args.expiry, tt.args.data)
+			got, err := MutateHeader(tt.args.data, tt.args.clock)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("mutateHeader() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if got != tt.want {
-				t.Errorf("mutateHeader() = %v, want %v", got, tt.want)
-			}
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }
 
-type testclock struct {
-	now int64
-}
-
-func (tc testclock) Now() time.Time {
-	return time.Unix(tc.now, 0)
-}
-
-func newTestClock(now int64) jwt.Clock {
-	return testclock{now}
-}
-
 func TestUnmutateHeader(t *testing.T) {
-	keyset := loadkeys(t)
+	jwtregistry.Clear()
+	jwtregistry.Register(RegistryName, "opsmx-clouddriver-proxy",
+		jwtregistry.WithKeyset(loadkeys(t)),
+		jwtregistry.WithSigningKeyName("key1"),
+	)
 	type args struct {
-		tokenString string
+		tokenString []byte
 		clock       jwt.Clock
 	}
 	tests := []struct {
@@ -96,8 +81,8 @@ func TestUnmutateHeader(t *testing.T) {
 		{
 			"valid",
 			args{
-				"eyJhbGciOiJIUzI1NiIsImtpZCI6ImtleTEiLCJ0eXAiOiJKV1QifQ.eyJleHAiOjk5OTk5LCJpYXQiOjEyMzQsImlzcyI6Im9wc214IiwidSI6ImFsaWNlIn0.Sz9tP7CKNGSrrovn3zEv5bO3eMivTAPXnp_AYLtUtvE",
-				newTestClock(5555),
+				[]byte("eyJhbGciOiJIUzI1NiIsImtpZCI6ImtleTEiLCJ0eXAiOiJKV1QifQ.eyJpYXQiOjExMTEsImlzcyI6Im9wc214LWNsb3VkZHJpdmVyLXByb3h5IiwidSI6ImFsaWNlIn0.Vl1-Dtwj5O2lzOSkZFmBjSwatTHxko0RmS16d3oqfz4"),
+				&jwtregistry.TimeClock{NowTime: 5555},
 			},
 			"alice",
 			false,
@@ -105,8 +90,8 @@ func TestUnmutateHeader(t *testing.T) {
 		{
 			"before created time",
 			args{
-				"eyJhbGciOiJIUzI1NiIsImtpZCI6ImtleTEiLCJ0eXAiOiJKV1QifQ.eyJleHAiOjk5OTk5LCJpYXQiOjEyMzQsImlzcyI6Im9wc214IiwidSI6ImFsaWNlIn0.Sz9tP7CKNGSrrovn3zEv5bO3eMivTAPXnp_AYLtUtvE",
-				newTestClock(111),
+				[]byte("eyJhbGciOiJIUzI1NiIsImtpZCI6ImtleTEiLCJ0eXAiOiJKV1QifQ.eyJleHAiOjk5OTk5LCJpYXQiOjEyMzQsImlzcyI6Im9wc214IiwidSI6ImFsaWNlIn0.Sz9tP7CKNGSrrovn3zEv5bO3eMivTAPXnp_AYLtUtvE"),
+				&jwtregistry.TimeClock{NowTime: 111},
 			},
 			"",
 			true,
@@ -114,8 +99,8 @@ func TestUnmutateHeader(t *testing.T) {
 		{
 			"after expiry time",
 			args{
-				"eyJhbGciOiJIUzI1NiIsImtpZCI6ImtleTEiLCJ0eXAiOiJKV1QifQ.eyJleHAiOjk5OTk5LCJpYXQiOjEyMzQsImlzcyI6Im9wc214IiwidSI6ImFsaWNlIn0.Sz9tP7CKNGSrrovn3zEv5bO3eMivTAPXnp_AYLtUtvE",
-				newTestClock(99999),
+				[]byte("eyJhbGciOiJIUzI1NiIsImtpZCI6ImtleTEiLCJ0eXAiOiJKV1QifQ.eyJleHAiOjk5OTk5LCJpYXQiOjEyMzQsImlzcyI6Im9wc214IiwidSI6ImFsaWNlIn0.Sz9tP7CKNGSrrovn3zEv5bO3eMivTAPXnp_AYLtUtvE"),
+				&jwtregistry.TimeClock{NowTime: 99999},
 			},
 			"",
 			true,
@@ -123,8 +108,8 @@ func TestUnmutateHeader(t *testing.T) {
 		{
 			"no such key",
 			args{
-				"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6ImZvbyJ9.eyJpc3MiOiJvcHNteCIsInUiOiJhbGljZSIsImlhdCI6MTIzNCwiZXhwIjo5OTk5fQ.Ayh-HqzKAcpZqHFi7dtdGdNCPX0Ipp7Vi7BD5bQx9Q0",
-				newTestClock(5555),
+				[]byte("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6ImZvbyJ9.eyJpc3MiOiJvcHNteCIsInUiOiJhbGljZSIsImlhdCI6MTIzNCwiZXhwIjo5OTk5fQ.Ayh-HqzKAcpZqHFi7dtdGdNCPX0Ipp7Vi7BD5bQx9Q0"),
+				&jwtregistry.TimeClock{NowTime: 5555},
 			},
 			"",
 			true,
@@ -132,8 +117,8 @@ func TestUnmutateHeader(t *testing.T) {
 		{
 			"missing 'u'",
 			args{
-				"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6ImtleTEifQ.eyJpc3MiOiJvcHNteCIsImlhdCI6MTIzNCwiZXhwIjo5OTk5fQ.Ke_f3wGC4DiaXzoLW7Ymz_HRMRPxH-A4BJCqzGd0TpM",
-				newTestClock(5555),
+				[]byte("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6ImtleTEifQ.eyJpc3MiOiJvcHNteCIsImlhdCI6MTIzNCwiZXhwIjo5OTk5fQ.Ke_f3wGC4DiaXzoLW7Ymz_HRMRPxH-A4BJCqzGd0TpM"),
+				&jwtregistry.TimeClock{NowTime: 5555},
 			},
 			"",
 			true,
@@ -141,8 +126,8 @@ func TestUnmutateHeader(t *testing.T) {
 		{
 			"missing 'iss'",
 			args{
-				"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6ImtleTEifQ.eyJpYXQiOjEyMzQsInUiOiJhbGljZSIsImV4cCI6OTk5OX0.RfuheRuXlrRUcIjEzyLX_Imy2POFfYIoJZ9Uj89dFUQ",
-				newTestClock(5555),
+				[]byte("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6ImtleTEifQ.eyJpYXQiOjEyMzQsInUiOiJhbGljZSIsImV4cCI6OTk5OX0.RfuheRuXlrRUcIjEzyLX_Imy2POFfYIoJZ9Uj89dFUQ"),
+				&jwtregistry.TimeClock{NowTime: 5555},
 			},
 			"",
 			true,
@@ -150,8 +135,8 @@ func TestUnmutateHeader(t *testing.T) {
 		{
 			"bad 'iss'",
 			args{
-				"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6ImtleTEifQ.eyJpc3MiOiJmb28iLCJpYXQiOjEyMzQsInUiOiJhbGljZSIsImV4cCI6OTk5OX0.xGCEiPf1wiAUQ32bCClW7NIFqq3Cc1fBqKDWDlWr7tk",
-				newTestClock(5555),
+				[]byte("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6ImtleTEifQ.eyJpc3MiOiJmb28iLCJpYXQiOjEyMzQsInUiOiJhbGljZSIsImV4cCI6OTk5OX0.xGCEiPf1wiAUQ32bCClW7NIFqq3Cc1fBqKDWDlWr7tk"),
+				&jwtregistry.TimeClock{NowTime: 5555},
 			},
 			"",
 			true,
@@ -159,7 +144,7 @@ func TestUnmutateHeader(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotUsername, err := UnmutateHeader(keyset, tt.args.tokenString, tt.args.clock)
+			gotUsername, err := UnmutateHeader(tt.args.tokenString, tt.args.clock)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("UnmutateHeader() error = %v, wantErr %v", err, tt.wantErr)
 				return

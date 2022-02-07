@@ -25,7 +25,6 @@ import (
 	"net"
 	"sync/atomic"
 
-	"github.com/lestrrat-go/jwx/jwk"
 	"github.com/opsmx/oes-birger/pkg/serviceconfig"
 	"github.com/opsmx/oes-birger/pkg/tunnel"
 	"github.com/opsmx/oes-birger/pkg/tunnelroute"
@@ -204,7 +203,7 @@ func (s *agentTunnelServer) EventTunnel(stream tunnel.AgentTunnelService_EventTu
 			}
 
 		case *tunnel.MessageWrapper_HttpTunnelControl:
-			handleHTTPControl(in, httpids, s.endpoints, dataflow, s.keyset, s.mutateKey)
+			handleHTTPControl(in, httpids, s.endpoints, dataflow)
 		case nil:
 			// ignore for now
 		default:
@@ -213,7 +212,7 @@ func (s *agentTunnelServer) EventTunnel(stream tunnel.AgentTunnelService_EventTu
 	}
 }
 
-func handleHTTPControl(in *tunnel.MessageWrapper, httpids *util.SessionList, endpoints []serviceconfig.ConfiguredEndpoint, dataflow chan *tunnel.MessageWrapper, keyset jwk.Set, mutateKey jwk.Key) {
+func handleHTTPControl(in *tunnel.MessageWrapper, httpids *util.SessionList, endpoints []serviceconfig.ConfiguredEndpoint, dataflow chan *tunnel.MessageWrapper) {
 	tunnelControl := in.GetHttpTunnelControl() // caller ensures this will work
 	switch controlMessage := tunnelControl.ControlType.(type) {
 	case *tunnel.HttpTunnelControl_CancelRequest:
@@ -223,7 +222,7 @@ func handleHTTPControl(in *tunnel.MessageWrapper, httpids *util.SessionList, end
 		found := false
 		for _, endpoint := range endpoints {
 			if endpoint.Configured && endpoint.Type == req.Type && endpoint.Name == req.Name {
-				go endpoint.Instance.ExecuteHTTPRequest(dataflow, req, keyset, mutateKey)
+				go endpoint.Instance.ExecuteHTTPRequest(dataflow, req)
 				found = true
 				break
 			}
@@ -269,15 +268,13 @@ type agentTunnelServer struct {
 	tunnel.UnimplementedAgentTunnelServiceServer
 	endpoints []serviceconfig.ConfiguredEndpoint
 	insecure  bool
-	keyset    jwk.Set
-	mutateKey jwk.Key
 }
 
-func newAgentServer(insecure bool, keyset jwk.Set) *agentTunnelServer {
+func newAgentServer(insecure bool) *agentTunnelServer {
 	return &agentTunnelServer{insecure: insecure}
 }
 
-func runAgentGRPCServer(insecureAgents bool, serverCert tls.Certificate, keyset jwk.Set, mutateKey jwk.Key) {
+func runAgentGRPCServer(insecureAgents bool, serverCert tls.Certificate) {
 	log.Printf("Starting Agent GRPC server on port %d...", config.AgentListenPort)
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", config.AgentListenPort))
 	if err != nil {
@@ -289,11 +286,7 @@ func runAgentGRPCServer(insecureAgents bool, serverCert tls.Certificate, keyset 
 		grpcL := m.MatchWithWriters(cmux.HTTP2MatchHeaderFieldSendSettings("content-type", "application/grpc"))
 
 		grpcServer := grpc.NewServer()
-		server := &agentTunnelServer{
-			insecure:  insecureAgents,
-			keyset:    keyset,
-			mutateKey: mutateKey,
-		}
+		server := &agentTunnelServer{insecure: insecureAgents}
 		server.endpoints = endpoints
 		tunnel.RegisterAgentTunnelServiceServer(grpcServer, server)
 
@@ -319,11 +312,7 @@ func runAgentGRPCServer(insecureAgents bool, serverCert tls.Certificate, keyset 
 		})
 		opts := []grpc.ServerOption{grpc.Creds(creds)}
 		grpcServer := grpc.NewServer(opts...)
-		server := &agentTunnelServer{
-			insecure:  insecureAgents,
-			keyset:    keyset,
-			mutateKey: mutateKey,
-		}
+		server := &agentTunnelServer{insecure: insecureAgents}
 		server.endpoints = endpoints
 		tunnel.RegisterAgentTunnelServiceServer(grpcServer, server)
 		if err := grpcServer.Serve(lis); err != nil {

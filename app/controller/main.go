@@ -55,7 +55,6 @@ var (
 
 	jwtKeyset     = jwk.NewSet()
 	jwtCurrentKey string
-	mutateKey     jwk.Key
 
 	config *ControllerConfig
 
@@ -201,10 +200,6 @@ func loadKeyset() {
 	if len(config.ServiceAuth.HeaderMutationKeyName) == 0 {
 		log.Fatal("serviceAuth.headerMutationKeyName is not set")
 	}
-	var found bool
-	if mutateKey, found = jwtKeyset.LookupKeyID(config.ServiceAuth.HeaderMutationKeyName); !found {
-		log.Fatal("serviceAuth.headerMutationKeyName is not in the loaded list of keys")
-	}
 
 	log.Printf("Loaded %d serviceKeys", jwtKeyset.Len())
 }
@@ -279,10 +274,10 @@ func main() {
 	cnc := cncserver.MakeCNCServer(config, authority, routes, jwtKeyset, jwtCurrentKey, version.String())
 	go cnc.RunServer(*serverCert)
 
-	go runAgentGRPCServer(config.InsecureAgentConnections, *serverCert, jwtKeyset, mutateKey)
+	go runAgentGRPCServer(config.InsecureAgentConnections, *serverCert)
 
 	// Always listen on our well-known port, and always use HTTPS for this one.
-	go serviceconfig.RunHTTPSServer(routes, authority, *serverCert, jwtKeyset, mutateKey, serviceconfig.IncomingServiceConfig{
+	go serviceconfig.RunHTTPSServer(routes, authority, *serverCert, jwtKeyset, serviceconfig.IncomingServiceConfig{
 		Name: "_services",
 		Port: config.ServiceListenPort,
 	})
@@ -290,9 +285,9 @@ func main() {
 	// Now, add all the others defined by our config.
 	for _, service := range config.ServiceConfig.IncomingServices {
 		if service.UseHTTP {
-			go serviceconfig.RunHTTPServer(routes, jwtKeyset, mutateKey, service)
+			go serviceconfig.RunHTTPServer(routes, service)
 		} else {
-			go serviceconfig.RunHTTPSServer(routes, authority, *serverCert, jwtKeyset, mutateKey, service)
+			go serviceconfig.RunHTTPSServer(routes, authority, *serverCert, jwtKeyset, service)
 		}
 	}
 

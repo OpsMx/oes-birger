@@ -30,7 +30,6 @@ import (
 	"github.com/aws/aws-sdk-go/aws/ec2metadata"
 	"github.com/aws/aws-sdk-go/aws/session"
 	v4 "github.com/aws/aws-sdk-go/aws/signer/v4"
-	"github.com/lestrrat-go/jwx/jwk"
 	"github.com/opsmx/oes-birger/pkg/secrets"
 	"github.com/opsmx/oes-birger/pkg/tunnel"
 	"golang.org/x/net/context"
@@ -113,7 +112,7 @@ func MakeAwsEndpoint(name string, configBytes []byte, secretsLoader secrets.Secr
 
 // ExecuteHTTPRequest does the actual call to connect to HTTP, and will send the data back over the
 // tunnel.
-func (a *AwsEndpoint) ExecuteHTTPRequest(dataflow chan *tunnel.MessageWrapper, req *tunnel.OpenHTTPTunnelRequest, _ jwk.Set, _ jwk.Key) {
+func (a *AwsEndpoint) ExecuteHTTPRequest(dataflow chan *tunnel.MessageWrapper, req *tunnel.OpenHTTPTunnelRequest) {
 	log.Printf("Running request %v", req)
 	tlsConfig := &tls.Config{
 		MinVersion: tls.VersionTLS12,
@@ -177,5 +176,5 @@ func (a *AwsEndpoint) ExecuteHTTPRequest(dataflow chan *tunnel.MessageWrapper, r
 		return
 	}
 
-	tunnel.RunHTTPRequest(client, req, httpRequest, dataflow, baseURL, nil)
+	tunnel.RunHTTPRequest(client, req, httpRequest, dataflow, baseURL)
 }

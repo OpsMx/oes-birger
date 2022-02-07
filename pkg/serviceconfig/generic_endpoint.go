@@ -25,7 +25,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/lestrrat-go/jwx/jwk"
 	"github.com/opsmx/oes-birger/pkg/secrets"
 	"github.com/opsmx/oes-birger/pkg/tunnel"
 	"golang.org/x/net/context"
@@ -180,7 +179,7 @@ func MakeGenericEndpoint(endpointType string, endpointName string, configBytes [
 
 // ExecuteHTTPRequest does the actual call to connect to HTTP, and will send the data back over the
 // tunnel.
-func (ep *GenericEndpoint) ExecuteHTTPRequest(dataflow chan *tunnel.MessageWrapper, req *tunnel.OpenHTTPTunnelRequest, keyset jwk.Set, mutateKey jwk.Key) {
+func (ep *GenericEndpoint) ExecuteHTTPRequest(dataflow chan *tunnel.MessageWrapper, req *tunnel.OpenHTTPTunnelRequest) {
 	log.Printf("Running request %v", req)
 	tlsConfig := &tls.Config{
 		MinVersion: tls.VersionTLS12,
@@ -221,5 +220,5 @@ func (ep *GenericEndpoint) ExecuteHTTPRequest(dataflow chan *tunnel.MessageWrapp
 		httpRequest.Header.Set("Authorization", "Token "+creds.rawToken)
 	}
 
-	tunnel.RunHTTPRequest(client, req, httpRequest, dataflow, ep.config.URL, nil)
+	tunnel.RunHTTPRequest(client, req, httpRequest, dataflow, ep.config.URL)
 }

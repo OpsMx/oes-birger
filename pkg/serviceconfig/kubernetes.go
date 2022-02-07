@@ -30,7 +30,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/lestrrat-go/jwx/jwk"
 	"github.com/opsmx/oes-birger/pkg/kubeconfig"
 	"github.com/opsmx/oes-birger/pkg/tunnel"
 	"golang.org/x/net/context"
@@ -214,7 +213,7 @@ func (ke *KubernetesEndpoint) loadServiceAccount() (*kubeContext, error) {
 
 // ExecuteHTTPRequest does the actual call to connect to HTTP, and will send the data back over the
 // tunnel.
-func (ke *KubernetesEndpoint) ExecuteHTTPRequest(dataflow chan *tunnel.MessageWrapper, req *tunnel.OpenHTTPTunnelRequest, _ jwk.Set, _ jwk.Key) {
+func (ke *KubernetesEndpoint) ExecuteHTTPRequest(dataflow chan *tunnel.MessageWrapper, req *tunnel.OpenHTTPTunnelRequest) {
 	c := ke.makeServerContextFields()
 
 	// TODO: A ServerCA is technically optional, but we might want to fail if it's not present...
@@ -258,7 +257,7 @@ func (ke *KubernetesEndpoint) ExecuteHTTPRequest(dataflow chan *tunnel.MessageWr
 		httpRequest.Header.Set("Authorization", "Bearer "+c.token)
 	}
 
-	tunnel.RunHTTPRequest(client, req, httpRequest, dataflow, c.serverURL, nil)
+	tunnel.RunHTTPRequest(client, req, httpRequest, dataflow, c.serverURL)
 }
 
 func (ke *KubernetesEndpoint) loadKubernetesSecurity() *kubeContext {
