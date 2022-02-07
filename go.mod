@@ -3,13 +3,13 @@ module github.com/opsmx/oes-birger
 go 1.17
 
 require (
-	github.com/aws/aws-sdk-go v1.42.47
+	github.com/aws/aws-sdk-go v1.42.48
 	github.com/go-resty/resty/v2 v2.7.0
 	github.com/google/go-cmp v0.5.7
 	github.com/lestrrat-go/jwx v1.2.18
 	github.com/oklog/ulid/v2 v2.0.2
 	github.com/prometheus/client_golang v1.12.1
-	github.com/skandragon/jwtregistry v0.0.2
+	github.com/skandragon/jwtregistry v0.0.3
 	github.com/soheilhy/cmux v0.1.5
 	github.com/stretchr/testify v1.7.0
 	github.com/tevino/abool v1.2.0
@@ -63,7 +63,7 @@ require (
 	golang.org/x/text v0.3.7 // indirect
 	golang.org/x/time v0.0.0-20211116232009-f0f3c7e86c11 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
-	google.golang.org/genproto v0.0.0-20220204002441-d6cc3cc0770e // indirect
+	google.golang.org/genproto v0.0.0-20220207185906-7721543eae58 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	k8s.io/klog/v2 v2.40.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20220124234850-424119656bbf // indirect
