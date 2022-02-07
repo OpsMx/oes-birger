@@ -19,7 +19,7 @@ package util
 import (
 	"sync"
 
-	"github.com/opsmx/oes-birger/pkg/tunnel"
+	"github.com/opsmx/oes-birger/internal/tunnel"
 )
 
 // SessionList holds a list of IDs that have been used on a specific route,

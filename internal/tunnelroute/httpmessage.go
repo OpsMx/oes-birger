@@ -16,7 +16,7 @@
 
 package tunnelroute
 
-import "github.com/opsmx/oes-birger/pkg/tunnel"
+import "github.com/opsmx/oes-birger/internal/tunnel"
 
 // HTTPMessage holds the context of an incoming HTTP request.
 type HTTPMessage struct {

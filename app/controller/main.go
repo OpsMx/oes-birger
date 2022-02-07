@@ -37,12 +37,12 @@ import (
 	"github.com/lestrrat-go/jwx/jwa"
 	"github.com/lestrrat-go/jwx/jwk"
 	"github.com/opsmx/oes-birger/app/controller/cncserver"
-	"github.com/opsmx/oes-birger/pkg/ca"
-	"github.com/opsmx/oes-birger/pkg/secrets"
-	"github.com/opsmx/oes-birger/pkg/serviceconfig"
-	"github.com/opsmx/oes-birger/pkg/tunnelroute"
-	"github.com/opsmx/oes-birger/pkg/util"
-	"github.com/opsmx/oes-birger/pkg/webhook"
+	"github.com/opsmx/oes-birger/internal/ca"
+	"github.com/opsmx/oes-birger/internal/secrets"
+	"github.com/opsmx/oes-birger/internal/serviceconfig"
+	"github.com/opsmx/oes-birger/internal/tunnelroute"
+	"github.com/opsmx/oes-birger/internal/util"
+	"github.com/opsmx/oes-birger/internal/webhook"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
@@ -157,14 +157,13 @@ func loadKeyset() {
 	if config.ServiceAuth.CurrentKeyName == "" {
 		log.Fatalf("No primary serviceAuth key name provided")
 	}
-	jwtCurrentKey = config.ServiceAuth.CurrentKeyName
 
 	err := filepath.WalkDir(config.ServiceAuth.SecretsPath, func(path string, info fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
 		if !info.Type().IsRegular() {
-			return nil
+			return fmt.Errorf("Not a regular file")
 		}
 		content, err := ioutil.ReadFile(path)
 		if err != nil {
@@ -188,6 +187,18 @@ func loadKeyset() {
 	})
 	if err != nil {
 		log.Fatalf("cannot load key serviceAuth keys: %v", err)
+	}
+
+	jwtCurrentKey = config.ServiceAuth.CurrentKeyName
+	if len(jwtCurrentKey) == 0 {
+		log.Fatal("serviceAuth.currentKeyName is not set")
+	}
+	if _, found := jwtKeyset.LookupKeyID(jwtCurrentKey); !found {
+		log.Fatal("serviceAuth.currentKeyName is not in the loaded list of keys")
+	}
+
+	if len(config.ServiceAuth.HeaderMutationKeyName) == 0 {
+		log.Fatal("serviceAuth.headerMutationKeyName is not set")
 	}
 
 	log.Printf("Loaded %d serviceKeys", jwtKeyset.Len())

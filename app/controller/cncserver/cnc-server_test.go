@@ -30,8 +30,8 @@ import (
 
 	"github.com/lestrrat-go/jwx/jwa"
 	"github.com/lestrrat-go/jwx/jwk"
-	"github.com/opsmx/oes-birger/pkg/ca"
-	"github.com/opsmx/oes-birger/pkg/fwdapi"
+	"github.com/opsmx/oes-birger/internal/ca"
+	"github.com/opsmx/oes-birger/internal/fwdapi"
 )
 
 type handlerTracker struct {

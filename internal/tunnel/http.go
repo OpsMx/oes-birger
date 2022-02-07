@@ -21,24 +21,47 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"strings"
+
+	"github.com/opsmx/oes-birger/internal/jwtutil"
 )
 
 var (
-	emptyBytes = []byte("")
+	emptyBytes              = []byte("")
+	mutatedHeaders          = []string{"X-Spinnaker-User"}
+	strippedOutgoingHeaders = []string{"Authorization"}
 )
 
-// MakeHeaders copies from http headers to protobuf's format
-func MakeHeaders(headers map[string][]string) []*HttpHeader {
+func containsFolded(l []string, t string) bool {
+	for i := 0; i < len(l); i++ {
+		if strings.EqualFold(l[i], t) {
+			return true
+		}
+	}
+	return false
+}
+
+// MakeHeaders copies from http headers to protobuf's format, possibly with mutation
+func MakeHeaders(headers map[string][]string) ([]*HttpHeader, error) {
 	ret := make([]*HttpHeader, 0)
 	for name, values := range headers {
-		if name != "Authorization" {
+		if containsFolded(mutatedHeaders, name) {
+			// only handle the first item in the list, which is typical here
+			value := values[0]
+			mutated, err := jwtutil.MutateHeader(value, nil)
+			if err != nil {
+				return nil, err
+			}
+			ret = append(ret, &HttpHeader{Name: name, Values: []string{string(mutated)}})
+		} else if !containsFolded(strippedOutgoingHeaders, name) {
 			ret = append(ret, &HttpHeader{Name: name, Values: values})
 		}
 	}
-	return ret
+	return ret, nil
 }
 
-// CopyHeaders will copy the headers from a tunnel request to the http request.
+// CopyHeaders will copy the headers from a tunnel request to the http request, possibly
+// with unmutation
 func CopyHeaders(req *OpenHTTPTunnelRequest, httpRequest *http.Request) {
 	for _, header := range req.Headers {
 		for _, value := range header.Values {
@@ -80,7 +103,11 @@ func MakeBadGatewayResponse(id string) *MessageWrapper {
 	}
 }
 
-func makeResponse(id string, response *http.Response) *MessageWrapper {
+func makeResponse(id string, response *http.Response) (*MessageWrapper, error) {
+	headers, err := MakeHeaders(response.Header)
+	if err != nil {
+		return nil, err
+	}
 	return &MessageWrapper{
 		Event: &MessageWrapper_HttpTunnelControl{
 			HttpTunnelControl: &HttpTunnelControl{
@@ -89,12 +116,12 @@ func makeResponse(id string, response *http.Response) *MessageWrapper {
 						Id:            id,
 						Status:        int32(response.StatusCode),
 						ContentLength: response.ContentLength,
-						Headers:       MakeHeaders(response.Header),
+						Headers:       headers,
 					},
 				},
 			},
 		},
-	}
+	}, nil
 }
 
 // RunHTTPRequest will make a HTTP request, and send the data to the remote end.
@@ -108,7 +135,13 @@ func RunHTTPRequest(client *http.Client, req *OpenHTTPTunnelRequest, httpRequest
 	}
 
 	// First, send the headers.
-	dataflow <- makeResponse(req.Id, httpResponse)
+	response, err := makeResponse(req.Id, httpResponse)
+	if err != nil {
+		log.Printf("Failed to unmutate headers: %v", err)
+		dataflow <- MakeBadGatewayResponse(req.Id)
+		return
+	}
+	dataflow <- response
 
 	// Now, send one or more data packet.
 	for {

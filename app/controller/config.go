@@ -24,8 +24,8 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/opsmx/oes-birger/pkg/ca"
-	"github.com/opsmx/oes-birger/pkg/serviceconfig"
+	"github.com/opsmx/oes-birger/internal/ca"
+	"github.com/opsmx/oes-birger/internal/serviceconfig"
 )
 
 // ControllerConfig holds all the configuration for the controller.  The
@@ -54,8 +54,9 @@ type agentConfig struct {
 }
 
 type serviceAuthConfig struct {
-	CurrentKeyName string `yaml:"currentKeyName,omitempty"`
-	SecretsPath    string `yaml:"secretsPath,omitempty"`
+	CurrentKeyName        string `yaml:"currentKeyName,omitempty"`
+	HeaderMutationKeyName string `yaml:"headerMutationKeyName,omitempty"`
+	SecretsPath           string `yaml:"secretsPath,omitempty"`
 }
 
 // LoadConfig will load YAML configuration from the provided filename,

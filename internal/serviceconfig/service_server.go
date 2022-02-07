@@ -24,12 +24,12 @@ import (
 	"net/http"
 
 	"github.com/lestrrat-go/jwx/jwk"
-	"github.com/opsmx/oes-birger/pkg/ca"
-	"github.com/opsmx/oes-birger/pkg/jwtutil"
-	"github.com/opsmx/oes-birger/pkg/tunnel"
-	"github.com/opsmx/oes-birger/pkg/tunnelroute"
-	"github.com/opsmx/oes-birger/pkg/ulid"
-	"github.com/opsmx/oes-birger/pkg/util"
+	"github.com/opsmx/oes-birger/internal/ca"
+	"github.com/opsmx/oes-birger/internal/jwtutil"
+	"github.com/opsmx/oes-birger/internal/tunnel"
+	"github.com/opsmx/oes-birger/internal/tunnelroute"
+	"github.com/opsmx/oes-birger/internal/ulid"
+	"github.com/opsmx/oes-birger/internal/util"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/tevino/abool"
@@ -201,14 +201,27 @@ func runAPIHandler(routes *tunnelroute.ConnectedRoutes, ep tunnelroute.Search, w
 	apiRequestCounter.WithLabelValues(ep.Name, ep.EndpointName).Inc()
 	transactionID := ulid.GlobalContext.Ulid()
 
-	body, _ := ioutil.ReadAll(r.Body)
+	body, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		log.Printf("unable to read entire message body")
+		w.WriteHeader(http.StatusServiceUnavailable)
+		return
+	}
+
+	headers, err := tunnel.MakeHeaders(r.Header)
+	if err != nil {
+		log.Printf("unable to convert headers")
+		w.WriteHeader(http.StatusServiceUnavailable)
+		return
+	}
+
 	req := &tunnel.OpenHTTPTunnelRequest{
 		Id:      transactionID,
 		Type:    ep.EndpointType,
 		Name:    ep.EndpointName,
 		Method:  r.Method,
 		URI:     r.RequestURI,
-		Headers: tunnel.MakeHeaders(r.Header),
+		Headers: headers,
 		Body:    body,
 	}
 	message := &tunnelroute.HTTPMessage{Out: make(chan *tunnel.MessageWrapper), Cmd: req}
@@ -255,6 +268,7 @@ func handleTunnelControl(state *apiHandlerState, tunnelControl *tunnel.HttpTunne
 		state.seenHeader = true
 		state.isChunked = resp.ContentLength < 0
 		copyHeaders(resp, w)
+		// TODO: unmutate headers
 		w.WriteHeader(int(resp.Status))
 		if resp.ContentLength == 0 {
 			state.cleanClose.Set()

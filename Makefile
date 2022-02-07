@@ -37,7 +37,7 @@ IMAGE_TARGETS = controller agent make-ca
 # Due to the way we build, we will make the universe no matter which files
 # actually change.  With the many targets, this is just so much easier,
 # and it also ensures the Docker images have identical timestamp-based tags.
-pb_deps = pkg/tunnel/tunnel.pb.go pkg/tunnel/tunnel_grpc.pb.go
+pb_deps = internal/tunnel/tunnel.pb.go internal/tunnel/tunnel_grpc.pb.go
 all_deps := ${pb_deps} $(shell find * -name '*.go' | grep -v _test)
 
 now := $(shell date -u +%Y%m%dT%H%M%S)
@@ -58,12 +58,12 @@ buildtime:
 # Common components, like GRPC client code generation.
 #
 
-pkg/tunnel/tunnel.pb.go: go.mod pkg/tunnel/tunnel.proto
+internal/tunnel/tunnel.pb.go: go.mod internal/tunnel/tunnel.proto
 	protoc --go_out=. \
 		--go_opt=paths=source_relative \
 		--go-grpc_out=. \
 		--go-grpc_opt=paths=source_relative \
-		pkg/tunnel/tunnel.proto
+		internal/tunnel/tunnel.proto
 
 #
 # Build locally, mostly for development speed.

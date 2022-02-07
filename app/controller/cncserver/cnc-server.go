@@ -30,10 +30,10 @@ import (
 
 	"github.com/lestrrat-go/jwx/jwk"
 	"github.com/oklog/ulid/v2"
-	"github.com/opsmx/oes-birger/pkg/ca"
-	"github.com/opsmx/oes-birger/pkg/fwdapi"
-	"github.com/opsmx/oes-birger/pkg/jwtutil"
-	"github.com/opsmx/oes-birger/pkg/util"
+	"github.com/opsmx/oes-birger/internal/ca"
+	"github.com/opsmx/oes-birger/internal/fwdapi"
+	"github.com/opsmx/oes-birger/internal/jwtutil"
+	"github.com/opsmx/oes-birger/internal/util"
 )
 
 type cncCertificateAuthority interface {

@@ -25,11 +25,11 @@ import (
 	"net"
 	"sync/atomic"
 
-	"github.com/opsmx/oes-birger/pkg/serviceconfig"
-	"github.com/opsmx/oes-birger/pkg/tunnel"
-	"github.com/opsmx/oes-birger/pkg/tunnelroute"
-	"github.com/opsmx/oes-birger/pkg/ulid"
-	"github.com/opsmx/oes-birger/pkg/util"
+	"github.com/opsmx/oes-birger/internal/serviceconfig"
+	"github.com/opsmx/oes-birger/internal/tunnel"
+	"github.com/opsmx/oes-birger/internal/tunnelroute"
+	"github.com/opsmx/oes-birger/internal/ulid"
+	"github.com/opsmx/oes-birger/internal/util"
 	"github.com/soheilhy/cmux"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -270,10 +270,6 @@ type agentTunnelServer struct {
 	insecure  bool
 }
 
-func newAgentServer(insecure bool) *agentTunnelServer {
-	return &agentTunnelServer{insecure: insecure}
-}
-
 func runAgentGRPCServer(insecureAgents bool, serverCert tls.Certificate) {
 	log.Printf("Starting Agent GRPC server on port %d...", config.AgentListenPort)
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", config.AgentListenPort))
@@ -286,7 +282,7 @@ func runAgentGRPCServer(insecureAgents bool, serverCert tls.Certificate) {
 		grpcL := m.MatchWithWriters(cmux.HTTP2MatchHeaderFieldSendSettings("content-type", "application/grpc"))
 
 		grpcServer := grpc.NewServer()
-		server := newAgentServer(insecureAgents)
+		server := &agentTunnelServer{insecure: insecureAgents}
 		server.endpoints = endpoints
 		tunnel.RegisterAgentTunnelServiceServer(grpcServer, server)
 
@@ -312,7 +308,7 @@ func runAgentGRPCServer(insecureAgents bool, serverCert tls.Certificate) {
 		})
 		opts := []grpc.ServerOption{grpc.Creds(creds)}
 		grpcServer := grpc.NewServer(opts...)
-		server := newAgentServer(insecureAgents)
+		server := &agentTunnelServer{insecure: insecureAgents}
 		server.endpoints = endpoints
 		tunnel.RegisterAgentTunnelServiceServer(grpcServer, server)
 		if err := grpcServer.Serve(lis); err != nil {

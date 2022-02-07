@@ -30,8 +30,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/opsmx/oes-birger/pkg/kubeconfig"
-	"github.com/opsmx/oes-birger/pkg/tunnel"
+	"github.com/opsmx/oes-birger/internal/kubeconfig"
+	"github.com/opsmx/oes-birger/internal/tunnel"
 	"golang.org/x/net/context"
 	"gopkg.in/yaml.v3"
 )

@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/opsmx/oes-birger/pkg/secrets"
-	"github.com/opsmx/oes-birger/pkg/tunnel"
+	"github.com/opsmx/oes-birger/internal/secrets"
+	"github.com/opsmx/oes-birger/internal/tunnel"
 	"gopkg.in/yaml.v2"
 )
 

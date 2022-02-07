@@ -25,8 +25,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/opsmx/oes-birger/pkg/secrets"
-	"github.com/opsmx/oes-birger/pkg/tunnel"
+	"github.com/opsmx/oes-birger/internal/secrets"
+	"github.com/opsmx/oes-birger/internal/tunnel"
 	"golang.org/x/net/context"
 	"gopkg.in/yaml.v3"
 )
