@@ -22,14 +22,16 @@ import (
 	"github.com/lestrrat-go/jwx/jwt"
 	"github.com/skandragon/jwtregistry"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func Test_MutateHeader(t *testing.T) {
 	jwtregistry.Clear()
-	jwtregistry.Register(RegistryName, "opsmx-clouddriver-proxy",
+	err := jwtregistry.Register(RegistryName, "opsmx-clouddriver-proxy",
 		jwtregistry.WithKeyset(loadkeys(t)),
 		jwtregistry.WithSigningKeyName("key1"),
 	)
+	require.NoError(t, err)
 	type args struct {
 		data  string
 		clock jwt.Clock
@@ -64,10 +66,11 @@ func Test_MutateHeader(t *testing.T) {
 
 func TestUnmutateHeader(t *testing.T) {
 	jwtregistry.Clear()
-	jwtregistry.Register(RegistryName, "opsmx-clouddriver-proxy",
+	err := jwtregistry.Register(RegistryName, "opsmx-clouddriver-proxy",
 		jwtregistry.WithKeyset(loadkeys(t)),
 		jwtregistry.WithSigningKeyName("key1"),
 	)
+	require.NoError(t, err)
 	type args struct {
 		tokenString []byte
 		clock       jwt.Clock
