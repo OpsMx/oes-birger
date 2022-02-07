@@ -23,7 +23,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/opsmx/oes-birger/pkg/ca"
+	"github.com/opsmx/oes-birger/internal/ca"
 )
 
 var (

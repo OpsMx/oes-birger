@@ -8,11 +8,11 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/opsmx/oes-birger/pkg/serviceconfig"
-	"github.com/opsmx/oes-birger/pkg/tunnel"
-	"github.com/opsmx/oes-birger/pkg/tunnelroute"
-	"github.com/opsmx/oes-birger/pkg/ulid"
-	"github.com/opsmx/oes-birger/pkg/util"
+	"github.com/opsmx/oes-birger/internal/serviceconfig"
+	"github.com/opsmx/oes-birger/internal/tunnel"
+	"github.com/opsmx/oes-birger/internal/tunnelroute"
+	"github.com/opsmx/oes-birger/internal/ulid"
+	"github.com/opsmx/oes-birger/internal/util"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 )

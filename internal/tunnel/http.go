@@ -23,7 +23,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/opsmx/oes-birger/pkg/jwtutil"
+	"github.com/opsmx/oes-birger/internal/jwtutil"
 )
 
 var (

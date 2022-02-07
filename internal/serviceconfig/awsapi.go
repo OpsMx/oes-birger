@@ -30,8 +30,8 @@ import (
 	"github.com/aws/aws-sdk-go/aws/ec2metadata"
 	"github.com/aws/aws-sdk-go/aws/session"
 	v4 "github.com/aws/aws-sdk-go/aws/signer/v4"
-	"github.com/opsmx/oes-birger/pkg/secrets"
-	"github.com/opsmx/oes-birger/pkg/tunnel"
+	"github.com/opsmx/oes-birger/internal/secrets"
+	"github.com/opsmx/oes-birger/internal/tunnel"
 	"golang.org/x/net/context"
 	"gopkg.in/yaml.v3"
 )

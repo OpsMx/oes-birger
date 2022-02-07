@@ -37,12 +37,12 @@ import (
 	"github.com/lestrrat-go/jwx/jwa"
 	"github.com/lestrrat-go/jwx/jwk"
 	"github.com/opsmx/oes-birger/app/controller/cncserver"
-	"github.com/opsmx/oes-birger/pkg/ca"
-	"github.com/opsmx/oes-birger/pkg/secrets"
-	"github.com/opsmx/oes-birger/pkg/serviceconfig"
-	"github.com/opsmx/oes-birger/pkg/tunnelroute"
-	"github.com/opsmx/oes-birger/pkg/util"
-	"github.com/opsmx/oes-birger/pkg/webhook"
+	"github.com/opsmx/oes-birger/internal/ca"
+	"github.com/opsmx/oes-birger/internal/secrets"
+	"github.com/opsmx/oes-birger/internal/serviceconfig"
+	"github.com/opsmx/oes-birger/internal/tunnelroute"
+	"github.com/opsmx/oes-birger/internal/util"
+	"github.com/opsmx/oes-birger/internal/webhook"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 

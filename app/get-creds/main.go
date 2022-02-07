@@ -24,7 +24,7 @@ import (
 	"os"
 
 	"github.com/go-resty/resty/v2"
-	"github.com/opsmx/oes-birger/pkg/fwdapi"
+	"github.com/opsmx/oes-birger/internal/fwdapi"
 )
 
 var (
