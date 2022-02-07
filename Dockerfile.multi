@@ -33,7 +33,7 @@ FROM buildmod AS build-binaries
 COPY . .
 ARG TARGETOS
 ARG TARGETARCH
-RUN touch pkg/tunnel/tunnel.pb.go
+RUN touch internal/tunnel/tunnel.pb.go
 RUN mkdir /out /out/agent-binaries
 RUN GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="-s -w" -o /out/agent app/agent/*.go
 RUN GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="-s -w" -o /out/controller app/controller/*.go

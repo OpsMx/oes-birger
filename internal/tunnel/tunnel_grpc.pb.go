@@ -129,5 +129,5 @@ var AgentTunnelService_ServiceDesc = grpc.ServiceDesc{
 			ClientStreams: true,
 		},
 	},
-	Metadata: "pkg/tunnel/tunnel.proto",
+	Metadata: "internal/tunnel/tunnel.proto",
 }

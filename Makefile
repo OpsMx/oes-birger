@@ -58,12 +58,12 @@ buildtime:
 # Common components, like GRPC client code generation.
 #
 
-pkg/tunnel/tunnel.pb.go: go.mod pkg/tunnel/tunnel.proto
+internal/tunnel/tunnel.pb.go: go.mod internal/tunnel/tunnel.proto
 	protoc --go_out=. \
 		--go_opt=paths=source_relative \
 		--go-grpc_out=. \
 		--go-grpc_opt=paths=source_relative \
-		pkg/tunnel/tunnel.proto
+		internal/tunnel/tunnel.proto
 
 #
 # Build locally, mostly for development speed.
