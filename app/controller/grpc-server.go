@@ -270,10 +270,6 @@ type agentTunnelServer struct {
 	insecure  bool
 }
 
-func newAgentServer(insecure bool) *agentTunnelServer {
-	return &agentTunnelServer{insecure: insecure}
-}
-
 func runAgentGRPCServer(insecureAgents bool, serverCert tls.Certificate) {
 	log.Printf("Starting Agent GRPC server on port %d...", config.AgentListenPort)
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", config.AgentListenPort))
