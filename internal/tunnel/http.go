@@ -45,18 +45,14 @@ func containsFolded(l []string, t string) bool {
 func MakeHeaders(headers map[string][]string) (ret []*HttpHeader, err error) {
 	ret = make([]*HttpHeader, 0)
 	for name, values := range headers {
-		if containsFolded(mutatedHeaders, name) {
+		if jwtutil.MutationIsRegistered() && containsFolded(mutatedHeaders, name) {
 			// only handle the first item in the list, which is typical here
 			value := values[0]
-			mutated := value
-			if jwtutil.MutationIsRegistered() {
-				mutatedBytes, err := jwtutil.MutateHeader(value, nil)
-				if err != nil {
-					return nil, err
-				}
-				mutated = string(mutatedBytes)
+			mutated, err := jwtutil.MutateHeader(value, nil)
+			if err != nil {
+				return nil, err
 			}
-			ret = append(ret, &HttpHeader{Name: name, Values: []string{mutated}})
+			ret = append(ret, &HttpHeader{Name: name, Values: []string{string(mutated)}})
 		} else if !containsFolded(strippedOutgoingHeaders, name) {
 			ret = append(ret, &HttpHeader{Name: name, Values: values})
 		}
@@ -68,8 +64,18 @@ func MakeHeaders(headers map[string][]string) (ret []*HttpHeader, err error) {
 // with unmutation.
 func CopyHeaders(headers []*HttpHeader, out *http.Header) error {
 	for _, header := range headers {
-		for _, value := range header.Values {
-			out.Add(header.Name, value)
+		if jwtutil.MutationIsRegistered() && containsFolded(mutatedHeaders, header.Name) {
+			// only handle the first value here as well
+			value := header.Values[0]
+			unmutated, err := jwtutil.UnmutateHeader([]byte(value), nil)
+			if err != nil {
+				return err
+			}
+			out.Add(header.Name, unmutated)
+		} else {
+			for _, value := range header.Values {
+				out.Add(header.Name, value)
+			}
 		}
 	}
 	return nil

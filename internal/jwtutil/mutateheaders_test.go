@@ -27,7 +27,6 @@ import (
 )
 
 func Test_MutateHeader(t *testing.T) {
-	jwtregistry.Clear()
 	err := RegisterMutationKeyset(LoadTestKeys(t), "key1")
 	require.NoError(t, err)
 	type args struct {
@@ -64,7 +63,6 @@ func Test_MutateHeader(t *testing.T) {
 }
 
 func TestUnmutateHeader(t *testing.T) {
-	jwtregistry.Clear()
 	err := jwtregistry.Register(mutateRegistryName, "opsmx-clouddriver-proxy",
 		jwtregistry.WithKeyset(LoadTestKeys(t)),
 		jwtregistry.WithSigningKeyName("key1"),
@@ -156,4 +154,17 @@ func TestUnmutateHeader(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestUnregisterMutationKeyset(t *testing.T) {
+	err := jwtregistry.Register(mutateRegistryName, "opsmx-clouddriver-proxy",
+		jwtregistry.WithKeyset(LoadTestKeys(t)),
+		jwtregistry.WithSigningKeyName("key1"),
+	)
+	require.NoError(t, err)
+	t.Run("register/unregister sequence", func(t *testing.T) {
+		assert.True(t, MutationIsRegistered())
+		UnregisterMutationKeyset()
+		assert.False(t, MutationIsRegistered())
+	})
 }

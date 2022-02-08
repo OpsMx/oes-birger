@@ -21,7 +21,6 @@ import (
 	"testing"
 
 	"github.com/opsmx/oes-birger/internal/jwtutil"
-	"github.com/skandragon/jwtregistry"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -52,17 +51,16 @@ func Test_containsFolded(t *testing.T) {
 }
 
 func TestMakeHeaders_NoMutation(t *testing.T) {
+	jwtutil.UnregisterMutationKeyset()
 	tests := []struct {
 		name    string
 		headers map[string][]string
 		wantRet []*HttpHeader
-		wantErr bool
 	}{
 		{
 			"empty headers",
 			map[string][]string{},
 			[]*HttpHeader{},
-			false,
 		},
 		{
 			"one item",
@@ -70,7 +68,6 @@ func TestMakeHeaders_NoMutation(t *testing.T) {
 			[]*HttpHeader{
 				{Name: "foo", Values: []string{"bar"}},
 			},
-			false,
 		},
 		{
 			"two items",
@@ -79,7 +76,6 @@ func TestMakeHeaders_NoMutation(t *testing.T) {
 				{Name: "foo", Values: []string{"bar"}},
 				{Name: "baz", Values: []string{"bax"}},
 			},
-			false,
 		},
 		{
 			"one item, two values",
@@ -87,7 +83,6 @@ func TestMakeHeaders_NoMutation(t *testing.T) {
 			[]*HttpHeader{
 				{Name: "foo", Values: []string{"bar", "baz"}},
 			},
-			false,
 		},
 		{
 			"does not mutate mutatable headers if not registered",
@@ -95,16 +90,21 @@ func TestMakeHeaders_NoMutation(t *testing.T) {
 			[]*HttpHeader{
 				{Name: mutatedHeaders[0], Values: []string{"bar"}},
 			},
-			false,
+		},
+		{
+			"strips",
+			map[string][]string{
+				strippedOutgoingHeaders[0]: {"bar"},
+				"foo":                      {"bar"},
+			},
+			[]*HttpHeader{
+				{Name: "foo", Values: []string{"bar"}},
+			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			gotRet, err := MakeHeaders(tt.headers)
-			if tt.wantErr {
-				require.Error(t, err)
-				return
-			}
 			require.NoError(t, err)
 			assert.ElementsMatch(t, tt.wantRet, gotRet)
 		})
@@ -112,7 +112,6 @@ func TestMakeHeaders_NoMutation(t *testing.T) {
 }
 
 func TestMakeHeaders_Mutation(t *testing.T) {
-	jwtregistry.Clear()
 	keyset := jwtutil.LoadTestKeys(t)
 	err := jwtutil.RegisterMutationKeyset(keyset, "key1")
 	require.NoError(t, err)
@@ -177,7 +176,6 @@ func TestMakeHeaders_Mutation(t *testing.T) {
 }
 
 func TestMakeHeaders_MutationBroken(t *testing.T) {
-	jwtregistry.Clear()
 	keyset := jwtutil.LoadTestKeys(t)
 	err := jwtutil.RegisterMutationKeyset(keyset, "keynotthere")
 	require.NoError(t, err)
@@ -189,7 +187,8 @@ func TestMakeHeaders_MutationBroken(t *testing.T) {
 	})
 }
 
-func TestCopyHeaders(t *testing.T) {
+func TestCopyHeaders_NoUnmutate(t *testing.T) {
+	jwtutil.UnregisterMutationKeyset()
 	tests := []struct {
 		name        string
 		headers     []*HttpHeader
@@ -224,11 +223,98 @@ func TestCopyHeaders(t *testing.T) {
 				"Bob":   {"baz"},
 			},
 		},
+		{
+			"one item, mutatable header, not mutated due to no registry entry",
+			[]*HttpHeader{
+				{Name: mutatedHeaders[0], Values: []string{"baz"}},
+			},
+			http.Header{
+				mutatedHeaders[0]: {"baz"}, // note case is expected
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := http.Header{}
 			err := CopyHeaders(tt.headers, &got)
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantHeaders, got)
+		})
+	}
+}
+
+func TestCopyHeaders_Unmutate(t *testing.T) {
+	keyset := jwtutil.LoadTestKeys(t)
+	err := jwtutil.RegisterMutationKeyset(keyset, "key1")
+	require.NoError(t, err)
+	tests := []struct {
+		name        string
+		headers     []*HttpHeader
+		wantHeaders http.Header
+		wantErr     bool
+	}{
+		{
+			"one item",
+			[]*HttpHeader{
+				{Name: "bob", Values: []string{"baz"}},
+			},
+			http.Header{
+				"Bob": {"baz"}, // note case is expected
+			},
+			false,
+		},
+		{
+			"one item, mutatable header, unmutated",
+			[]*HttpHeader{
+				{Name: mutatedHeaders[0], Values: []string{"eyJhbGciOiJIUzI1NiIsImtpZCI6ImtleTEiLCJ0eXAiOiJKV1QifQ.eyJpYXQiOjExMTEsImlzcyI6Im9wc214LWhlYWRlci1tdXRhdGlvbiIsInUiOiJhbGljZSJ9.Qm6oubKqTW7ZHQ0IB8lc_04Nnqj_jXEeNECBy-06to4"}},
+			},
+			http.Header{
+				mutatedHeaders[0]: {"alice"},
+			},
+			false,
+		},
+		{
+			"two items, one mutatable header, unmutated",
+			[]*HttpHeader{
+				{Name: "bob", Values: []string{"baz"}},
+				{Name: mutatedHeaders[0], Values: []string{"eyJhbGciOiJIUzI1NiIsImtpZCI6ImtleTEiLCJ0eXAiOiJKV1QifQ.eyJpYXQiOjExMTEsImlzcyI6Im9wc214LWhlYWRlci1tdXRhdGlvbiIsInUiOiJhbGljZSJ9.Qm6oubKqTW7ZHQ0IB8lc_04Nnqj_jXEeNECBy-06to4"}},
+			},
+			http.Header{
+				"Bob":             {"baz"},
+				mutatedHeaders[0]: {"alice"},
+			},
+			false,
+		},
+		{
+			"one item, mutatable header, only first item unmutated",
+			[]*HttpHeader{
+				{Name: mutatedHeaders[0], Values: []string{
+					"eyJhbGciOiJIUzI1NiIsImtpZCI6ImtleTEiLCJ0eXAiOiJKV1QifQ.eyJpYXQiOjExMTEsImlzcyI6Im9wc214LWhlYWRlci1tdXRhdGlvbiIsInUiOiJhbGljZSJ9.Qm6oubKqTW7ZHQ0IB8lc_04Nnqj_jXEeNECBy-06to4",
+					"eyJhbGciOiJIUzI1NiIsImtpZCI6ImtleTEiLCJ0eXAiOiJKV1QifQ.eyJpYXQiOjExMTEsImlzcyI6Im9wc214LWhlYWRlci1tdXRhdGlvbiIsInUiOiJib2IifQ.6BcMt4RWXr2dO7v-t_hEHmWKfCjqUbqOeZ4_z5mFIjE",
+				}},
+			},
+			http.Header{
+				mutatedHeaders[0]: {"alice"},
+			},
+			false,
+		},
+		{
+			"one item, mutatable header, junk in",
+			[]*HttpHeader{
+				{Name: mutatedHeaders[0], Values: []string{"nota-token.nota-token.notatoken"}},
+			},
+			http.Header{},
+			true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := http.Header{}
+			err := CopyHeaders(tt.headers, &got)
+			if tt.wantErr {
+				require.Error(t, err)
+				return
+			}
 			require.NoError(t, err)
 			assert.Equal(t, tt.wantHeaders, got)
 		})

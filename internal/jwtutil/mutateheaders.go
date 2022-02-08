@@ -66,6 +66,12 @@ func RegisterMutationKeyset(keyset jwk.Set, signingKeyName string) error {
 	)
 }
 
+// UnregisterMutationKeyset removes the registration.  This is mostly for testing.
+func UnregisterMutationKeyset() {
+	mutationRegistered = false
+	jwtregistry.Delete(mutateRegistryName)
+}
+
 // MutationIsRegistered indicates if RegisterMutationKeyset was called at least once.
 func MutationIsRegistered() bool {
 	return mutationRegistered
