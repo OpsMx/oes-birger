@@ -208,7 +208,12 @@ func (ep *GenericEndpoint) ExecuteHTTPRequest(dataflow chan *tunnel.MessageWrapp
 		return
 	}
 
-	tunnel.CopyHeaders(req.Headers, &httpRequest.Header)
+	err = tunnel.CopyHeaders(req.Headers, &httpRequest.Header)
+	if err != nil {
+		log.Printf("failed to copy headers: %v", err)
+		dataflow <- tunnel.MakeBadGatewayResponse(req.Id)
+		return
+	}
 
 	creds := ep.config.Credentials
 	switch creds.Type {
