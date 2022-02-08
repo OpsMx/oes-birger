@@ -1,0 +1,17 @@
+outgoingServices:
+  - name: poc-clouddriver
+    type: clouddriver
+    enabled: true
+    config:
+      url: http://poc-clouddriver:7002
+incomingServices:
+  - name: poc-fiat
+    serviceType: fiat
+    port: 7003
+    destination: controller
+    destinationService: poc-fiat
+  - name: poc-front50
+    serviceType: frontfifty
+    port: 8080
+    destination: controller
+    destinationService: poc-front50
