@@ -42,17 +42,21 @@ func containsFolded(l []string, t string) bool {
 }
 
 // MakeHeaders copies from http headers to protobuf's format, possibly with mutation
-func MakeHeaders(headers map[string][]string) ([]*HttpHeader, error) {
-	ret := make([]*HttpHeader, 0)
+func MakeHeaders(headers map[string][]string) (ret []*HttpHeader, err error) {
+	ret = make([]*HttpHeader, 0)
 	for name, values := range headers {
 		if containsFolded(mutatedHeaders, name) {
 			// only handle the first item in the list, which is typical here
 			value := values[0]
-			mutated, err := jwtutil.MutateHeader(value, nil)
-			if err != nil {
-				return nil, err
+			mutated := value
+			if jwtutil.MutationIsRegistered() {
+				mutatedBytes, err := jwtutil.MutateHeader(value, nil)
+				if err != nil {
+					return nil, err
+				}
+				mutated = string(mutatedBytes)
 			}
-			ret = append(ret, &HttpHeader{Name: name, Values: []string{string(mutated)}})
+			ret = append(ret, &HttpHeader{Name: name, Values: []string{mutated}})
 		} else if !containsFolded(strippedOutgoingHeaders, name) {
 			ret = append(ret, &HttpHeader{Name: name, Values: values})
 		}
