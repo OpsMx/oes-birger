@@ -58,13 +58,6 @@ func MakeJWT(epType string, epName string, agent string, clock jwt.Clock) (strin
 	return string(signed), nil
 }
 
-func getField(token jwt.Token, name string) (string, error) {
-	if i, ok := token.Get(name); ok {
-		return i.(string), nil
-	}
-	return "", fmt.Errorf("missing %s", name)
-}
-
 // ValidateJWT will validate and return the enbedded claims.
 func ValidateJWT(tokenString string, clock jwt.Clock) (epType string, epName string, agent string, err error) {
 	claims, err := jwtregistry.Validate(serviceauthRegistryName, []byte(tokenString), clock)

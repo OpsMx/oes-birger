@@ -60,18 +60,53 @@ func TestMakeJWT(t *testing.T) {
 	}
 }
 
+func TestMakeJWT_BrokenSigner(t *testing.T) {
+	keyset := LoadTestKeys(t)
+	err := RegisterServiceauthKeyset(keyset, "not-there")
+	require.NoError(t, err)
+	tests := []struct {
+		name    string
+		epType  string
+		epName  string
+		agent   string
+		clock   jwt.Clock
+		want    string
+		wantErr bool
+	}{
+		{
+			"key1",
+			"artifactory",
+			"bob",
+			"agent1",
+			&jwtregistry.TimeClock{NowTime: 1111},
+			"",
+			true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := MakeJWT(tt.epType, tt.epName, tt.agent, tt.clock)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("MakeJWT() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
 func TestValidateJWT(t *testing.T) {
 	keyset := LoadTestKeys(t)
 	err := RegisterServiceauthKeyset(keyset, "key1")
 	require.NoError(t, err)
 	tests := []struct {
-		name      string
-		token     string
-		clock     jwt.Clock
-		wantType  string
-		wantName  string
-		wantAgent string
-		wantErr   bool
+		name          string
+		token         string
+		clock         jwt.Clock
+		wantType      string
+		wantName      string
+		wantAgent     string
+		wantErrString string
 	}{
 		{
 			"valid",
@@ -80,34 +115,56 @@ func TestValidateJWT(t *testing.T) {
 			"artifactory",
 			"bob",
 			"agent1",
-			false,
+			"",
 		},
 		{
-			"invalid1",
+			"wrong-issuer",
 			"eyJhbGciOiJIUzI1NiIsImtpZCI6ImtleTEiLCJ0eXAiOiJKV1QifQ.eyJhIjoiYWdlbnQxIiwiaWF0IjoxMTExLCJpc3MiOiJub3QtdmFsaWQiLCJuIjoiYm9iIiwidCI6ImFydGlmYWN0b3J5In0.bplIcfd1SlifxrzOKTuXTj5J1VkSkmmRw2PsRWzFymc",
 			&jwtregistry.TimeClock{NowTime: 1111},
 			"",
 			"",
 			"",
-			true,
+			`"iss" not satisfied: values do not match`,
+		},
+		{
+			"missing-a",
+			"eyJhbGciOiJIUzI1NiIsImtpZCI6ImtleTEiLCJ0eXAiOiJKV1QifQ.eyJheCI6ImFnZW50MSIsImlhdCI6MTExMSwiaXNzIjoib3BzbXgiLCJuIjoiYm9iIiwidCI6ImFydGlmYWN0b3J5In0.9wy-WWMMDTDiDNZ1XF0a7cCgNfvTTlxbyxkag9PKoq4",
+			&jwtregistry.TimeClock{NowTime: 1111},
+			"",
+			"",
+			"",
+			`no 'a' key in JWT claims`,
+		},
+		{
+			"missing-n",
+			"eyJhbGciOiJIUzI1NiIsImtpZCI6ImtleTEiLCJ0eXAiOiJKV1QifQ.eyJhIjoiYWdlbnQxIiwiaWF0IjoxMTExLCJpc3MiOiJvcHNteCIsIm54IjoiYm9iIiwidCI6ImFydGlmYWN0b3J5In0.LSH68qx5PEkB-lfN5nztFVYFlSZChCU33zJf2NWVxBE",
+			&jwtregistry.TimeClock{NowTime: 1111},
+			"",
+			"",
+			"",
+			`no 'n' key in JWT claims`,
+		},
+		{
+			"missing-t",
+			"eyJhbGciOiJIUzI1NiIsImtpZCI6ImtleTEiLCJ0eXAiOiJKV1QifQ.eyJhIjoiYWdlbnQxIiwiaWF0IjoxMTExLCJpc3MiOiJvcHNteCIsIm4iOiJib2IiLCJ0eCI6ImFydGlmYWN0b3J5In0.noL3WZ4ScRylMOSP1ZKjJ0vPLudMSQc5CGB77W6WyFE",
+			&jwtregistry.TimeClock{NowTime: 1111},
+			"",
+			"",
+			"",
+			`no 't' key in JWT claims`,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			gotType, gotName, gotAgent, err := ValidateJWT(tt.token, tt.clock)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("ValidateJWT() error = %v, wantErr %v", err, tt.wantErr)
+			if tt.wantErrString != "" {
+				require.EqualError(t, err, tt.wantErrString)
 				return
 			}
-			if gotType != tt.wantType {
-				t.Errorf("ValidateJWT() gotType = %v, want %v", gotType, tt.wantType)
-			}
-			if gotName != tt.wantName {
-				t.Errorf("ValidateJWT() gotName = %v, want %v", gotName, tt.wantName)
-			}
-			if gotAgent != tt.wantAgent {
-				t.Errorf("ValidateJWT() gotAgent = %v, want %v", gotAgent, tt.wantAgent)
-			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantAgent, gotAgent)
+			assert.Equal(t, tt.wantName, gotName)
+			assert.Equal(t, tt.wantType, gotType)
 		})
 	}
 }
