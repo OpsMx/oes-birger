@@ -66,12 +66,13 @@ func MakeHeaders(headers map[string][]string) (ret []*HttpHeader, err error) {
 
 // CopyHeaders will copy the headers from a tunnel request to the http request, possibly
 // with unmutation
-func CopyHeaders(req *OpenHTTPTunnelRequest, httpRequest *http.Request) {
-	for _, header := range req.Headers {
+func CopyHeaders(headers []*HttpHeader, out *http.Header) error {
+	for _, header := range headers {
 		for _, value := range header.Values {
-			httpRequest.Header.Add(header.Name, value)
+			out.Add(header.Name, value)
 		}
 	}
+	return nil
 }
 
 func makeChunkedResponse(id string, data []byte) *MessageWrapper {

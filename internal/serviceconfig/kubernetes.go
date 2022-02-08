@@ -252,7 +252,7 @@ func (ke *KubernetesEndpoint) ExecuteHTTPRequest(dataflow chan *tunnel.MessageWr
 		return
 	}
 
-	tunnel.CopyHeaders(req, httpRequest)
+	tunnel.CopyHeaders(req.Headers, &httpRequest.Header)
 	if len(c.token) > 0 {
 		httpRequest.Header.Set("Authorization", "Bearer "+c.token)
 	}

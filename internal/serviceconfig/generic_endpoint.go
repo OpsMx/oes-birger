@@ -208,7 +208,7 @@ func (ep *GenericEndpoint) ExecuteHTTPRequest(dataflow chan *tunnel.MessageWrapp
 		return
 	}
 
-	tunnel.CopyHeaders(req, httpRequest)
+	tunnel.CopyHeaders(req.Headers, &httpRequest.Header)
 
 	creds := ep.config.Credentials
 	switch creds.Type {
