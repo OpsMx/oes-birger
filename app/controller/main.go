@@ -76,14 +76,7 @@ func getAgentNameFromContext(ctx context.Context) (string, error) {
 	if len(tlsAuth.State.VerifiedChains) == 0 || len(tlsAuth.State.VerifiedChains[0]) == 0 {
 		return "", status.Error(codes.Unauthenticated, "could not verify peer certificate")
 	}
-	names, err := ca.GetCertificateNameFromCert(tlsAuth.State.VerifiedChains[0][0])
-	if err != nil {
-		return "", err
-	}
-	if names.Purpose != ca.CertificatePurposeAgent {
-		return "", fmt.Errorf("not an agent certificate")
-	}
-	return names.Agent, nil
+	return getAgentNameFromCertificate(tlsAuth.State.VerifiedChains[0][0])
 }
 
 func getAgentNameFromCertificate(cert *x509.Certificate) (string, error) {

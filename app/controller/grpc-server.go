@@ -187,21 +187,11 @@ func (s *agentTunnelServer) EventTunnel(stream tunnel.AgentTunnelService_EventTu
 			routes.Add(state)
 			s.sendWebhook(state, req.Endpoints)
 
-			// now, send our response hello
-			pbEndpoints := serviceconfig.EndpointsToPB(s.endpoints)
-			hello := &tunnel.MessageWrapper{
-				Event: &tunnel.MessageWrapper_Hello{
-					Hello: &tunnel.Hello{
-						Version:   version.String(),
-						Endpoints: pbEndpoints,
-						Hostname:  "controller",
-					},
-				},
+			if err = s.sendHello(stream); err != nil {
+				log.Printf("Unable to send hello packet, closing connection")
+				routes.Remove(state)
+				return err
 			}
-			if err = stream.Send(hello); err != nil {
-				log.Fatalf("Unable to send hello packet: %v", err)
-			}
-
 		case *tunnel.MessageWrapper_HttpTunnelControl:
 			handleHTTPControl(in, httpids, s.endpoints, dataflow)
 		case nil:
@@ -210,6 +200,20 @@ func (s *agentTunnelServer) EventTunnel(stream tunnel.AgentTunnelService_EventTu
 			log.Printf("Received unknown message: %s: %T", state, x)
 		}
 	}
+}
+
+func (s *agentTunnelServer) sendHello(stream tunnel.AgentTunnelService_EventTunnelServer) error {
+	pbEndpoints := serviceconfig.EndpointsToPB(s.endpoints)
+	hello := &tunnel.MessageWrapper{
+		Event: &tunnel.MessageWrapper_Hello{
+			Hello: &tunnel.Hello{
+				Version:   version.String(),
+				Endpoints: pbEndpoints,
+				Hostname:  "controller",
+			},
+		},
+	}
+	return stream.Send(hello)
 }
 
 func handleHTTPControl(in *tunnel.MessageWrapper, httpids *util.SessionList, endpoints []serviceconfig.ConfiguredEndpoint, dataflow chan *tunnel.MessageWrapper) {
