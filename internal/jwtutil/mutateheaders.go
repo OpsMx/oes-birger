@@ -52,13 +52,23 @@ const (
 	mutateValidity     = 15 * time.Minute
 )
 
+var (
+	mutationRegistered = false
+)
+
 // RegisterMutationKeyset registers (or re-registers) a new keyset and signing key name.
 func RegisterMutationKeyset(keyset jwk.Set, signingKeyName string) error {
+	mutationRegistered = true
 	return jwtregistry.Register(mutateRegistryName, mutateIssuer,
 		jwtregistry.WithKeyset(keyset),
 		jwtregistry.WithSigningKeyName(signingKeyName),
 		jwtregistry.WithSigningValidityPeriod(mutateValidity),
 	)
+}
+
+// MutationIsRegistered indicates if RegisterMutationKeyset was called at least once.
+func MutationIsRegistered() bool {
+	return mutationRegistered
 }
 
 // MutateHeader will take a header value (as a string) and return a JWT which we
