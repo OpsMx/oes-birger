@@ -56,18 +56,12 @@ var (
 
 	jwtKeyset     = jwk.NewSet()
 	jwtCurrentKey string
-
-	config *ControllerConfig
-
+	config        *ControllerConfig
 	secretsLoader secrets.SecretLoader
-
-	authority *ca.CA
-
-	hook *webhook.Runner
-
-	routes = tunnelroute.MakeRoutes()
-
-	endpoints []serviceconfig.ConfiguredEndpoint
+	authority     *ca.CA
+	hook          *webhook.Runner
+	routes        = tunnelroute.MakeRoutes()
+	endpoints     []serviceconfig.ConfiguredEndpoint
 )
 
 func getAgentNameFromContext(ctx context.Context) (string, error) {
