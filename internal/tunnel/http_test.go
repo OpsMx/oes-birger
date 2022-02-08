@@ -17,6 +17,7 @@
 package tunnel
 
 import (
+	"net/http"
 	"testing"
 
 	"github.com/opsmx/oes-birger/internal/jwtutil"
@@ -120,13 +121,11 @@ func TestMakeHeaders_Mutation(t *testing.T) {
 		name    string
 		headers map[string][]string
 		wantRet []*HttpHeader
-		wantErr bool
 	}{
 		{
 			"empty headers",
 			map[string][]string{},
 			[]*HttpHeader{},
-			false,
 		},
 		{
 			"one item",
@@ -134,7 +133,6 @@ func TestMakeHeaders_Mutation(t *testing.T) {
 			[]*HttpHeader{
 				{Name: "foo", Values: []string{"bar"}},
 			},
-			false,
 		},
 		{
 			"two items",
@@ -143,16 +141,11 @@ func TestMakeHeaders_Mutation(t *testing.T) {
 				{Name: "foo", Values: []string{"bar"}},
 				{Name: "baz", Values: []string{"bax"}},
 			},
-			false,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			gotRet, err := MakeHeaders(tt.headers)
-			if tt.wantErr {
-				require.Error(t, err)
-				return
-			}
 			require.NoError(t, err)
 			assert.ElementsMatch(t, tt.wantRet, gotRet)
 		})
@@ -181,4 +174,63 @@ func TestMakeHeaders_Mutation(t *testing.T) {
 		assert.Equal(t, "X-Spinnaker-User", name)
 		assert.Equal(t, 1, len(values), "expected one value")
 	})
+}
+
+func TestMakeHeaders_MutationBroken(t *testing.T) {
+	jwtregistry.Clear()
+	keyset := jwtutil.LoadTestKeys(t)
+	err := jwtutil.RegisterMutationKeyset(keyset, "keynotthere")
+	require.NoError(t, err)
+
+	// special cases for testing actual mutations where it can't mutate due to broken jwtregistry
+	t.Run("errors", func(t *testing.T) {
+		_, err := MakeHeaders(map[string][]string{mutatedHeaders[0]: {"bar"}})
+		require.Error(t, err)
+	})
+}
+
+func TestCopyHeaders(t *testing.T) {
+	tests := []struct {
+		name        string
+		headers     []*HttpHeader
+		wantHeaders http.Header
+	}{
+		{
+			"one item",
+			[]*HttpHeader{
+				{Name: "bob", Values: []string{"baz"}},
+			},
+			http.Header{
+				"Bob": {"baz"}, // note case is expected
+			},
+		},
+		{
+			"one item, two values",
+			[]*HttpHeader{
+				{Name: "bob", Values: []string{"baz", "bar"}},
+			},
+			http.Header{
+				"Bob": {"baz", "bar"}, // note case is expected
+			},
+		},
+		{
+			"two items",
+			[]*HttpHeader{
+				{Name: "alice", Values: []string{"foo"}},
+				{Name: "bob", Values: []string{"baz"}},
+			},
+			http.Header{
+				"Alice": {"foo"},
+				"Bob":   {"baz"},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := http.Header{}
+			err := CopyHeaders(tt.headers, &got)
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantHeaders, got)
+		})
+	}
 }

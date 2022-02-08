@@ -65,7 +65,7 @@ func MakeHeaders(headers map[string][]string) (ret []*HttpHeader, err error) {
 }
 
 // CopyHeaders will copy the headers from a tunnel request to the http request, possibly
-// with unmutation
+// with unmutation.
 func CopyHeaders(headers []*HttpHeader, out *http.Header) error {
 	for _, header := range headers {
 		for _, value := range header.Values {
@@ -108,12 +108,12 @@ func MakeBadGatewayResponse(id string) *MessageWrapper {
 	}
 }
 
-func makeResponse(id string, response *http.Response) (*MessageWrapper, error) {
+func makeResponse(id string, response *http.Response) (ret *MessageWrapper, err error) {
 	headers, err := MakeHeaders(response.Header)
 	if err != nil {
-		return nil, err
+		return
 	}
-	return &MessageWrapper{
+	ret = &MessageWrapper{
 		Event: &MessageWrapper_HttpTunnelControl{
 			HttpTunnelControl: &HttpTunnelControl{
 				ControlType: &HttpTunnelControl_HttpTunnelResponse{
@@ -126,7 +126,8 @@ func makeResponse(id string, response *http.Response) (*MessageWrapper, error) {
 				},
 			},
 		},
-	}, nil
+	}
+	return
 }
 
 // RunHTTPRequest will make a HTTP request, and send the data to the remote end.
