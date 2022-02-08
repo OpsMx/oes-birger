@@ -29,7 +29,9 @@ import (
 var (
 	namespace         = flag.String("namespace", "", "The namespace to place the secrets into")
 	caSecretName      = flag.String("caSecretName", "ca-secret", "the name of the CA secret")
+	withKubernetes    = flag.Bool("withKubernetes", true, "also generate kubernetes manifests")
 	controlSecretName = flag.String("controlSecretName", "oes-control-secret", "the name of the secret for the control secret")
+	alsoAgentNamed    = flag.String("alsoAgentNamed", "", "also create an agent credential, in agent-cert.pem and agent-key.pem")
 )
 
 func maybePrintNamespace(f *os.File) {
@@ -66,36 +68,38 @@ func main() {
 		log.Fatal("Code error, returned CA cert base64 doesn't match generated CA cert")
 	}
 
-	log.Printf("Writing controller-secrets.yaml")
-	f, err := os.OpenFile("controller-secrets.yaml", os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
-	if err != nil {
-		log.Panicf("%v", err)
-	}
-	fmt.Fprintln(f, "apiVersion: v1")
-	fmt.Fprintln(f, "kind: Secret")
-	fmt.Fprintln(f, "type: kubernetes.io/tls")
-	fmt.Fprintln(f, "metadata:")
-	maybePrintNamespace(f)
-	fmt.Fprintf(f, "  name: %s\n", *caSecretName)
-	fmt.Fprintln(f, "data:")
-	fmt.Fprintf(f, "  tls.crt: %s\n", ca64)
-	fmt.Fprintf(f, "  tls.key: %s\n", caPrivateKey64)
+	if *withKubernetes {
+		log.Printf("Writing controller-secrets.yaml")
+		f, err := os.OpenFile("controller-secrets.yaml", os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
+		if err != nil {
+			log.Panicf("%v", err)
+		}
+		fmt.Fprintln(f, "apiVersion: v1")
+		fmt.Fprintln(f, "kind: Secret")
+		fmt.Fprintln(f, "type: kubernetes.io/tls")
+		fmt.Fprintln(f, "metadata:")
+		maybePrintNamespace(f)
+		fmt.Fprintf(f, "  name: %s\n", *caSecretName)
+		fmt.Fprintln(f, "data:")
+		fmt.Fprintf(f, "  tls.crt: %s\n", ca64)
+		fmt.Fprintf(f, "  tls.key: %s\n", caPrivateKey64)
 
-	fmt.Fprintln(f, "---")
+		fmt.Fprintln(f, "---")
 
-	fmt.Fprintln(f, "apiVersion: v1")
-	fmt.Fprintln(f, "kind: Secret")
-	fmt.Fprintln(f, "type: kubernetes.io/tls")
-	fmt.Fprintln(f, "metadata:")
-	maybePrintNamespace(f)
-	fmt.Fprintf(f, "  name: %s\n", *controlSecretName)
-	fmt.Fprintln(f, "data:")
-	fmt.Fprintf(f, "  tls.crt: %s\n", cert64)
-	fmt.Fprintf(f, "  tls.key: %s\n", certPrivKey64)
+		fmt.Fprintln(f, "apiVersion: v1")
+		fmt.Fprintln(f, "kind: Secret")
+		fmt.Fprintln(f, "type: kubernetes.io/tls")
+		fmt.Fprintln(f, "metadata:")
+		maybePrintNamespace(f)
+		fmt.Fprintf(f, "  name: %s\n", *controlSecretName)
+		fmt.Fprintln(f, "data:")
+		fmt.Fprintf(f, "  tls.crt: %s\n", cert64)
+		fmt.Fprintf(f, "  tls.key: %s\n", certPrivKey64)
 
-	err = f.Close()
-	if err != nil {
-		log.Panicf("%v", err)
+		err = f.Close()
+		if err != nil {
+			log.Panicf("%v", err)
+		}
 	}
 
 	cert, err := base64.StdEncoding.DecodeString(cert64)
@@ -121,6 +125,12 @@ func main() {
 
 	log.Printf("Writing authority certificate to ca-cert.pem")
 	err = os.WriteFile("ca-cert.pem", cacert, 0600)
+	if err != nil {
+		log.Panicf("%v", err)
+	}
+
+	log.Printf("Writing authority certificate to ca-cert.pem")
+	err = os.WriteFile("ca-key.pem", key, 0600)
 	if err != nil {
 		log.Panicf("%v", err)
 	}
