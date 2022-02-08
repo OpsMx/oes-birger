@@ -40,30 +40,30 @@ func maybePrintNamespace(f *os.File) {
 	}
 }
 
+func check(err error) {
+	if err != nil {
+		log.Panic(err)
+	}
+}
+
 func main() {
 	flag.Parse()
 
 	cacert, caPrivateKey, err := ca.MakeCertificateAuthority()
-	if err != nil {
-		log.Fatalf("%v", err)
-	}
+	check(err)
 
 	ca64 := base64.StdEncoding.EncodeToString(cacert)
 	caPrivateKey64 := base64.StdEncoding.EncodeToString(caPrivateKey)
 
 	authority, err := ca.MakeCAFromData(cacert, caPrivateKey)
-	if err != nil {
-		log.Fatalf("%v", err)
-	}
+	check(err)
 
 	name := ca.CertificateName{
 		Name:    "oes",
 		Purpose: ca.CertificatePurposeControl,
 	}
 	ca64too, cert64, certPrivKey64, err := authority.GenerateCertificate(name)
-	if err != nil {
-		log.Fatalf("%v", err)
-	}
+	check(err)
 	if ca64too != ca64 {
 		log.Fatal("Code error, returned CA cert base64 doesn't match generated CA cert")
 	}
@@ -71,9 +71,7 @@ func main() {
 	if *withKubernetes {
 		log.Printf("Writing controller-secrets.yaml")
 		f, err := os.OpenFile("controller-secrets.yaml", os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
-		if err != nil {
-			log.Panicf("%v", err)
-		}
+		check(err)
 		fmt.Fprintln(f, "apiVersion: v1")
 		fmt.Fprintln(f, "kind: Secret")
 		fmt.Fprintln(f, "type: kubernetes.io/tls")
@@ -97,41 +95,49 @@ func main() {
 		fmt.Fprintf(f, "  tls.key: %s\n", certPrivKey64)
 
 		err = f.Close()
-		if err != nil {
-			log.Panicf("%v", err)
-		}
+		check(err)
 	}
 
 	cert, err := base64.StdEncoding.DecodeString(cert64)
-	if err != nil {
-		log.Panicf("%v", err)
-	}
-	key, err := base64.StdEncoding.DecodeString(certPrivKey64)
-	if err != nil {
-		log.Panicf("%v", err)
-	}
-
-	log.Printf("Writing control secret to control-cert.pem")
+	check(err)
+	log.Printf("Writing control certificate to control-cert.pem")
 	err = os.WriteFile("control-cert.pem", cert, 0600)
-	if err != nil {
-		log.Panicf("%v", err)
-	}
+	check(err)
 
+	key, err := base64.StdEncoding.DecodeString(certPrivKey64)
+	check(err)
 	log.Printf("Writing control key to control-key.pem")
 	err = os.WriteFile("control-key.pem", key, 0600)
-	if err != nil {
-		log.Panicf("%v", err)
-	}
+	check(err)
 
 	log.Printf("Writing authority certificate to ca-cert.pem")
 	err = os.WriteFile("ca-cert.pem", cacert, 0600)
-	if err != nil {
-		log.Panicf("%v", err)
-	}
+	check(err)
 
-	log.Printf("Writing authority certificate to ca-cert.pem")
-	err = os.WriteFile("ca-key.pem", key, 0600)
-	if err != nil {
-		log.Panicf("%v", err)
+	cakey, err := base64.StdEncoding.DecodeString(caPrivateKey64)
+	check(err)
+	log.Printf("Writing authority key to ca-key.pem")
+	err = os.WriteFile("ca-key.pem", cakey, 0600)
+	check(err)
+
+	if *alsoAgentNamed != "" {
+		name := ca.CertificateName{
+			Agent:   *alsoAgentNamed,
+			Purpose: ca.CertificatePurposeAgent,
+		}
+		_, user64, key64, err := authority.GenerateCertificate(name)
+		check(err)
+
+		cert, err := base64.StdEncoding.DecodeString(user64)
+		check(err)
+		log.Printf("Writing agent certificate to agent-cert.pem")
+		err = os.WriteFile("agent-cert.pem", cert, 0600)
+		check(err)
+
+		key, err := base64.StdEncoding.DecodeString(key64)
+		check(err)
+		log.Printf("Writing agent key to agent-key.pem")
+		err = os.WriteFile("agent-key.pem", key, 0600)
+		check(err)
 	}
 }
