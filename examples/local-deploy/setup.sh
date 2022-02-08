@@ -8,4 +8,3 @@ set -e
 }
 
 ../../bin/make-ca --withKubernetes=false --alsoAgentNamed=smith
-

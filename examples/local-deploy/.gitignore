@@ -1,5 +1,2 @@
-ca-cert.pem
-control-cert.pem
-control-key.pem
+*.pem
 controller-secrets.yaml
-ca-key.pem

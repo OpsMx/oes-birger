@@ -2,4 +2,5 @@
 
 set -e
 
-../../bin/agent --help
+../../bin/agent -caCertFile ca-cert.pem --configFile config/agent/config.yaml
+

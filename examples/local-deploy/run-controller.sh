@@ -2,4 +2,5 @@
 
 set -e
 
-../../bin/controller --help
+../../bin/controller --configFile config/controller/config.yaml
+

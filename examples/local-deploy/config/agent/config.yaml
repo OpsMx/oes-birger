@@ -1,3 +1,4 @@
-controllerHostname: controller.mgraff1.flame.org:9001
-certFile: /app/config/agent-certificate.pem
-keyFile: /app/config/agent-private-key.pem
+controllerHostname: localhost:8001
+certFile: agent-cert.pem
+keyFile: agent-key.pem
+servicesConfigPath: config/agent/services.yaml

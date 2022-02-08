@@ -15,7 +15,7 @@ using simple curl commands to the controller.
 1. `sh setup.sh` to create keys.
 1. `sh run-controller.sh` to run the controller.
 1. `sh run-agent.sh` to run the agent.
-1. `docker run -d --name  whoami -P traefik/whoami --port 8300` to run the whoami service, on port 8300.
+1. `docker run -d --name whoami --rm -P traefik/whoami --port 8300` to run the whoami service, on port 8300.  This will run in the backround.  To stop it, use `docker stop whoami` which will stop it and remove it.
 
 If any of the ports used need to be changed, edit the configs or command lines.
 
@@ -23,14 +23,14 @@ Run each of the `run-` shell commands in a new window, so you can run all three 
 
 # Testing things
 
-`curl http://localhost:8001` will connect to the controller, which will forward the
+`curl http://localhost:8004` will connect to the controller, which will forward the
 request to the agent, which will connect to the `whoami` service and report the
 reply.
 
-`curl http://localhost:8101` will connect to the agent, which will forward the request
+`curl http://localhost:8006` will connect to the agent, which will forward the request
 to the controller, which will connect to the `whoam` service and report the reply.
 
-`curl http://localhost:8002` will connect to the controller, which will send the request
+`curl http://localhost:8005` will connect to the controller, which will send the request
 to the agent, loop the response back through the agent via port 8101, and reply.  This
 is to test end-to-end X-Spinnaker-User header mutations.
 

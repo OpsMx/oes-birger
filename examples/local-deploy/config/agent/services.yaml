@@ -1,17 +1,17 @@
 outgoingServices:
-  - name: poc-clouddriver
-    type: clouddriver
+  - name: whoami
+    type: whoami
     enabled: true
     config:
-      url: http://poc-clouddriver:7002
+      url: http://localhost:8300
+  - name: whoami-loop
+    type: whoami
+    enabled: true
+    config:
+      url: http://localhost:8006 # loop back to our own port here
 incomingServices:
-  - name: poc-fiat
-    serviceType: fiat
-    port: 7003
+  - name: controller-whoami
+    serviceType: whoami
+    port: 8006
     destination: controller
-    destinationService: poc-fiat
-  - name: poc-front50
-    serviceType: frontfifty
-    port: 8080
-    destination: controller
-    destinationService: poc-front50
+    destinationService: whoami
