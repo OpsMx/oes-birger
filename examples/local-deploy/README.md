@@ -9,6 +9,11 @@ Additionally, the agent will have a "loopback" service that talks back
 to the whoami-agent endpoint, allowing a test of mutations on headers
 using simple curl commands to the controller.
 
+# Ports Used
+
+The default config uses ports 8001, 8002, 8003, 8004, 8005, 8006, and 8300.
+The controller has the majority of those ports, the agent 2, and whoami 1.
+
 # Running Things
 
 1. Run `make` at the top level of this project.
