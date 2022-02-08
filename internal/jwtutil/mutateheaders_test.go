@@ -28,7 +28,7 @@ import (
 
 func Test_MutateHeader(t *testing.T) {
 	jwtregistry.Clear()
-	err := RegisterMutationKeyset(loadkeys(t), "key1")
+	err := RegisterMutationKeyset(LoadTestKeys(t), "key1")
 	require.NoError(t, err)
 	type args struct {
 		data  string
@@ -66,7 +66,7 @@ func Test_MutateHeader(t *testing.T) {
 func TestUnmutateHeader(t *testing.T) {
 	jwtregistry.Clear()
 	err := jwtregistry.Register(mutateRegistryName, "opsmx-clouddriver-proxy",
-		jwtregistry.WithKeyset(loadkeys(t)),
+		jwtregistry.WithKeyset(LoadTestKeys(t)),
 		jwtregistry.WithSigningKeyName("key1"),
 	)
 	require.NoError(t, err)

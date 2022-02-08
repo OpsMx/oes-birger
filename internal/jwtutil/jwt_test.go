@@ -1,5 +1,3 @@
-package jwtutil
-
 /*
  * Copyright 2021 OpsMx, Inc.
  *
@@ -16,43 +14,19 @@ package jwtutil
  * limitations under the License.
  */
 
+package jwtutil
+
 import (
 	"testing"
 
-	"github.com/lestrrat-go/jwx/jwa"
-	"github.com/lestrrat-go/jwx/jwk"
 	"github.com/lestrrat-go/jwx/jwt"
 	"github.com/skandragon/jwtregistry"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func makekey(t *testing.T, name string, content string) jwk.Key {
-	key, err := jwk.New([]byte(content))
-	if err != nil {
-		t.Error(err)
-		t.FailNow()
-	}
-	err = key.Set(jwk.KeyIDKey, name)
-	if err != nil {
-		panic(err)
-	}
-	err = key.Set(jwk.AlgorithmKey, jwa.HS256)
-	if err != nil {
-		panic(err)
-	}
-	return key
-}
-
-func loadkeys(t *testing.T) jwk.Set {
-	keyset := jwk.NewSet()
-	keyset.Add(makekey(t, "key1", "this is a key"))
-	keyset.Add(makekey(t, "key2", "this is a key2"))
-	return keyset
-}
-
 func TestMakeJWT(t *testing.T) {
-	keyset := loadkeys(t)
+	keyset := LoadTestKeys(t)
 	err := RegisterServiceauthKeyset(keyset, "key1")
 	require.NoError(t, err)
 	tests := []struct {
@@ -87,7 +61,7 @@ func TestMakeJWT(t *testing.T) {
 }
 
 func TestValidateJWT(t *testing.T) {
-	keyset := loadkeys(t)
+	keyset := LoadTestKeys(t)
 	err := RegisterServiceauthKeyset(keyset, "key1")
 	require.NoError(t, err)
 	tests := []struct {
