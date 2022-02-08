@@ -37,7 +37,7 @@ const (
 
 // RegisterServiceauthKeyset registers (or re-registers) a new keyset and signing key name.
 func RegisterServiceauthKeyset(keyset jwk.Set, signingKeyName string) error {
-	return jwtregistry.Register(serviceauthRegistryName, mutateIssuer,
+	return jwtregistry.Register(serviceauthRegistryName, serviceauthIssuer,
 		jwtregistry.WithKeyset(keyset),
 		jwtregistry.WithSigningKeyName(signingKeyName),
 	)

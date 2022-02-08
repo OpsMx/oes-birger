@@ -410,7 +410,9 @@ func TestCNCServer_generateServiceCredentials(t *testing.T) {
 			}
 			keyset := jwk.NewSet()
 			keyset.Add(key1)
-			jwtutil.RegisterServiceauthKeyset(keyset, "key1")
+			if err = jwtutil.RegisterServiceauthKeyset(keyset, "key1"); err != nil {
+				panic(err)
+			}
 			c := MakeCNCServer(&mockConfig{}, &mockAuthority{}, nil, "")
 
 			body, err := json.Marshal(tt.request)

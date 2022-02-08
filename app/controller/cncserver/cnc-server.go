@@ -28,7 +28,6 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/lestrrat-go/jwx/jwk"
 	"github.com/oklog/ulid/v2"
 	"github.com/opsmx/oes-birger/internal/ca"
 	"github.com/opsmx/oes-birger/internal/fwdapi"
@@ -58,8 +57,6 @@ type CNCServer struct {
 	cfg           cncConfig
 	authority     cncCertificateAuthority
 	agentReporter cncAgentStatsReporter
-	jwkKeyset     jwk.Set
-	jwtCurrentKey string
 	version       string
 }
 

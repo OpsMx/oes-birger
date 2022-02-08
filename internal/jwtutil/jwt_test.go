@@ -44,7 +44,7 @@ func TestMakeJWT(t *testing.T) {
 			"bob",
 			"agent1",
 			&jwtregistry.TimeClock{NowTime: 1111},
-			"eyJhbGciOiJIUzI1NiIsImtpZCI6ImtleTEiLCJ0eXAiOiJKV1QifQ.eyJhIjoiYWdlbnQxIiwiaWF0IjoxMTExLCJpc3MiOiJvcHNteC1oZWFkZXItbXV0YXRpb24iLCJuIjoiYm9iIiwidCI6ImFydGlmYWN0b3J5In0.SWFm9OopZa8sZ1UZnV8u70gefHps3tAVlslcczofU_0",
+			"eyJhbGciOiJIUzI1NiIsImtpZCI6ImtleTEiLCJ0eXAiOiJKV1QifQ.eyJhIjoiYWdlbnQxIiwiaWF0IjoxMTExLCJpc3MiOiJvcHNteCIsIm4iOiJib2IiLCJ0IjoiYXJ0aWZhY3RvcnkifQ.DW4Dj8C94KzKUaZ8tIrMrDnaXc-ipHaEL50N2IcHAoA",
 			false,
 		},
 	}
@@ -75,7 +75,7 @@ func TestValidateJWT(t *testing.T) {
 	}{
 		{
 			"valid",
-			"eyJhbGciOiJIUzI1NiIsImtpZCI6ImtleTEiLCJ0eXAiOiJKV1QifQ.eyJhIjoiYWdlbnQxIiwiaWF0IjoxMTExLCJpc3MiOiJvcHNteC1oZWFkZXItbXV0YXRpb24iLCJuIjoiYm9iIiwidCI6ImFydGlmYWN0b3J5In0.SWFm9OopZa8sZ1UZnV8u70gefHps3tAVlslcczofU_0",
+			"eyJhbGciOiJIUzI1NiIsImtpZCI6ImtleTEiLCJ0eXAiOiJKV1QifQ.eyJhIjoiYWdlbnQxIiwiaWF0IjoxMTExLCJpc3MiOiJvcHNteCIsIm4iOiJib2IiLCJ0IjoiYXJ0aWZhY3RvcnkifQ.DW4Dj8C94KzKUaZ8tIrMrDnaXc-ipHaEL50N2IcHAoA",
 			&jwtregistry.TimeClock{NowTime: 1111},
 			"artifactory",
 			"bob",
@@ -84,7 +84,7 @@ func TestValidateJWT(t *testing.T) {
 		},
 		{
 			"invalid1",
-			"eyJhbGciOiJIUzI1NiIsImtpZCI6ImtleTEiLCJ0eXAiOiJKV1QifQ.eyJhIjoiYWdlbnQxIiwiaXNzIjoib3BzbXgiLCJuIjoiYm9iIiwidCI6ImFydGlmYWN0b3J5In0.",
+			"eyJhbGciOiJIUzI1NiIsImtpZCI6ImtleTEiLCJ0eXAiOiJKV1QifQ.eyJhIjoiYWdlbnQxIiwiaWF0IjoxMTExLCJpc3MiOiJub3QtdmFsaWQiLCJuIjoiYm9iIiwidCI6ImFydGlmYWN0b3J5In0.bplIcfd1SlifxrzOKTuXTj5J1VkSkmmRw2PsRWzFymc",
 			&jwtregistry.TimeClock{NowTime: 1111},
 			"",
 			"",

@@ -243,8 +243,12 @@ func main() {
 
 	// Create registry entries to sign and validate JWTs for service authentication,
 	// and protect x-spinnaker-user header.
-	jwtutil.RegisterServiceauthKeyset(jwtKeyset, config.ServiceAuth.CurrentKeyName)
-	jwtutil.RegisterMutationKeyset(jwtKeyset, config.ServiceAuth.HeaderMutationKeyName)
+	if err = jwtutil.RegisterServiceauthKeyset(jwtKeyset, config.ServiceAuth.CurrentKeyName); err != nil {
+		log.Fatal(err)
+	}
+	if err = jwtutil.RegisterMutationKeyset(jwtKeyset, config.ServiceAuth.HeaderMutationKeyName); err != nil {
+		log.Fatal(err)
+	}
 
 	if len(config.Webhook) > 0 {
 		hook = webhook.NewRunner(config.Webhook)
