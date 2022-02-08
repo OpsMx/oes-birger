@@ -4,9 +4,12 @@ controlHostname: localhost
 controlListenPort: 8002
 agentHostname: localhost
 agentListenPort: 8003
+caConfig:
+  caCertFile: ca-cert.pem
+  caKeyFile: ca-key.pem
 serviceAuth:
   currentKeyName: key1
-  servicesConfigPath: key2
+  headerMutationKeyName: key2
   secretsPath: not-actually
 services:
   outgoingServices:
@@ -19,10 +22,12 @@ services:
     - name: agent-whoami
       serviceType: whoami
       port: 8004
+      useHTTP: true
       destination: smith
       destinationService: whoami
     - name: agent-whoami-loop
       serviceType: whoami
       port: 8005
+      useHTTP: true
       destination: smith
       destinationService: whoami-loop

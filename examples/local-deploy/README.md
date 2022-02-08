@@ -15,7 +15,7 @@ using simple curl commands to the controller.
 1. `sh setup.sh` to create keys.
 1. `sh run-controller.sh` to run the controller.
 1. `sh run-agent.sh` to run the agent.
-1. `docker run -d --name whoami --rm -P traefik/whoami --port 8300` to run the whoami service, on port 8300.  This will run in the backround.  To stop it, use `docker stop whoami` which will stop it and remove it.
+1. `docker run -d --name whoami --rm -p 8300:8300 traefik/whoami --port 8300` to run the whoami service, on port 8300.  This will run in the backround.  To stop it, use `docker stop whoami` which will stop it and remove it.
 
 If any of the ports used need to be changed, edit the configs or command lines.
 

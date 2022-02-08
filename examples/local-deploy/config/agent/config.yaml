@@ -1,4 +1,4 @@
-controllerHostname: localhost:8001
+controllerHostname: localhost:8003
 certFile: agent-cert.pem
 keyFile: agent-key.pem
 servicesConfigPath: config/agent/services.yaml
