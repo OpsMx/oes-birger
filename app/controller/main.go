@@ -157,8 +157,9 @@ func loadKeyset() {
 		if err != nil {
 			return err
 		}
+		// skip not refular files
 		if !info.Type().IsRegular() {
-			return fmt.Errorf("Not a regular file")
+			return nil
 		}
 		content, err := ioutil.ReadFile(path)
 		if err != nil {
