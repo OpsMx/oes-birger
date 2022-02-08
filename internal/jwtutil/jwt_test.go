@@ -17,11 +17,14 @@ package jwtutil
  */
 
 import (
-	"reflect"
 	"testing"
 
 	"github.com/lestrrat-go/jwx/jwa"
 	"github.com/lestrrat-go/jwx/jwk"
+	"github.com/lestrrat-go/jwx/jwt"
+	"github.com/skandragon/jwtregistry"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func makekey(t *testing.T, name string, content string) jwk.Key {
@@ -50,63 +53,47 @@ func loadkeys(t *testing.T) jwk.Set {
 
 func TestMakeJWT(t *testing.T) {
 	keyset := loadkeys(t)
+	err := RegisterServiceauthKeyset(keyset, "key1")
+	require.NoError(t, err)
 	tests := []struct {
 		name    string
-		keyid   string
-		keyset  jwk.Set
 		epType  string
 		epName  string
 		agent   string
+		clock   jwt.Clock
 		want    string
 		wantErr bool
 	}{
 		{
 			"key1",
-			"key1",
-			keyset,
 			"artifactory",
 			"bob",
 			"agent1",
-			"eyJhbGciOiJIUzI1NiIsImtpZCI6ImtleTEiLCJ0eXAiOiJKV1QifQ.eyJhIjoiYWdlbnQxIiwiaXNzIjoib3BzbXgiLCJuIjoiYm9iIiwidCI6ImFydGlmYWN0b3J5In0.TdshkeQ7ScSkWWkkl8QRMZ4ZmoJWQkqNiDceKCIH8ms",
-			false,
-		},
-		{
-			"key2",
-			"key2",
-			keyset,
-			"jenkins",
-			"bob",
-			"agent1",
-			"eyJhbGciOiJIUzI1NiIsImtpZCI6ImtleTIiLCJ0eXAiOiJKV1QifQ.eyJhIjoiYWdlbnQxIiwiaXNzIjoib3BzbXgiLCJuIjoiYm9iIiwidCI6ImplbmtpbnMifQ.QvTMDpqsmC8KsUt5J3bvSAp9noLOYjboMiyinWR7uVA",
+			&jwtregistry.TimeClock{NowTime: 1111},
+			"eyJhbGciOiJIUzI1NiIsImtpZCI6ImtleTEiLCJ0eXAiOiJKV1QifQ.eyJhIjoiYWdlbnQxIiwiaWF0IjoxMTExLCJpc3MiOiJvcHNteC1oZWFkZXItbXV0YXRpb24iLCJuIjoiYm9iIiwidCI6ImFydGlmYWN0b3J5In0.SWFm9OopZa8sZ1UZnV8u70gefHps3tAVlslcczofU_0",
 			false,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var key jwk.Key
-			var ok bool
-			if key, ok = tt.keyset.LookupKeyID(tt.keyid); !ok {
-				t.Errorf("key not found: %s", tt.keyid)
-				t.FailNow()
-			}
-			got, err := MakeJWT(key, tt.epType, tt.epName, tt.agent)
+			got, err := MakeJWT(tt.epType, tt.epName, tt.agent, tt.clock)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("MakeJWT() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("MakeJWT() = %v, want %v", got, tt.want)
-			}
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }
 
 func TestValidateJWT(t *testing.T) {
 	keyset := loadkeys(t)
+	err := RegisterServiceauthKeyset(keyset, "key1")
+	require.NoError(t, err)
 	tests := []struct {
 		name      string
-		keyset    jwk.Set
 		token     string
+		clock     jwt.Clock
 		wantType  string
 		wantName  string
 		wantAgent string
@@ -114,8 +101,8 @@ func TestValidateJWT(t *testing.T) {
 	}{
 		{
 			"valid",
-			keyset,
-			"eyJhbGciOiJIUzI1NiIsImtpZCI6ImtleTEiLCJ0eXAiOiJKV1QifQ.eyJhIjoiYWdlbnQxIiwiaXNzIjoib3BzbXgiLCJuIjoiYm9iIiwidCI6ImFydGlmYWN0b3J5In0.TdshkeQ7ScSkWWkkl8QRMZ4ZmoJWQkqNiDceKCIH8ms",
+			"eyJhbGciOiJIUzI1NiIsImtpZCI6ImtleTEiLCJ0eXAiOiJKV1QifQ.eyJhIjoiYWdlbnQxIiwiaWF0IjoxMTExLCJpc3MiOiJvcHNteC1oZWFkZXItbXV0YXRpb24iLCJuIjoiYm9iIiwidCI6ImFydGlmYWN0b3J5In0.SWFm9OopZa8sZ1UZnV8u70gefHps3tAVlslcczofU_0",
+			&jwtregistry.TimeClock{NowTime: 1111},
 			"artifactory",
 			"bob",
 			"agent1",
@@ -123,8 +110,8 @@ func TestValidateJWT(t *testing.T) {
 		},
 		{
 			"invalid1",
-			keyset,
 			"eyJhbGciOiJIUzI1NiIsImtpZCI6ImtleTEiLCJ0eXAiOiJKV1QifQ.eyJhIjoiYWdlbnQxIiwiaXNzIjoib3BzbXgiLCJuIjoiYm9iIiwidCI6ImFydGlmYWN0b3J5In0.",
+			&jwtregistry.TimeClock{NowTime: 1111},
 			"",
 			"",
 			"",
@@ -133,7 +120,7 @@ func TestValidateJWT(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotType, gotName, gotAgent, err := ValidateJWT(tt.keyset, tt.token)
+			gotType, gotName, gotAgent, err := ValidateJWT(tt.token, tt.clock)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ValidateJWT() error = %v, wantErr %v", err, tt.wantErr)
 				return

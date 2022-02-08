@@ -32,6 +32,8 @@ import (
 	"github.com/lestrrat-go/jwx/jwk"
 	"github.com/opsmx/oes-birger/internal/ca"
 	"github.com/opsmx/oes-birger/internal/fwdapi"
+	"github.com/opsmx/oes-birger/internal/jwtutil"
+	"github.com/stretchr/testify/assert"
 )
 
 type handlerTracker struct {
@@ -105,12 +107,6 @@ func requireError(matchstring string) verifierFunc {
 	}
 }
 
-func stringEquals(t *testing.T, msg string, got string, want string) {
-	if want != got {
-		t.Errorf("Expected %s to be '%s', not '%s'", msg, want, got)
-	}
-}
-
 var (
 	goodCert = x509.Certificate{
 		Subject: pkix.Name{
@@ -141,7 +137,7 @@ func TestCNCServer_authenticate(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c := MakeCNCServer(nil, nil, nil, nil, "", "")
+			c := MakeCNCServer(nil, nil, nil, "")
 			h := handlerTracker{}
 			r := httptest.NewRequest("GET", "https://localhost/statistics", nil)
 			r.TLS.PeerCertificates = []*x509.Certificate{tt.cert}
@@ -161,12 +157,12 @@ func TestCNCServer_generateKubectlComponents(t *testing.T) {
 		if err != nil {
 			panic(err)
 		}
-		stringEquals(t, "AgentName", response.AgentName, "agent smith")
-		stringEquals(t, "Name", response.Name, "alice smith")
-		stringEquals(t, "ServerURL", response.ServerURL, "https://service.local")
-		stringEquals(t, "UserCertificate", response.UserCertificate, "b")
-		stringEquals(t, "UserKey", response.UserKey, "c")
-		stringEquals(t, "CACert", response.CACert, "a")
+		assert.Equal(t, "agent smith", response.AgentName)
+		assert.Equal(t, "alice smith", response.Name)
+		assert.Equal(t, "https://service.local", response.ServerURL)
+		assert.Equal(t, "b", response.UserCertificate)
+		assert.Equal(t, "c", response.UserKey)
+		assert.Equal(t, "a", response.CACert)
 	}
 
 	tests := []struct {
@@ -199,7 +195,7 @@ func TestCNCServer_generateKubectlComponents(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c := MakeCNCServer(&mockConfig{}, &mockAuthority{}, nil, nil, "", "")
+			c := MakeCNCServer(&mockConfig{}, &mockAuthority{}, nil, "")
 
 			body, err := json.Marshal(tt.request)
 			if err != nil {
@@ -237,12 +233,12 @@ func TestCNCServer_generateAgentManifestComponents(t *testing.T) {
 		if err != nil {
 			panic(err)
 		}
-		stringEquals(t, "AgentName", response.AgentName, "agent smith")
-		stringEquals(t, "ServerHostname", response.ServerHostname, "agent.local")
-		stringEquals(t, "ServerPort", fmt.Sprintf("%d", response.ServerPort), "1234")
-		stringEquals(t, "AgentCertificate", response.AgentCertificate, "b")
-		stringEquals(t, "AgentKey", response.AgentKey, "c")
-		stringEquals(t, "CACert", response.CACert, "a")
+		assert.Equal(t, "agent smith", response.AgentName)
+		assert.Equal(t, "agent.local", response.ServerHostname)
+		assert.Equal(t, "1234", fmt.Sprintf("%d", response.ServerPort))
+		assert.Equal(t, "b", response.AgentCertificate)
+		assert.Equal(t, "c", response.AgentKey)
+		assert.Equal(t, "a", response.CACert)
 	}
 
 	tests := []struct {
@@ -272,7 +268,7 @@ func TestCNCServer_generateAgentManifestComponents(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c := MakeCNCServer(&mockConfig{}, &mockAuthority{}, nil, nil, "", "")
+			c := MakeCNCServer(&mockConfig{}, &mockAuthority{}, nil, "")
 
 			body, err := json.Marshal(tt.request)
 			if err != nil {
@@ -310,12 +306,12 @@ func MakeServiceCheckFunc() func(*testing.T, []byte) {
 		if err != nil {
 			panic(err)
 		}
-		stringEquals(t, "AgentName", response.AgentName, "agent smith")
-		stringEquals(t, "Name", response.Name, "service smith")
-		stringEquals(t, "Type", response.Type, "jenkins")
-		stringEquals(t, "URL", response.URL, "https://service.local")
-		stringEquals(t, "CACert", response.CACert, "base64-cacert")
-		stringEquals(t, "CredentialType", response.CredentialType, "basic")
+		assert.Equal(t, "agent smith", response.AgentName)
+		assert.Equal(t, "service smith", response.Name)
+		assert.Equal(t, "jenkins", response.Type)
+		assert.Equal(t, "https://service.local", response.URL)
+		assert.Equal(t, "base64-cacert", response.CACert)
+		assert.Equal(t, "basic", response.CredentialType)
 		creds := response.Credential.(map[string]interface{})
 		if len(creds) != 2 {
 			t.Errorf("Unexpected keys: %#v", creds)
@@ -336,12 +332,12 @@ func MakeAWSCheckFunc() func(*testing.T, []byte) {
 		if err != nil {
 			panic(err)
 		}
-		stringEquals(t, "AgentName", response.AgentName, "agent smith")
-		stringEquals(t, "Name", response.Name, "service smith")
-		stringEquals(t, "Type", response.Type, "aws")
-		stringEquals(t, "URL", response.URL, "https://service.local")
-		stringEquals(t, "CACert", response.CACert, "base64-cacert")
-		stringEquals(t, "CredentialType", response.CredentialType, "aws")
+		assert.Equal(t, "agent smith", response.AgentName)
+		assert.Equal(t, "service smith", response.Name)
+		assert.Equal(t, "aws", response.Type)
+		assert.Equal(t, "https://service.local", response.URL)
+		assert.Equal(t, "base64-cacert", response.CACert)
+		assert.Equal(t, "aws", response.CredentialType)
 		creds := response.Credential.(map[string]interface{})
 		if len(creds) != 2 {
 			t.Errorf("Unexpected keys: %#v", creds)
@@ -362,21 +358,18 @@ func TestCNCServer_generateServiceCredentials(t *testing.T) {
 	tests := []struct {
 		name         string
 		request      interface{}
-		jwkKey       string
 		validateBody verifierFunc
 		wantStatus   int
 	}{
 		{
 			"badJSON",
 			"badjson",
-			"key1",
 			requireError("json: cannot unmarshal"),
 			http.StatusBadRequest,
 		},
 		{
 			"missingName",
 			fwdapi.ServiceCredentialRequest{},
-			"key1",
 			requireError("is invalid"),
 			http.StatusBadRequest,
 		},
@@ -387,20 +380,8 @@ func TestCNCServer_generateServiceCredentials(t *testing.T) {
 				Type:      "jenkins",
 				Name:      "service smith",
 			},
-			"key1",
 			serviceCheckFunc,
 			http.StatusOK,
-		},
-		{
-			"bad-jwt-key",
-			fwdapi.ServiceCredentialRequest{
-				AgentName: "agent smith",
-				Type:      "jenkins",
-				Name:      "service smith",
-			},
-			"missingKey",
-			requireError("unable to find service key"),
-			http.StatusBadRequest,
 		},
 		{
 			"aws",
@@ -409,7 +390,6 @@ func TestCNCServer_generateServiceCredentials(t *testing.T) {
 				Type:      "aws",
 				Name:      "service smith",
 			},
-			"key1",
 			awsCheckFunc,
 			http.StatusOK,
 		},
@@ -428,9 +408,10 @@ func TestCNCServer_generateServiceCredentials(t *testing.T) {
 			if err != nil {
 				panic(err)
 			}
-			keys := jwk.NewSet()
-			keys.Add(key1)
-			c := MakeCNCServer(&mockConfig{}, &mockAuthority{}, nil, keys, tt.jwkKey, "")
+			keyset := jwk.NewSet()
+			keyset.Add(key1)
+			jwtutil.RegisterServiceauthKeyset(keyset, "key1")
+			c := MakeCNCServer(&mockConfig{}, &mockAuthority{}, nil, "")
 
 			body, err := json.Marshal(tt.request)
 			if err != nil {
@@ -442,14 +423,8 @@ func TestCNCServer_generateServiceCredentials(t *testing.T) {
 			h := c.generateServiceCredentials()
 			h.ServeHTTP(w, r)
 
-			if w.Result().StatusCode != tt.wantStatus {
-				t.Errorf("Expected status code %d, got %d", tt.wantStatus, w.Code)
-			}
-
-			ct := w.Result().Header.Get("content-type")
-			if ct != "application/json" {
-				t.Errorf("Expected content-type to be application/json, not %s", ct)
-			}
+			assert.Equal(t, tt.wantStatus, w.Result().StatusCode)
+			assert.Equal(t, "application/json", w.Result().Header.Get("content-type"), "incorrect returned content type")
 
 			resultBody, err := ioutil.ReadAll(w.Result().Body)
 			if err != nil {
@@ -468,11 +443,11 @@ func TestCNCServer_generateControlCredentials(t *testing.T) {
 		if err != nil {
 			panic(err)
 		}
-		stringEquals(t, "Name", response.Name, "contra smith")
-		stringEquals(t, "URL", response.URL, "https://control.local")
-		stringEquals(t, "Certificate", response.Certificate, "b")
-		stringEquals(t, "Key", response.Key, "c")
-		stringEquals(t, "CACert", response.CACert, "a")
+		assert.Equal(t, "contra smith", response.Name)
+		assert.Equal(t, "https://control.local", response.URL)
+		assert.Equal(t, "b", response.Certificate)
+		assert.Equal(t, "c", response.Key)
+		assert.Equal(t, "a", response.CACert)
 	}
 
 	tests := []struct {
@@ -502,7 +477,7 @@ func TestCNCServer_generateControlCredentials(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c := MakeCNCServer(&mockConfig{}, &mockAuthority{}, nil, nil, "", "")
+			c := MakeCNCServer(&mockConfig{}, &mockAuthority{}, nil, "")
 
 			body, err := json.Marshal(tt.request)
 			if err != nil {
@@ -535,7 +510,7 @@ func TestCNCServer_generateControlCredentials(t *testing.T) {
 
 func TestCNCServer_getStatistics(t *testing.T) {
 	t.Run("getCredentials", func(t *testing.T) {
-		c := MakeCNCServer(nil, nil, &mockAgents{}, nil, "", "")
+		c := MakeCNCServer(nil, nil, &mockAgents{}, "")
 
 		r := httptest.NewRequest("GET", "https://localhost/foo", nil)
 		w := httptest.NewRecorder()
