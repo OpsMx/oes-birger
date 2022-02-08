@@ -160,28 +160,12 @@ func (s *agentTunnelServer) EventTunnel(stream tunnel.AgentTunnelService_EventTu
 		case *tunnel.MessageWrapper_Hello:
 			req := in.GetHello()
 			if s.insecure {
-				cert, err := x509.ParseCertificate(req.ClientCertificate)
-				if err != nil {
-					return err
-				}
-				agentIdentity, err = getAgentNameFromCertificate(cert)
-				if err != nil {
+				if agentIdentity, err = getAgentNameFromBytes(req.ClientCertificate); err != nil {
 					return err
 				}
 				state.Name = agentIdentity
 			}
-			endpoints := make([]tunnelroute.Endpoint, len(req.Endpoints))
-			for i, ep := range req.Endpoints {
-				endpoints[i] = tunnelroute.Endpoint{
-					Name:       ep.Name,
-					Type:       ep.Type,
-					Configured: ep.Configured,
-					Namespaces: ep.Namespaces,
-					AccountID:  ep.AccountID,
-					AssumeRole: ep.AssumeRole,
-				}
-			}
-			state.Endpoints = endpoints
+			state.Endpoints = reqToEndpoints(req.Endpoints)
 			state.Version = req.Version
 			state.Hostname = req.Hostname
 			routes.Add(state)
@@ -200,6 +184,30 @@ func (s *agentTunnelServer) EventTunnel(stream tunnel.AgentTunnelService_EventTu
 			log.Printf("Received unknown message: %s: %T", state, x)
 		}
 	}
+}
+
+func getAgentNameFromBytes(data []byte) (name string, err error) {
+	cert, err := x509.ParseCertificate(data)
+	if err != nil {
+		return
+	}
+	name, err = getAgentNameFromCertificate(cert)
+	return
+}
+
+func reqToEndpoints(health []*tunnel.EndpointHealth) []tunnelroute.Endpoint {
+	endpoints := make([]tunnelroute.Endpoint, len(health))
+	for i, ep := range health {
+		endpoints[i] = tunnelroute.Endpoint{
+			Name:       ep.Name,
+			Type:       ep.Type,
+			Configured: ep.Configured,
+			Namespaces: ep.Namespaces,
+			AccountID:  ep.AccountID,
+			AssumeRole: ep.AssumeRole,
+		}
+	}
+	return endpoints
 }
 
 func (s *agentTunnelServer) sendHello(stream tunnel.AgentTunnelService_EventTunnelServer) error {
