@@ -38,6 +38,7 @@ import (
 	"github.com/lestrrat-go/jwx/jwk"
 	"github.com/opsmx/oes-birger/app/controller/cncserver"
 	"github.com/opsmx/oes-birger/internal/ca"
+	"github.com/opsmx/oes-birger/internal/jwtutil"
 	"github.com/opsmx/oes-birger/internal/secrets"
 	"github.com/opsmx/oes-birger/internal/serviceconfig"
 	"github.com/opsmx/oes-birger/internal/tunnelroute"
@@ -55,18 +56,12 @@ var (
 
 	jwtKeyset     = jwk.NewSet()
 	jwtCurrentKey string
-
-	config *ControllerConfig
-
+	config        *ControllerConfig
 	secretsLoader secrets.SecretLoader
-
-	authority *ca.CA
-
-	hook *webhook.Runner
-
-	routes = tunnelroute.MakeRoutes()
-
-	endpoints []serviceconfig.ConfiguredEndpoint
+	authority     *ca.CA
+	hook          *webhook.Runner
+	routes        = tunnelroute.MakeRoutes()
+	endpoints     []serviceconfig.ConfiguredEndpoint
 )
 
 func getAgentNameFromContext(ctx context.Context) (string, error) {
@@ -246,6 +241,15 @@ func main() {
 
 	loadKeyset()
 
+	// Create registry entries to sign and validate JWTs for service authentication,
+	// and protect x-spinnaker-user header.
+	if err = jwtutil.RegisterServiceauthKeyset(jwtKeyset, config.ServiceAuth.CurrentKeyName); err != nil {
+		log.Fatal(err)
+	}
+	if err = jwtutil.RegisterMutationKeyset(jwtKeyset, config.ServiceAuth.HeaderMutationKeyName); err != nil {
+		log.Fatal(err)
+	}
+
 	if len(config.Webhook) > 0 {
 		hook = webhook.NewRunner(config.Webhook)
 		go hook.Run()
@@ -271,13 +275,13 @@ func main() {
 
 	endpoints = serviceconfig.ConfigureEndpoints(secretsLoader, &config.ServiceConfig)
 
-	cnc := cncserver.MakeCNCServer(config, authority, routes, jwtKeyset, jwtCurrentKey, version.String())
+	cnc := cncserver.MakeCNCServer(config, authority, routes, version.String())
 	go cnc.RunServer(*serverCert)
 
 	go runAgentGRPCServer(config.InsecureAgentConnections, *serverCert)
 
 	// Always listen on our well-known port, and always use HTTPS for this one.
-	go serviceconfig.RunHTTPSServer(routes, authority, *serverCert, jwtKeyset, serviceconfig.IncomingServiceConfig{
+	go serviceconfig.RunHTTPSServer(routes, authority, *serverCert, serviceconfig.IncomingServiceConfig{
 		Name: "_services",
 		Port: config.ServiceListenPort,
 	})
@@ -287,7 +291,7 @@ func main() {
 		if service.UseHTTP {
 			go serviceconfig.RunHTTPServer(routes, service)
 		} else {
-			go serviceconfig.RunHTTPSServer(routes, authority, *serverCert, jwtKeyset, service)
+			go serviceconfig.RunHTTPSServer(routes, authority, *serverCert, service)
 		}
 	}
 

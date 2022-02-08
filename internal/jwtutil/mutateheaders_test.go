@@ -17,6 +17,7 @@
 package jwtutil
 
 import (
+	"log"
 	"testing"
 
 	"github.com/lestrrat-go/jwx/jwt"
@@ -26,11 +27,7 @@ import (
 )
 
 func Test_MutateHeader(t *testing.T) {
-	jwtregistry.Clear()
-	err := jwtregistry.Register(RegistryName, "opsmx-clouddriver-proxy",
-		jwtregistry.WithKeyset(loadkeys(t)),
-		jwtregistry.WithSigningKeyName("key1"),
-	)
+	err := RegisterMutationKeyset(LoadTestKeys(t), "key1")
 	require.NoError(t, err)
 	type args struct {
 		data  string
@@ -48,7 +45,7 @@ func Test_MutateHeader(t *testing.T) {
 				"alice",
 				&jwtregistry.TimeClock{NowTime: 1111},
 			},
-			[]byte("eyJhbGciOiJIUzI1NiIsImtpZCI6ImtleTEiLCJ0eXAiOiJKV1QifQ.eyJpYXQiOjExMTEsImlzcyI6Im9wc214LWNsb3VkZHJpdmVyLXByb3h5IiwidSI6ImFsaWNlIn0.Vl1-Dtwj5O2lzOSkZFmBjSwatTHxko0RmS16d3oqfz4"),
+			[]byte("eyJhbGciOiJIUzI1NiIsImtpZCI6ImtleTEiLCJ0eXAiOiJKV1QifQ.eyJleHAiOjIwMTEsImlhdCI6MTExMSwiaXNzIjoib3BzbXgtaGVhZGVyLW11dGF0aW9uIiwidSI6ImFsaWNlIn0.5ufaewbtmA85c0wDHYA72XIxHJQgTRrtfWvZlj1os6Q"),
 			false,
 		},
 	}
@@ -59,15 +56,15 @@ func Test_MutateHeader(t *testing.T) {
 				t.Errorf("mutateHeader() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
+			log.Printf("%s", got)
 			assert.Equal(t, tt.want, got)
 		})
 	}
 }
 
 func TestUnmutateHeader(t *testing.T) {
-	jwtregistry.Clear()
-	err := jwtregistry.Register(RegistryName, "opsmx-clouddriver-proxy",
-		jwtregistry.WithKeyset(loadkeys(t)),
+	err := jwtregistry.Register(mutateRegistryName, "opsmx-clouddriver-proxy",
+		jwtregistry.WithKeyset(LoadTestKeys(t)),
 		jwtregistry.WithSigningKeyName("key1"),
 	)
 	require.NoError(t, err)
@@ -157,4 +154,17 @@ func TestUnmutateHeader(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestUnregisterMutationKeyset(t *testing.T) {
+	err := jwtregistry.Register(mutateRegistryName, "opsmx-clouddriver-proxy",
+		jwtregistry.WithKeyset(LoadTestKeys(t)),
+		jwtregistry.WithSigningKeyName("key1"),
+	)
+	require.NoError(t, err)
+	t.Run("register/unregister sequence", func(t *testing.T) {
+		assert.True(t, MutationIsRegistered())
+		UnregisterMutationKeyset()
+		assert.False(t, MutationIsRegistered())
+	})
 }

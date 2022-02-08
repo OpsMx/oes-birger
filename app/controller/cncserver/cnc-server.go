@@ -28,7 +28,6 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/lestrrat-go/jwx/jwk"
 	"github.com/oklog/ulid/v2"
 	"github.com/opsmx/oes-birger/internal/ca"
 	"github.com/opsmx/oes-birger/internal/fwdapi"
@@ -58,8 +57,6 @@ type CNCServer struct {
 	cfg           cncConfig
 	authority     cncCertificateAuthority
 	agentReporter cncAgentStatsReporter
-	jwkKeyset     jwk.Set
-	jwtCurrentKey string
 	version       string
 }
 
@@ -70,16 +67,12 @@ func MakeCNCServer(
 	config cncConfig,
 	authority cncCertificateAuthority,
 	agents cncAgentStatsReporter,
-	jwkset jwk.Set,
-	currentKey string,
 	vers string,
 ) *CNCServer {
 	return &CNCServer{
 		cfg:           config,
 		authority:     authority,
 		agentReporter: agents,
-		jwkKeyset:     jwkset,
-		jwtCurrentKey: currentKey,
 		version:       vers,
 	}
 }
@@ -235,15 +228,7 @@ func (s *CNCServer) generateServiceCredentials() http.HandlerFunc {
 			return
 		}
 
-		var key jwk.Key
-		var ok bool
-		if key, ok = s.jwkKeyset.LookupKeyID(s.jwtCurrentKey); !ok {
-			err := fmt.Errorf("unable to find service key '%s'", s.jwtCurrentKey)
-			util.FailRequest(w, err, http.StatusBadRequest)
-			return
-		}
-
-		token, err := jwtutil.MakeJWT(key, req.Type, req.Name, req.AgentName)
+		token, err := jwtutil.MakeJWT(req.Type, req.Name, req.AgentName, nil)
 		if err != nil {
 			util.FailRequest(w, err, http.StatusBadRequest)
 			return

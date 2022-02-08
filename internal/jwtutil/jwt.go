@@ -22,75 +22,57 @@ package jwtutil
 import (
 	"fmt"
 
-	"github.com/lestrrat-go/jwx/jwa"
 	"github.com/lestrrat-go/jwx/jwk"
 	"github.com/lestrrat-go/jwx/jwt"
+	"github.com/skandragon/jwtregistry"
 )
 
 const (
-	jwtEndpointTypeKey = "t"
-	jwtEndpointNameKey = "n"
-	jwtAgentKey        = "a"
-	opsmxIssuerString  = "opsmx"
+	jwtEndpointTypeKey      = "t"
+	jwtEndpointNameKey      = "n"
+	jwtAgentKey             = "a"
+	serviceauthIssuer       = "opsmx"
+	serviceauthRegistryName = "service-auth"
 )
 
+// RegisterServiceauthKeyset registers (or re-registers) a new keyset and signing key name.
+func RegisterServiceauthKeyset(keyset jwk.Set, signingKeyName string) error {
+	return jwtregistry.Register(serviceauthRegistryName, serviceauthIssuer,
+		jwtregistry.WithKeyset(keyset),
+		jwtregistry.WithSigningKeyName(signingKeyName),
+	)
+}
+
 // MakeJWT will return a token with provided type, name, and agent name embedded in the claims.
-func MakeJWT(key jwk.Key, epType string, epName string, agent string) (string, error) {
-	t := jwt.New()
-
-	err := t.Set(jwt.IssuerKey, opsmxIssuerString)
-	if err != nil {
-		return "", err
+func MakeJWT(epType string, epName string, agent string, clock jwt.Clock) (string, error) {
+	claims := map[string]string{
+		jwtEndpointTypeKey: epType,
+		jwtEndpointNameKey: epName,
+		jwtAgentKey:        agent,
 	}
 
-	err = t.Set(jwtEndpointTypeKey, epType)
-	if err != nil {
-		return "", err
-	}
-
-	err = t.Set(jwtEndpointNameKey, epName)
-	if err != nil {
-		return "", err
-	}
-
-	err = t.Set(jwtAgentKey, agent)
-	if err != nil {
-		return "", err
-	}
-
-	signed, err := jwt.Sign(t, jwa.HS256, key)
+	signed, err := jwtregistry.Sign(serviceauthRegistryName, claims, clock)
 	if err != nil {
 		return "", err
 	}
 	return string(signed), nil
 }
 
-func getField(token jwt.Token, name string) (string, error) {
-	if i, ok := token.Get(name); ok {
-		return i.(string), nil
-	}
-	return "", fmt.Errorf("missing %s", name)
-}
-
 // ValidateJWT will validate and return the enbedded claims.
-func ValidateJWT(keyset jwk.Set, tokenString string) (epType string, epName string, agent string, err error) {
-	token, err := jwt.Parse(
-		[]byte(tokenString),
-		jwt.WithValidate(true),
-		jwt.WithIssuer(opsmxIssuerString),
-		jwt.WithKeySet(keyset),
-	)
+func ValidateJWT(tokenString string, clock jwt.Clock) (epType string, epName string, agent string, err error) {
+	claims, err := jwtregistry.Validate(serviceauthRegistryName, []byte(tokenString), clock)
 	if err != nil {
 		return
 	}
-	if epType, err = getField(token, jwtEndpointTypeKey); err != nil {
-		return "", "", "", err
+	var found bool
+	if epType, found = claims[jwtEndpointTypeKey]; !found {
+		err = fmt.Errorf("no '%s' key in JWT claims", jwtEndpointTypeKey)
 	}
-	if epName, err = getField(token, jwtEndpointNameKey); err != nil {
-		return "", "", "", err
+	if epName, found = claims[jwtEndpointNameKey]; !found {
+		err = fmt.Errorf("no '%s' key in JWT claims", jwtEndpointNameKey)
 	}
-	if agent, err = getField(token, jwtAgentKey); err != nil {
-		return "", "", "", err
+	if agent, found = claims[jwtAgentKey]; !found {
+		err = fmt.Errorf("no '%s' key in JWT claims", jwtAgentKey)
 	}
 	return
 }

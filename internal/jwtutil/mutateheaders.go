@@ -18,7 +18,9 @@ package jwtutil
 
 import (
 	"fmt"
+	"time"
 
+	"github.com/lestrrat-go/jwx/jwk"
 	"github.com/lestrrat-go/jwx/jwt"
 
 	"github.com/skandragon/jwtregistry"
@@ -44,20 +46,47 @@ import (
 // This allows splitting Clouddrivers off to remote locations while still ensuring
 // they only contact our internal, secure components with requests sent to them.
 
-// RegistryName is the name we expect to be used in jwtregistry.Register() by
-// someone prior to calling us.
-const RegistryName = "header-mutation"
+const (
+	mutateRegistryName = "header-mutation"
+	mutateIssuer       = "opsmx-header-mutation"
+	mutateValidity     = 15 * time.Minute
+)
+
+var (
+	mutationRegistered = false
+)
+
+// RegisterMutationKeyset registers (or re-registers) a new keyset and signing key name.
+func RegisterMutationKeyset(keyset jwk.Set, signingKeyName string) error {
+	mutationRegistered = true
+	return jwtregistry.Register(mutateRegistryName, mutateIssuer,
+		jwtregistry.WithKeyset(keyset),
+		jwtregistry.WithSigningKeyName(signingKeyName),
+		jwtregistry.WithSigningValidityPeriod(mutateValidity),
+	)
+}
+
+// UnregisterMutationKeyset removes the registration.  This is mostly for testing.
+func UnregisterMutationKeyset() {
+	mutationRegistered = false
+	jwtregistry.Delete(mutateRegistryName)
+}
+
+// MutationIsRegistered indicates if RegisterMutationKeyset was called at least once.
+func MutationIsRegistered() bool {
+	return mutationRegistered
+}
 
 // MutateHeader will take a header value (as a string) and return a JWT which we
 // can later use in UnmutateHeader to recover the original string value.
 func MutateHeader(data string, clock jwt.Clock) (signed []byte, err error) {
-	signed, err = jwtregistry.Sign(RegistryName, map[string]string{"u": data}, clock)
+	signed, err = jwtregistry.Sign(mutateRegistryName, map[string]string{"u": data}, clock)
 	return
 }
 
 // UnmutateHeader checks the mutated data and returns the unmutated original content.
 func UnmutateHeader(tokenString []byte, clock jwt.Clock) (username string, err error) {
-	claims, err := jwtregistry.Validate(RegistryName, tokenString, clock)
+	claims, err := jwtregistry.Validate(mutateRegistryName, tokenString, clock)
 	if err != nil {
 		return
 	}

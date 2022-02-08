@@ -42,10 +42,10 @@ func containsFolded(l []string, t string) bool {
 }
 
 // MakeHeaders copies from http headers to protobuf's format, possibly with mutation
-func MakeHeaders(headers map[string][]string) ([]*HttpHeader, error) {
-	ret := make([]*HttpHeader, 0)
+func MakeHeaders(headers map[string][]string) (ret []*HttpHeader, err error) {
+	ret = make([]*HttpHeader, 0)
 	for name, values := range headers {
-		if containsFolded(mutatedHeaders, name) {
+		if jwtutil.MutationIsRegistered() && containsFolded(mutatedHeaders, name) {
 			// only handle the first item in the list, which is typical here
 			value := values[0]
 			mutated, err := jwtutil.MutateHeader(value, nil)
@@ -61,13 +61,24 @@ func MakeHeaders(headers map[string][]string) ([]*HttpHeader, error) {
 }
 
 // CopyHeaders will copy the headers from a tunnel request to the http request, possibly
-// with unmutation
-func CopyHeaders(req *OpenHTTPTunnelRequest, httpRequest *http.Request) {
-	for _, header := range req.Headers {
-		for _, value := range header.Values {
-			httpRequest.Header.Add(header.Name, value)
+// with unmutation.
+func CopyHeaders(headers []*HttpHeader, out *http.Header) error {
+	for _, header := range headers {
+		if jwtutil.MutationIsRegistered() && containsFolded(mutatedHeaders, header.Name) {
+			// only handle the first value here as well
+			value := header.Values[0]
+			unmutated, err := jwtutil.UnmutateHeader([]byte(value), nil)
+			if err != nil {
+				return err
+			}
+			out.Add(header.Name, unmutated)
+		} else {
+			for _, value := range header.Values {
+				out.Add(header.Name, value)
+			}
 		}
 	}
+	return nil
 }
 
 func makeChunkedResponse(id string, data []byte) *MessageWrapper {
@@ -103,12 +114,12 @@ func MakeBadGatewayResponse(id string) *MessageWrapper {
 	}
 }
 
-func makeResponse(id string, response *http.Response) (*MessageWrapper, error) {
+func makeResponse(id string, response *http.Response) (ret *MessageWrapper, err error) {
 	headers, err := MakeHeaders(response.Header)
 	if err != nil {
-		return nil, err
+		return
 	}
-	return &MessageWrapper{
+	ret = &MessageWrapper{
 		Event: &MessageWrapper_HttpTunnelControl{
 			HttpTunnelControl: &HttpTunnelControl{
 				ControlType: &HttpTunnelControl_HttpTunnelResponse{
@@ -121,7 +132,8 @@ func makeResponse(id string, response *http.Response) (*MessageWrapper, error) {
 				},
 			},
 		},
-	}, nil
+	}
+	return
 }
 
 // RunHTTPRequest will make a HTTP request, and send the data to the remote end.

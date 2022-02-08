@@ -23,7 +23,6 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/lestrrat-go/jwx/jwk"
 	"github.com/opsmx/oes-birger/internal/ca"
 	"github.com/opsmx/oes-birger/internal/jwtutil"
 	"github.com/opsmx/oes-birger/internal/tunnel"
@@ -45,7 +44,7 @@ var (
 
 // RunHTTPSServer will listen for incoming service requests on a provided port, and
 // currently will use certificates or JWT to identify the destination.
-func RunHTTPSServer(routes *tunnelroute.ConnectedRoutes, ca *ca.CA, serverCert tls.Certificate, keyset jwk.Set, service IncomingServiceConfig) {
+func RunHTTPSServer(routes *tunnelroute.ConnectedRoutes, ca *ca.CA, serverCert tls.Certificate, service IncomingServiceConfig) {
 	log.Printf("Running service HTTPS listener on port %d", service.Port)
 
 	certPool, err := ca.MakeCertPool()
@@ -62,7 +61,7 @@ func RunHTTPSServer(routes *tunnelroute.ConnectedRoutes, ca *ca.CA, serverCert t
 
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("/", secureAPIHandlerMaker(routes, service, keyset))
+	mux.HandleFunc("/", secureAPIHandlerMaker(routes, service))
 
 	server := &http.Server{
 		Addr:      fmt.Sprintf(":%d", service.Port),
@@ -119,7 +118,7 @@ func extractEndpointFromCert(r *http.Request) (agentIdentity string, endpointTyp
 	return names.Agent, names.Type, names.Name, true
 }
 
-func extractEndpointFromJWT(r *http.Request, keyset jwk.Set) (agentIdentity string, endpointType string, endpointName string, validated bool) {
+func extractEndpointFromJWT(r *http.Request) (agentIdentity string, endpointType string, endpointName string, validated bool) {
 	authPassword := r.Header.Get("X-Opsmx-Token")
 	r.Header.Del("X-Opsmx-Token")
 
@@ -130,7 +129,7 @@ func extractEndpointFromJWT(r *http.Request, keyset jwk.Set) (agentIdentity stri
 		}
 	}
 
-	endpointType, endpointName, agentIdentity, err := jwtutil.ValidateJWT(keyset, authPassword)
+	endpointType, endpointName, agentIdentity, err := jwtutil.ValidateJWT(authPassword, nil)
 	if err != nil {
 		log.Printf("%v", err)
 		return "", "", "", false
@@ -139,13 +138,13 @@ func extractEndpointFromJWT(r *http.Request, keyset jwk.Set) (agentIdentity stri
 	return agentIdentity, endpointType, endpointName, true
 }
 
-func extractEndpoint(r *http.Request, keyset jwk.Set) (agentIdentity string, endpointType string, endpointName string, err error) {
+func extractEndpoint(r *http.Request) (agentIdentity string, endpointType string, endpointName string, err error) {
 	agentIdentity, endpointType, endpointName, found := extractEndpointFromCert(r)
 	if found {
 		return agentIdentity, endpointType, endpointName, nil
 	}
 
-	agentIdentity, endpointType, endpointName, found = extractEndpointFromJWT(r, keyset)
+	agentIdentity, endpointType, endpointName, found = extractEndpointFromJWT(r)
 	if found {
 		return agentIdentity, endpointType, endpointName, nil
 	}
@@ -153,9 +152,9 @@ func extractEndpoint(r *http.Request, keyset jwk.Set) (agentIdentity string, end
 	return "", "", "", fmt.Errorf("no valid credentials or JWT found")
 }
 
-func secureAPIHandlerMaker(routes *tunnelroute.ConnectedRoutes, service IncomingServiceConfig, keyset jwk.Set) func(http.ResponseWriter, *http.Request) {
+func secureAPIHandlerMaker(routes *tunnelroute.ConnectedRoutes, service IncomingServiceConfig) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
-		agentIdentity, endpointType, endpointName, err := extractEndpoint(r, keyset)
+		agentIdentity, endpointType, endpointName, err := extractEndpoint(r)
 		if err != nil {
 			util.FailRequest(w, err, http.StatusBadRequest)
 			return

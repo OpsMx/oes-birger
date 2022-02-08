@@ -252,7 +252,12 @@ func (ke *KubernetesEndpoint) ExecuteHTTPRequest(dataflow chan *tunnel.MessageWr
 		return
 	}
 
-	tunnel.CopyHeaders(req, httpRequest)
+	err = tunnel.CopyHeaders(req.Headers, &httpRequest.Header)
+	if err != nil {
+		log.Printf("failed to copy headers: %v", err)
+		dataflow <- tunnel.MakeBadGatewayResponse(req.Id)
+		return
+	}
 	if len(c.token) > 0 {
 		httpRequest.Header.Set("Authorization", "Bearer "+c.token)
 	}
