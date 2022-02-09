@@ -23,8 +23,11 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
+	"github.com/lestrrat-go/jwx/jwt"
+	"github.com/opsmx/oes-birger/internal/jwtutil"
 	"github.com/opsmx/oes-birger/internal/secrets"
 	"github.com/opsmx/oes-birger/internal/tunnel"
 	"golang.org/x/net/context"
@@ -177,6 +180,26 @@ func MakeGenericEndpoint(endpointType string, endpointName string, configBytes [
 	return ep, true, nil
 }
 
+func (ep *GenericEndpoint) unmutateURI(typ string, method string, uri string, clock jwt.Clock) (unmutatedURI string, err error) {
+	if typ != "fiat" {
+		return uri, nil
+	}
+	if method != http.MethodGet {
+		return uri, nil
+	}
+	if !jwtutil.MutationIsRegistered() {
+		return uri, nil
+	}
+	parts := strings.Split(uri, "/")
+	if len(parts) >= 3 && parts[1] == "authorize" {
+		if parts[2], err = jwtutil.UnmutateHeader([]byte(parts[2]), clock); err != nil {
+			return "", err
+		}
+		return strings.Join(parts, "/"), nil
+	}
+	return uri, nil
+}
+
 // ExecuteHTTPRequest does the actual call to connect to HTTP, and will send the data back over the
 // tunnel.
 func (ep *GenericEndpoint) ExecuteHTTPRequest(dataflow chan *tunnel.MessageWrapper, req *tunnel.OpenHTTPTunnelRequest) {
@@ -197,13 +220,20 @@ func (ep *GenericEndpoint) ExecuteHTTPRequest(dataflow chan *tunnel.MessageWrapp
 		Transport: tr,
 	}
 
+	uri, err := ep.unmutateURI(req.Type, req.Method, req.URI, nil)
+	if err != nil {
+		log.Printf("Failed to unmutate URI %s to %s: %v", req.Method, ep.config.URL+req.URI, err)
+		dataflow <- tunnel.MakeBadGatewayResponse(req.Id)
+		return
+	}
+
 	ctx, cancel := context.WithCancel(context.Background())
 	tunnel.RegisterCancelFunction(req.Id, cancel)
 	defer tunnel.UnregisterCancelFunction(req.Id)
 
-	httpRequest, err := http.NewRequestWithContext(ctx, req.Method, ep.config.URL+req.URI, bytes.NewBuffer(req.Body))
+	httpRequest, err := http.NewRequestWithContext(ctx, req.Method, ep.config.URL+uri, bytes.NewBuffer(req.Body))
 	if err != nil {
-		log.Printf("Failed to build request for %s to %s: %v", req.Method, ep.config.URL+req.URI, err)
+		log.Printf("Failed to build request for %s to %s: %v", req.Method, ep.config.URL+uri, err)
 		dataflow <- tunnel.MakeBadGatewayResponse(req.Id)
 		return
 	}

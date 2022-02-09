@@ -21,6 +21,11 @@ import (
 	"log"
 	"strings"
 	"testing"
+
+	"github.com/lestrrat-go/jwx/jwt"
+	"github.com/opsmx/oes-birger/internal/jwtutil"
+	"github.com/skandragon/jwtregistry"
+	"github.com/stretchr/testify/require"
 )
 
 func makeMap(username *string, password *string, token *string) *map[string][]byte {
@@ -309,6 +314,123 @@ func TestGenericEndpoint_loadKubernetesSecrets(t *testing.T) {
 			compareBytes(t, tt.wantRawUsername, ep.config.Credentials.rawUsername, "rawUsername")
 			compareBytes(t, tt.wantRawPassword, ep.config.Credentials.rawPassword, "rawPassword")
 			compareBytes(t, tt.wantRawToken, ep.config.Credentials.rawToken, "rawToken")
+		})
+	}
+}
+
+func TestGenericEndpoint_unmutateURI_nokey(t *testing.T) {
+	jwtutil.UnregisterMutationKeyset()
+	type args struct {
+		typ    string
+		method string
+		uri    string
+		clock  jwt.Clock
+	}
+	tests := []struct {
+		name             string
+		args             args
+		wantUnmutatedURI string
+		wantErr          bool
+	}{
+		{
+			"not-fiat",
+			args{"xxx", "GET", "/foo/bar", nil},
+			"/foo/bar",
+			false,
+		},
+		{
+			"fiat + POST, not mutated path",
+			args{"fiat", "POST", "/foo/bar", nil},
+			"/foo/bar",
+			false,
+		},
+		{
+			"fiat + GET, not mutated path",
+			args{"fiat", "GET", "/foo/bar", nil},
+			"/foo/bar",
+			false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ep := GenericEndpoint{}
+			gotUnmutatedURI, err := ep.unmutateURI(tt.args.typ, tt.args.method, tt.args.uri, tt.args.clock)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("GenericEndpoint.unmutateURI() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if gotUnmutatedURI != tt.wantUnmutatedURI {
+				t.Errorf("GenericEndpoint.unmutateURI() = %v, want %v", gotUnmutatedURI, tt.wantUnmutatedURI)
+			}
+		})
+	}
+}
+
+func TestGenericEndpoint_unmutateURI_key(t *testing.T) {
+	keyset := jwtutil.LoadTestKeys(t)
+	err := jwtutil.RegisterMutationKeyset(keyset, "key1")
+	require.NoError(t, err)
+
+	type args struct {
+		typ    string
+		method string
+		uri    string
+		clock  jwt.Clock
+	}
+	tests := []struct {
+		name             string
+		args             args
+		wantUnmutatedURI string
+		wantErr          bool
+	}{
+		{
+			"not-fiat",
+			args{"xxx", "GET", "/foo/bar", nil},
+			"/foo/bar",
+			false,
+		},
+		{
+			"fiat + POST, not mutated path",
+			args{"fiat", "POST", "/foo/bar", nil},
+			"/foo/bar",
+			false,
+		},
+		{
+			"fiat + GET, not mutated path",
+			args{"fiat", "GET", "/foo/bar", nil},
+			"/foo/bar",
+			false,
+		},
+		{
+			"fiat + GET, mutated path, jwt is good",
+			args{"fiat", "GET", "/authorize/eyJhbGciOiJIUzI1NiIsImtpZCI6ImtleTEiLCJ0eXAiOiJKV1QifQ.eyJleHAiOjIwMTEsImlhdCI6MTExMSwiaXNzIjoib3BzbXgtaGVhZGVyLW11dGF0aW9uIiwidSI6ImFsaWNlIn0.5ufaewbtmA85c0wDHYA72XIxHJQgTRrtfWvZlj1os6Q", &jwtregistry.TimeClock{NowTime: 1112}},
+			"/authorize/alice",
+			false,
+		},
+		{
+			"fiat + GET, mutated path, jwt is wrong format",
+			args{"fiat", "GET", "/authorize/bar", &jwtregistry.TimeClock{NowTime: 1112}},
+			"",
+			true,
+		},
+		{
+			"fiat + GET, mutated path, jwt is expired",
+			args{"fiat", "GET", "/authorize/eyJhbGciOiJIUzI1NiIsImtpZCI6ImtleTEiLCJ0eXAiOiJKV1QifQ.eyJleHAiOjIwMTEsImlhdCI6MTExMSwiaXNzIjoib3BzbXgtaGVhZGVyLW11dGF0aW9uIiwidSI6ImFsaWNlIn0.5ufaewbtmA85c0wDHYA72XIxHJQgTRrtfWvZlj1os6Q", &jwtregistry.TimeClock{NowTime: 99999}},
+			"",
+			true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ep := GenericEndpoint{}
+			gotUnmutatedURI, err := ep.unmutateURI(tt.args.typ, tt.args.method, tt.args.uri, tt.args.clock)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("GenericEndpoint.unmutateURI() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if gotUnmutatedURI != tt.wantUnmutatedURI {
+				t.Errorf("GenericEndpoint.unmutateURI() = %v, want %v", gotUnmutatedURI, tt.wantUnmutatedURI)
+			}
 		})
 	}
 }
