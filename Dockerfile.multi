@@ -43,7 +43,7 @@ RUN GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="-s -w" -o /out/make
 # Establish a base OS image used by all the applications.
 #
 FROM alpine:3 AS base-image
-RUN apk update && apk add ca-certificates && rm -rf /var/cache/apk/*
+RUN apk add --no-cache ca-certificates curl
 # the exit 0 hack is a work-around to build on ARM64 apparently...
 RUN update-ca-certificates ; exit 0
 RUN mkdir /local /local/ca-certificates && rm -rf /usr/local/share/ca-certificates && ln -s  /local/ca-certificates /usr/local/share/ca-certificates

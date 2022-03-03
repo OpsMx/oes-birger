@@ -113,6 +113,11 @@ buildtime/%.ts:: buildtime ${all_deps} Dockerfile
 test: ${pb_deps}
 	go test -race ./...
 
+
+.PHONY: testsuite
+testsuite: bin/agent bin/controller bin/make-ca bin/get-creds
+	docker build -t opsmx-agent-testsuite:latest -f Dockerfile.testsuite .
+
 #
 # Clean the world.
 #
