@@ -177,6 +177,12 @@ func MakeGenericEndpoint(endpointType string, endpointName string, configBytes [
 		return nil, false, nil
 	}
 
+	newURL := strings.TrimSuffix(ep.config.URL, "/")
+	if newURL != ep.config.URL {
+		log.Printf("removing trailing / from url: %s", newURL)
+		ep.config.URL = newURL
+	}
+
 	return ep, true, nil
 }
 
