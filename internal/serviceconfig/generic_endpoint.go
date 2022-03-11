@@ -23,7 +23,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"net/url"
 	"strings"
 	"time"
 
@@ -255,7 +254,7 @@ func (ep *GenericEndpoint) ExecuteHTTPRequest(dataflow chan *tunnel.MessageWrapp
 	creds := ep.config.Credentials
 	switch creds.Type {
 	case "basic":
-		httpRequest.SetBasicAuth(url.QueryEscape(creds.rawUsername), url.QueryEscape(creds.rawPassword))
+		httpRequest.SetBasicAuth(creds.rawUsername, creds.rawPassword)
 	case "bearer":
 		httpRequest.Header.Set("Authorization", "Bearer "+creds.rawToken)
 	case "token":
