@@ -254,10 +254,26 @@ func (ep *GenericEndpoint) ExecuteHTTPRequest(dataflow chan *tunnel.MessageWrapp
 	creds := ep.config.Credentials
 	switch creds.Type {
 	case "basic":
-		httpRequest.SetBasicAuth(creds.rawUsername, creds.rawPassword)
+		u := strings.TrimSpace(creds.rawUsername)
+		if u != creds.rawUsername {
+			log.Printf("warning: trimming whitespace from username for %s/%s", ep.endpointType, ep.endpointName)
+		}
+		p := strings.TrimSpace(creds.rawPassword)
+		if p != creds.rawPassword {
+			log.Printf("warning: trimming whitespace from password for %s/%s", ep.endpointType, ep.endpointName)
+		}
+		httpRequest.SetBasicAuth(u, p)
 	case "bearer":
+		t := strings.TrimSpace(creds.rawToken)
+		if t != creds.rawToken {
+			log.Printf("warning: trimming whitespace from token for %s/%s", ep.endpointType, ep.endpointName)
+		}
 		httpRequest.Header.Set("Authorization", "Bearer "+creds.rawToken)
 	case "token":
+		t := strings.TrimSpace(creds.rawToken)
+		if t != creds.rawToken {
+			log.Printf("warning: trimming whitespace from token for %s/%s", ep.endpointType, ep.endpointName)
+		}
 		httpRequest.Header.Set("Authorization", "Token "+creds.rawToken)
 	}
 
