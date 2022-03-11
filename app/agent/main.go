@@ -44,7 +44,7 @@ import (
 
 var (
 	versionBuild = -1
-	version      = util.Versions{Major: 3, Minor: 2, Patch: 4, Build: versionBuild}
+	version      = util.Versions{Major: 3, Minor: 2, Patch: 8, Build: versionBuild}
 
 	tickTime   = flag.Int("tickTime", 30, "Time between sending Ping messages")
 	caCertFile = flag.String("caCertFile", "/app/config/ca.pem", "The file containing the CA certificate we will use to verify the controller's cert")
