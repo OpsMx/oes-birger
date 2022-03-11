@@ -83,9 +83,9 @@ bin/%:: ${all_deps}
 images-ma: buildtime $(addsuffix -ma.ts, $(addprefix buildtime/,$(IMAGE_TARGETS)))
 
 buildtime/%-ma.ts:: ${all_deps} Dockerfile.multi
+	$(eval dockerTags = $(shell ./build-tag.sh ${IMAGE_PREFIX}forwarder-$(patsubst %.ts,%,$(@F)) v${now}))
 	${BUILDX} \
-		--tag ${IMAGE_PREFIX}forwarder-$(patsubst %-ma.ts,%,$(@F)):latest \
-		--tag ${IMAGE_PREFIX}forwarder-$(patsubst %-ma.ts,%,$(@F)):v${now} \
+		${dockerTags} \
 		--target $(patsubst %-ma.ts,%,$(@F))-image \
 		-f Dockerfile.multi \
 		--push .
@@ -98,9 +98,9 @@ buildtime/%-ma.ts:: ${all_deps} Dockerfile.multi
 images: $(addsuffix .ts, $(addprefix buildtime/,$(IMAGE_TARGETS)))
 
 buildtime/%.ts:: buildtime ${all_deps} Dockerfile
+	$(eval dockerTags = $(shell ./build-tag.sh ${IMAGE_PREFIX}forwarder-$(patsubst %.ts,%,$(@F)) v${now}))
 	docker build --pull \
-		--tag ${IMAGE_PREFIX}forwarder-$(patsubst %.ts,%,$(@F)):latest \
-		--tag ${IMAGE_PREFIX}forwarder-$(patsubst %.ts,%,$(@F)):v${now} \
+		${dockerTags} \
 		--target $(patsubst %.ts,%,$(@F))-image \
 		.
 	touch $@
