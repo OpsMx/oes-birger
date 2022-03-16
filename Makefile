@@ -17,7 +17,8 @@
 TARGETS=test local
 PLATFORM=linux/amd64,linux/arm64
 BUILDX=docker buildx build --pull --platform ${PLATFORM}
-IMAGE_PREFIX=docker.flame.org/library/
+#IMAGE_PREFIX=docker.flame.org/library/
+IMAGE_PREFIX=quay.io/opsmxpublic/
 
 #
 # Build targets.  Adding to these will cause magic to occur.
