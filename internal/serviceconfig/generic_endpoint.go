@@ -21,7 +21,6 @@ import (
 	"crypto/tls"
 	"encoding/base64"
 	"fmt"
-	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -30,6 +29,7 @@ import (
 	"github.com/opsmx/oes-birger/internal/jwtutil"
 	"github.com/opsmx/oes-birger/internal/secrets"
 	"github.com/opsmx/oes-birger/internal/tunnel"
+	"go.uber.org/zap"
 	"golang.org/x/net/context"
 	"gopkg.in/yaml.v3"
 )
@@ -168,18 +168,17 @@ func MakeGenericEndpoint(endpointType string, endpointName string, configBytes [
 
 	err = ep.loadSecrets(secretsLoader)
 	if err != nil {
-		log.Printf("Unable to load secret: %v", err)
+		zap.S().Errorf("Unable to load secret: %v", err)
 		return nil, false, nil
 	}
 
 	if ep.config.URL == "" {
-		log.Printf("url not set for %s/%s", endpointType, endpointName)
+		zap.S().Errorf("url not set for %s/%s", endpointType, endpointName)
 		return nil, false, nil
 	}
 
 	newURL := strings.TrimSuffix(ep.config.URL, "/")
 	if newURL != ep.config.URL {
-		log.Printf("removing trailing / from url: %s", newURL)
 		ep.config.URL = newURL
 	}
 
@@ -209,7 +208,7 @@ func (ep *GenericEndpoint) unmutateURI(typ string, method string, uri string, cl
 // ExecuteHTTPRequest does the actual call to connect to HTTP, and will send the data back over the
 // tunnel.
 func (ep *GenericEndpoint) ExecuteHTTPRequest(dataflow chan *tunnel.MessageWrapper, req *tunnel.OpenHTTPTunnelRequest) {
-	log.Printf("Running request %v", req)
+	zap.S().Debugf("Running request %v", req)
 	tlsConfig := &tls.Config{
 		MinVersion: tls.VersionTLS12,
 	}
@@ -228,7 +227,7 @@ func (ep *GenericEndpoint) ExecuteHTTPRequest(dataflow chan *tunnel.MessageWrapp
 
 	uri, err := ep.unmutateURI(req.Type, req.Method, req.URI, nil)
 	if err != nil {
-		log.Printf("Failed to unmutate URI %s to %s: %v", req.Method, ep.config.URL+req.URI, err)
+		zap.S().Errorf("Failed to unmutate URI %s to %s: %v", req.Method, ep.config.URL+req.URI, err)
 		dataflow <- tunnel.MakeBadGatewayResponse(req.Id)
 		return
 	}
@@ -239,14 +238,14 @@ func (ep *GenericEndpoint) ExecuteHTTPRequest(dataflow chan *tunnel.MessageWrapp
 
 	httpRequest, err := http.NewRequestWithContext(ctx, req.Method, ep.config.URL+uri, bytes.NewBuffer(req.Body))
 	if err != nil {
-		log.Printf("Failed to build request for %s to %s: %v", req.Method, ep.config.URL+uri, err)
+		zap.S().Errorf("Failed to build request for %s to %s: %v", req.Method, ep.config.URL+uri, err)
 		dataflow <- tunnel.MakeBadGatewayResponse(req.Id)
 		return
 	}
 
 	err = tunnel.CopyHeaders(req.Headers, &httpRequest.Header)
 	if err != nil {
-		log.Printf("failed to copy headers: %v", err)
+		zap.S().Errorf("failed to copy headers: %v", err)
 		dataflow <- tunnel.MakeBadGatewayResponse(req.Id)
 		return
 	}
@@ -256,23 +255,23 @@ func (ep *GenericEndpoint) ExecuteHTTPRequest(dataflow chan *tunnel.MessageWrapp
 	case "basic":
 		u := strings.TrimSpace(creds.rawUsername)
 		if u != creds.rawUsername {
-			log.Printf("warning: trimming whitespace from username for %s/%s", ep.endpointType, ep.endpointName)
+			zap.S().Infof("warning: trimming whitespace from username for %s/%s", ep.endpointType, ep.endpointName)
 		}
 		p := strings.TrimSpace(creds.rawPassword)
 		if p != creds.rawPassword {
-			log.Printf("warning: trimming whitespace from password for %s/%s", ep.endpointType, ep.endpointName)
+			zap.S().Infof("warning: trimming whitespace from password for %s/%s", ep.endpointType, ep.endpointName)
 		}
 		httpRequest.SetBasicAuth(u, p)
 	case "bearer":
 		t := strings.TrimSpace(creds.rawToken)
 		if t != creds.rawToken {
-			log.Printf("warning: trimming whitespace from token for %s/%s", ep.endpointType, ep.endpointName)
+			zap.S().Infof("warning: trimming whitespace from token for %s/%s", ep.endpointType, ep.endpointName)
 		}
 		httpRequest.Header.Set("Authorization", "Bearer "+creds.rawToken)
 	case "token":
 		t := strings.TrimSpace(creds.rawToken)
 		if t != creds.rawToken {
-			log.Printf("warning: trimming whitespace from token for %s/%s", ep.endpointType, ep.endpointName)
+			zap.S().Infof("warning: trimming whitespace from token for %s/%s", ep.endpointType, ep.endpointName)
 		}
 		httpRequest.Header.Set("Authorization", "Token "+creds.rawToken)
 	}

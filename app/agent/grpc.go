@@ -3,7 +3,6 @@ package main
 import (
 	"crypto/tls"
 	"io"
-	"log"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -199,7 +198,7 @@ func handleHTTPControl(in *tunnel.MessageWrapper, httpids *util.SessionList, end
 			}
 		}
 		if !found {
-			log.Printf("Request for unsupported HTTP tunnel type=%s name=%s", req.Type, req.Name)
+			zap.S().Errorf("Request for unsupported HTTP tunnel type=%s name=%s", req.Type, req.Name)
 			dataflow <- tunnel.MakeBadGatewayResponse(req.Id)
 		}
 	case *tunnel.HttpTunnelControl_HttpTunnelResponse:
@@ -212,7 +211,7 @@ func handleHTTPControl(in *tunnel.MessageWrapper, httpids *util.SessionList, end
 				httpids.RemoveUnlocked(resp.Id)
 			}
 		} else {
-			log.Printf("Got response to unknown HTTP request id %s", resp.Id)
+			zap.S().Debugf("Got response to unknown HTTP request id %s", resp.Id)
 		}
 		httpids.Unlock()
 	case *tunnel.HttpTunnelControl_HttpTunnelChunkedResponse:
@@ -225,12 +224,12 @@ func handleHTTPControl(in *tunnel.MessageWrapper, httpids *util.SessionList, end
 				httpids.RemoveUnlocked(resp.Id)
 			}
 		} else {
-			log.Printf("Got response to unknown HTTP request id %s", resp.Id)
+			zap.S().Debugf("Got response to unknown HTTP request id %s", resp.Id)
 		}
 		httpids.Unlock()
 	case nil:
 		return
 	default:
-		log.Printf("Received unknown HttpControl type: %T", controlMessage)
+		zap.S().Debugf("Received unknown HttpControl type: %T", controlMessage)
 	}
 }

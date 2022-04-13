@@ -141,7 +141,10 @@ func RunHTTPRequest(client *http.Client, req *OpenHTTPTunnelRequest, httpRequest
 	zap.S().Debugf("Sending HTTP request: %s to %v", req.Method, baseURL+req.URI)
 	httpResponse, err := client.Do(httpRequest)
 	if err != nil {
-		zap.S().Warnf("Failed to execute request for %s to %s: %v", req.Method, baseURL+req.URI, err)
+		zap.S().Warnw("failed to execute request",
+			"method", req.Method,
+			"uri", baseURL+req.URI,
+			"error", err)
 		dataflow <- MakeBadGatewayResponse(req.Id)
 		return
 	}

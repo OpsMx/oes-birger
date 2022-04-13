@@ -20,7 +20,6 @@ import (
 	"crypto/tls"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
 
 	"github.com/opsmx/oes-birger/internal/ca"
@@ -32,6 +31,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/tevino/abool"
+	"go.uber.org/zap"
 )
 
 var (
@@ -45,11 +45,11 @@ var (
 // RunHTTPSServer will listen for incoming service requests on a provided port, and
 // currently will use certificates or JWT to identify the destination.
 func RunHTTPSServer(routes *tunnelroute.ConnectedRoutes, ca *ca.CA, serverCert tls.Certificate, service IncomingServiceConfig) {
-	log.Printf("Running service HTTPS listener on port %d", service.Port)
+	zap.S().Infof("Running service HTTPS listener on port %d", service.Port)
 
 	certPool, err := ca.MakeCertPool()
 	if err != nil {
-		log.Fatalf("While making certpool: %v", err)
+		zap.S().Fatalf("While making certpool: %v", err)
 	}
 
 	tlsConfig := &tls.Config{
@@ -69,13 +69,13 @@ func RunHTTPSServer(routes *tunnelroute.ConnectedRoutes, ca *ca.CA, serverCert t
 		Handler:   mux,
 	}
 
-	log.Fatal(server.ListenAndServeTLS("", ""))
+	zap.S().Fatal(server.ListenAndServeTLS("", ""))
 }
 
 // RunHTTPServer will listen on an unencrypted HTTP only port, and will always forward
 // incoming requests to the hard-coded configured destination.
 func RunHTTPServer(routes *tunnelroute.ConnectedRoutes, service IncomingServiceConfig) {
-	log.Printf("Running service HTTP listener on port %d", service.Port)
+	zap.S().Infof("Running service HTTP listener on port %d", service.Port)
 
 	mux := http.NewServeMux()
 
@@ -86,7 +86,7 @@ func RunHTTPServer(routes *tunnelroute.ConnectedRoutes, service IncomingServiceC
 		Handler: mux,
 	}
 
-	log.Fatal(server.ListenAndServe())
+	zap.S().Fatal(server.ListenAndServe())
 }
 
 func fixedIdentityAPIHandlerMaker(routes *tunnelroute.ConnectedRoutes, service IncomingServiceConfig) func(http.ResponseWriter, *http.Request) {
@@ -107,7 +107,7 @@ func extractEndpointFromCert(r *http.Request) (agentIdentity string, endpointTyp
 
 	names, err := ca.GetCertificateNameFromCert(r.TLS.PeerCertificates[0])
 	if err != nil {
-		log.Printf("%v", err)
+		zap.S().Errorf("%v", err)
 		return "", "", "", false
 	}
 
@@ -131,7 +131,7 @@ func extractEndpointFromJWT(r *http.Request) (agentIdentity string, endpointType
 
 	endpointType, endpointName, agentIdentity, err := jwtutil.ValidateJWT(authPassword, nil)
 	if err != nil {
-		log.Printf("%v", err)
+		zap.S().Errorf("%v", err)
 		return "", "", "", false
 	}
 
@@ -184,7 +184,7 @@ func handleDone(n <-chan struct{}, routes *tunnelroute.ConnectedRoutes, state *a
 	if state.cleanClose.IsNotSet() {
 		err := routes.Cancel(target, id)
 		if err != nil {
-			log.Printf("while cancelling http request: %v", err)
+			zap.S().Errorf("while cancelling http request: %v", err)
 		}
 	}
 }
@@ -202,14 +202,14 @@ func runAPIHandler(routes *tunnelroute.ConnectedRoutes, ep tunnelroute.Search, w
 
 	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
-		log.Printf("unable to read entire message body")
+		zap.S().Errorf("unable to read entire message body")
 		w.WriteHeader(http.StatusServiceUnavailable)
 		return
 	}
 
 	headers, err := tunnel.MakeHeaders(r.Header)
 	if err != nil {
-		log.Printf("unable to convert headers")
+		zap.S().Errorf("unable to convert headers")
 		w.WriteHeader(http.StatusServiceUnavailable)
 		return
 	}
@@ -240,7 +240,7 @@ func runAPIHandler(routes *tunnelroute.ConnectedRoutes, ep tunnelroute.Search, w
 		in, more := <-message.Out
 		if !more {
 			if !handlerState.seenHeader {
-				log.Printf("Request timed out sending to agent")
+				zap.S().Errorf("Request timed out sending to agent")
 				w.WriteHeader(http.StatusBadGateway)
 			}
 			handlerState.cleanClose.Set()
@@ -255,7 +255,7 @@ func runAPIHandler(routes *tunnelroute.ConnectedRoutes, ep tunnelroute.Search, w
 		case nil:
 			// ignore for now
 		default:
-			log.Printf("Received unknown message: %T", x)
+			zap.S().Debugf("Received unknown message: %T", x)
 		}
 	}
 }
@@ -276,7 +276,7 @@ func handleTunnelControl(state *apiHandlerState, tunnelControl *tunnel.HttpTunne
 	case *tunnel.HttpTunnelControl_HttpTunnelChunkedResponse:
 		resp := controlMessage.HttpTunnelChunkedResponse
 		if !state.seenHeader {
-			log.Printf("Error: got ChunkedResponse before HttpResponse")
+			zap.S().Debugf("got ChunkedResponse before HttpResponse")
 			w.WriteHeader(http.StatusBadGateway)
 			return true
 		}
@@ -286,14 +286,14 @@ func handleTunnelControl(state *apiHandlerState, tunnelControl *tunnel.HttpTunne
 		}
 		n, err := w.Write(resp.Body)
 		if err != nil {
-			log.Printf("Error: cannot write: %v", err)
+			zap.S().Errorf("cannot write: %v", err)
 			if !state.seenHeader {
 				w.WriteHeader(http.StatusBadGateway)
 			}
 			return true
 		}
 		if n != len(resp.Body) {
-			log.Printf("Error: did not write full message: %d of %d written", n, len(resp.Body))
+			zap.S().Errorf("did not write full message: %d of %d written", n, len(resp.Body))
 			if !state.seenHeader {
 				w.WriteHeader(http.StatusBadGateway)
 			}
@@ -305,7 +305,7 @@ func handleTunnelControl(state *apiHandlerState, tunnelControl *tunnel.HttpTunne
 	case nil:
 		// ignore for now
 	default:
-		log.Printf("Received unknown HTTP control message: %T", controlMessage)
+		zap.S().Debugf("Received unknown HTTP control message: %T", controlMessage)
 	}
 	return false
 }
