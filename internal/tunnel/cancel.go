@@ -18,8 +18,9 @@ package tunnel
 
 import (
 	"context"
-	"log"
 	"sync"
+
+	"go.uber.org/zap"
 )
 
 var cancelRegistry = struct {
@@ -49,6 +50,6 @@ func CallCancelFunction(id string) {
 	cancel, ok := cancelRegistry.m[id]
 	if ok {
 		cancel()
-		log.Printf("Cancelling request %s", id)
+		zap.S().Debugf("Cancelling request %s", id)
 	}
 }

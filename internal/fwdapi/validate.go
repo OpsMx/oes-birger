@@ -18,8 +18,9 @@ package fwdapi
 
 import (
 	"fmt"
-	"log"
 	"regexp"
+
+	"go.uber.org/zap"
 )
 
 // NamePresent ensures the string is not null.
@@ -32,7 +33,7 @@ func typeValid(n string) bool {
 	matched, err := regexp.MatchString("^[a-z0-9]+$", n)
 	if err != nil {
 		// TODO: handle this better
-		log.Printf("matching service type: %v", err)
+		zap.S().Warnf("matching service type: %v", err)
 		return false
 	}
 	return matched

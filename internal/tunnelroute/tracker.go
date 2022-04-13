@@ -18,10 +18,11 @@ package tunnelroute
 
 import (
 	"fmt"
-	"log"
 	"math/rand"
 	"sync"
 	"time"
+
+	"go.uber.org/zap"
 )
 
 var (
@@ -113,9 +114,18 @@ func (s *ConnectedRoutes) Add(state Route) {
 	}
 	routeList = append(routeList, state)
 	s.m[state.GetName()] = routeList
-	log.Printf("Route %s added, now at %d paths, %d endpoints", state, len(routeList), len(state.GetEndpoints()))
+	zap.S().Infow("new route",
+		"destination", state.GetName(),
+		"sessionId", state.GetSession(),
+		"pathCount", len(routeList),
+		"endpointCount", len(state.GetEndpoints()))
 	for _, endpoint := range state.GetEndpoints() {
-		log.Printf("   destination: %s, endpoint: %s", state, &endpoint)
+		zap.S().Infow("endpoint",
+			"destination", state.GetName(),
+			"sessionId", state.GetSession(),
+			"endpointType", endpoint.Type,
+			"endpointName", endpoint.Name,
+			"endpointConfigured", endpoint.Configured)
 	}
 	connectedRoutesGauge.WithLabelValues(state.GetName()).Inc()
 }
@@ -136,14 +146,14 @@ func (s *ConnectedRoutes) Remove(state Route) {
 	routeList, ok := s.m[state.GetName()]
 	if !ok {
 		// This should not be possible.
-		log.Printf("no routes known by the name of %s", state)
+		zap.S().Errorf("no routes known by the name of %s", state)
 		return
 	}
 
 	// TODO: We should always find our entry...
 	i := sliceIndex(len(routeList), func(i int) bool { return routeList[i] == state })
 	if i == -1 {
-		log.Printf("attempt to remove unknown route %s", state)
+		zap.S().Errorf("attempt to remove unknown route %s", state)
 		return
 	}
 	routeList[i] = routeList[len(routeList)-1]
@@ -151,7 +161,10 @@ func (s *ConnectedRoutes) Remove(state Route) {
 	routeList = routeList[:len(routeList)-1]
 	s.m[state.GetName()] = routeList
 	connectedRoutesGauge.WithLabelValues(state.GetName()).Dec()
-	log.Printf("route %s removed, now at %d paths", state, len(routeList))
+	zap.S().Infow("remove route",
+		"destination", state.GetName(),
+		"sessionId", state.GetSession(),
+		"pathCount", len(routeList))
 }
 
 func (s *ConnectedRoutes) findService(ep Search) (Route, error) {
@@ -181,7 +194,7 @@ func (s *ConnectedRoutes) Send(ep Search, message interface{}) (string, bool) {
 	defer s.RUnlock()
 	route, err := s.findService(ep)
 	if err != nil {
-		log.Printf("%v", err)
+		zap.S().Warnf("%v", err)
 		return "", false
 	}
 	session := route.Send(message)

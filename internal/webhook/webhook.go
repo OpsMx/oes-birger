@@ -21,8 +21,9 @@ package webhook
 import (
 	"bytes"
 	"encoding/json"
-	"log"
 	"net/http"
+
+	"go.uber.org/zap"
 )
 
 //
@@ -74,18 +75,17 @@ func (wr *Runner) Run() {
 // Perform an actual web request
 //
 func (wr *Runner) perform(msg interface{}) {
-	log.Printf("Webhook request: %v", msg)
 	jsonString, err := json.Marshal(msg)
 	if err != nil {
-		log.Printf("Unable to marshal json: %v", err)
+		zap.S().Errorf("Unable to marshal json: %v", err)
 		return
 	}
 	resp, err := http.Post(wr.url, "application/json", bytes.NewBuffer(jsonString))
 	if err != nil {
-		log.Printf("Unable to send web request: %v", err)
+		zap.S().Errorf("Unable to send web request: %v", err)
 		return
 	}
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
-		log.Printf("Webhook returned %s", resp.Status)
+		zap.S().Warnf("Webhook returned %s", resp.Status)
 	}
 }

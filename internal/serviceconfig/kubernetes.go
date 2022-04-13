@@ -24,7 +24,6 @@ import (
 	"encoding/pem"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"os"
 	"sync"
@@ -32,6 +31,7 @@ import (
 
 	"github.com/opsmx/oes-birger/internal/kubeconfig"
 	"github.com/opsmx/oes-birger/internal/tunnel"
+	"go.uber.org/zap"
 	"golang.org/x/net/context"
 	"gopkg.in/yaml.v3"
 )
@@ -100,21 +100,21 @@ func (ke *KubernetesEndpoint) serverContextFromKubeconfig(kconfig *kubeconfig.Ku
 		}
 		user, cluster, err := kconfig.FindContext(name)
 		if err != nil {
-			log.Fatalf("Unable to retrieve cluster and user info for context %s: %v", name, err)
+			zap.S().Fatalf("Unable to retrieve cluster and user info for context %s: %v", name, err)
 		}
 
 		certData, err := base64.StdEncoding.DecodeString(user.User.ClientCertificateData)
 		if err != nil {
-			log.Fatalf("Error decoding user cert from base64 (%s): %v", user.Name, err)
+			zap.S().Fatalf("Error decoding user cert from base64 (%s): %v", user.Name, err)
 		}
 		keyData, err := base64.StdEncoding.DecodeString(user.User.ClientKeyData)
 		if err != nil {
-			log.Fatalf("Error decoding user key from base64 (%s): %v", user.Name, err)
+			zap.S().Fatalf("Error decoding user key from base64 (%s): %v", user.Name, err)
 		}
 
 		clientKeypair, err := tls.X509KeyPair(certData, keyData)
 		if err != nil {
-			log.Fatalf("Error loading client cert/key: %v", err)
+			zap.S().Fatalf("Error loading client cert/key: %v", err)
 		}
 
 		saf := &kubeContext{
@@ -127,12 +127,12 @@ func (ke *KubernetesEndpoint) serverContextFromKubeconfig(kconfig *kubeconfig.Ku
 		if len(cluster.Cluster.CertificateAuthorityData) > 0 {
 			serverCA, err := base64.StdEncoding.DecodeString(cluster.Cluster.CertificateAuthorityData)
 			if err != nil {
-				log.Fatalf("Error decoding server CA cert from base64 (%s): %v", cluster.Name, err)
+				zap.S().Fatalf("Error decoding server CA cert from base64 (%s): %v", cluster.Name, err)
 			}
 			pemBlock, _ := pem.Decode(serverCA)
 			serverCert, err := x509.ParseCertificate(pemBlock.Bytes)
 			if err != nil {
-				log.Fatalf("Error parsing server certificate: %v", err)
+				zap.S().Fatalf("Error parsing server certificate: %v", err)
 			}
 			saf.serverCA = serverCert
 		}
@@ -140,7 +140,7 @@ func (ke *KubernetesEndpoint) serverContextFromKubeconfig(kconfig *kubeconfig.Ku
 		return saf
 	}
 
-	log.Fatalf("Default context not found in kubeconfig")
+	zap.S().Fatalf("Default context not found in kubeconfig")
 
 	return nil
 }
@@ -217,7 +217,7 @@ func (ke *KubernetesEndpoint) ExecuteHTTPRequest(dataflow chan *tunnel.MessageWr
 	c := ke.makeServerContextFields()
 
 	// TODO: A ServerCA is technically optional, but we might want to fail if it's not present...
-	log.Printf("Running request %v", req)
+	zap.S().Debugw("running request", "request", "req")
 	tlsConfig := &tls.Config{
 		MinVersion:         tls.VersionTLS12,
 		InsecureSkipVerify: c.insecure,
@@ -247,14 +247,14 @@ func (ke *KubernetesEndpoint) ExecuteHTTPRequest(dataflow chan *tunnel.MessageWr
 
 	httpRequest, err := http.NewRequestWithContext(ctx, req.Method, c.serverURL+req.URI, bytes.NewBuffer(req.Body))
 	if err != nil {
-		log.Printf("Failed to build request for %s to %s: %v", req.Method, c.serverURL+req.URI, err)
+		zap.S().Warnf("Failed to build request for %s to %s: %v", req.Method, c.serverURL+req.URI, err)
 		dataflow <- tunnel.MakeBadGatewayResponse(req.Id)
 		return
 	}
 
 	err = tunnel.CopyHeaders(req.Headers, &httpRequest.Header)
 	if err != nil {
-		log.Printf("failed to copy headers: %v", err)
+		zap.S().Warnf("failed to copy headers: %v", err)
 		dataflow <- tunnel.MakeBadGatewayResponse(req.Id)
 		return
 	}
@@ -270,13 +270,13 @@ func (ke *KubernetesEndpoint) loadKubernetesSecurity() *kubeContext {
 	if err == nil {
 		kconfig, err := kubeconfig.ReadKubeConfig(yamlString)
 		if err != nil {
-			log.Fatalf("Unable to read kubeconfig: %v", err)
+			zap.S().Fatalf("Unable to read kubeconfig: %v", err)
 		}
 		return ke.serverContextFromKubeconfig(kconfig)
 	}
 	sa, err := ke.loadServiceAccount()
 	if err != nil {
-		log.Fatalf("No kubeconfig and no Kubernetes account found: %v", err)
+		zap.S().Fatalf("No kubeconfig and no Kubernetes account found: %v", err)
 	}
 	return sa
 }
@@ -286,7 +286,7 @@ func (ke *KubernetesEndpoint) updateServerContextTicker() {
 		saf := ke.loadKubernetesSecurity()
 		ke.Lock()
 		if !ke.f.isSameAs(saf) {
-			log.Printf("Updating security context for API calls to Kubernetes")
+			zap.L().Info("Updating security context for API calls to Kubernetes")
 			ke.f = *saf
 		}
 		ke.Unlock()

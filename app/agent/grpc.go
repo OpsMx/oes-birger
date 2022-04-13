@@ -13,6 +13,7 @@ import (
 	"github.com/opsmx/oes-birger/internal/tunnelroute"
 	"github.com/opsmx/oes-birger/internal/ulid"
 	"github.com/opsmx/oes-birger/internal/util"
+	"go.uber.org/zap"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 )
@@ -29,7 +30,7 @@ func tickerPinger(stream tunnel.GRPCEventStream) {
 			},
 		}
 		if err := stream.Send(req); err != nil {
-			log.Fatalf("Unable to send a PingRequest: %v", err)
+			zap.S().Fatalf("Unable to send a PingRequest: %v", err)
 		}
 	}
 }
@@ -43,10 +44,12 @@ func handleHTTPRequests(session string, requestChan chan interface{}, httpids *u
 				Event: tunnel.MakeHTTPTunnelOpenTunnelRequest(value.Cmd),
 			}
 			if err := stream.Send(resp); err != nil {
-				log.Printf("Unable to send to route %s for HTTP request %s", session, value.Cmd.Id)
+				zap.S().Warnw("unable to send HTTP request",
+					"session", session,
+					"id", value.Cmd.Id)
 			}
 		default:
-			log.Printf("Got unexpected message type: %T", interfacedRequest)
+			zap.S().Debugf("Got unexpected message type: %T", interfacedRequest)
 		}
 	}
 }
@@ -58,18 +61,16 @@ func handleHTTPCancelRequest(session string, cancelChan chan string, httpids *ut
 			Event: tunnel.MakeHTTPTunnelCancelRequest(id),
 		}
 		if err := stream.Send(resp); err != nil {
-			log.Printf("Unable to send to route %s for cancel request %s", session, id)
+			zap.S().Warnw("unable to send cancel", "session", session, "id", id)
 		}
 	}
-	log.Printf("cancel channel closed for route %s", session)
 }
 
 func dataflowHandler(dataflow chan *tunnel.MessageWrapper, stream tunnel.GRPCEventStream) {
 	for ew := range dataflow {
 		if err := stream.Send(ew); err != nil {
-			log.Fatalf("Unable to respond over GRPC: %v", err)
+			zap.S().Fatalw("Unable to respond over GRPC", "error", err)
 		}
-		util.Debug("GRPC-SEND: %v", ew)
 	}
 }
 
@@ -81,7 +82,7 @@ func runTunnel(wg *sync.WaitGroup, sa *serverContext, conn *grpc.ClientConn, end
 
 	stream, err := client.EventTunnel(ctx)
 	if err != nil {
-		log.Fatalf("%v.EventTunnel(_) = _, %v", client, err)
+		zap.S().Fatalw("EventTunnel(_) = _", "client", client, "error", err)
 	}
 	pbEndpoints := serviceconfig.EndpointsToPB(endpoints)
 	hello := &tunnel.MessageWrapper{
@@ -95,7 +96,7 @@ func runTunnel(wg *sync.WaitGroup, sa *serverContext, conn *grpc.ClientConn, end
 		},
 	}
 	if err = stream.Send(hello); err != nil {
-		log.Fatalf("Unable to send hello packet: %v", err)
+		zap.S().Fatalw("unable to send hello message", "error", err)
 	}
 
 	dataflow := make(chan *tunnel.MessageWrapper, 20)
@@ -126,7 +127,6 @@ func runTunnel(wg *sync.WaitGroup, sa *serverContext, conn *grpc.ClientConn, end
 		for {
 			in, err := stream.Recv()
 			if err == io.EOF {
-				log.Printf("Closing %s", state)
 				httpids.CloseAll()
 				routes.Remove(state)
 				close(waitc)
@@ -135,17 +135,17 @@ func runTunnel(wg *sync.WaitGroup, sa *serverContext, conn *grpc.ClientConn, end
 			if err != nil {
 				httpids.CloseAll()
 				routes.Remove(state)
-				log.Fatalf("Failed to receive a message: %T: %v", err, err)
+				zap.S().Fatalw("failed to receive GRPC", "error", err)
 			}
-
-			util.Debug("GRPC-RECV: %v", in)
 
 			switch x := in.Event.(type) {
 			case *tunnel.MessageWrapper_PingRequest:
 				req := in.GetPingRequest()
 				atomic.StoreUint64(&state.LastPing, tunnel.Now())
 				if err := stream.Send(tunnel.MakePingResponse(req)); err != nil {
-					log.Printf("Unable to respond to %s with ping response: %v", state, err)
+					zap.S().Warnw("unable to respond to ping",
+						"destination", state,
+						"error", err)
 					routes.Remove(state)
 					close(waitc)
 					return
@@ -174,7 +174,7 @@ func runTunnel(wg *sync.WaitGroup, sa *serverContext, conn *grpc.ClientConn, end
 			case nil:
 				continue
 			default:
-				log.Printf("Received unknown message: %T", x)
+				zap.S().Warnf("Received unknown message: %T", x)
 			}
 		}
 	}()

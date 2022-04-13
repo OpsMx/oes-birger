@@ -40,11 +40,13 @@ import (
 	"github.com/opsmx/oes-birger/internal/serviceconfig"
 	"github.com/opsmx/oes-birger/internal/tunnelroute"
 	"github.com/opsmx/oes-birger/internal/util"
+
+	"go.uber.org/zap"
 )
 
 var (
 	versionBuild = -1
-	version      = util.Versions{Major: 3, Minor: 2, Patch: 8, Build: versionBuild}
+	version      = util.Versions{Major: 3, Minor: 3, Patch: 0, Build: versionBuild}
 
 	tickTime   = flag.Int("tickTime", 30, "Time between sending Ping messages")
 	caCertFile = flag.String("caCertFile", "/app/config/ca.pem", "The file containing the CA certificate we will use to verify the controller's cert")
@@ -60,6 +62,8 @@ var (
 	endpoints []serviceconfig.ConfiguredEndpoint
 
 	routes = tunnelroute.MakeRoutes()
+	logger *zap.Logger
+	sl     *zap.SugaredLogger
 )
 
 func loadCACertPEM() []byte {
@@ -68,11 +72,11 @@ func loadCACertPEM() []byte {
 		return cert
 	}
 	if config.CACert64 == nil {
-		log.Fatal("Unable to load CA certificate from file or from config")
+		zap.S().Fatal("Unable to load CA certificate from file or from config")
 	}
 	cert, err = base64.StdEncoding.DecodeString(*config.CACert64)
 	if err != nil {
-		log.Fatal("Unable to decode CA cert base64 from config")
+		zap.S().Fatal("Unable to decode CA cert base64 from config")
 	}
 	return cert
 }
@@ -82,12 +86,12 @@ func loadCACert() []byte {
 
 	block, _ := pem.Decode([]byte(certPEM))
 	if block == nil {
-		log.Fatal("failed to parse certificate PEM")
+		zap.S().Fatal("failed to parse certificate PEM")
 	}
 
 	err := ca.ValidateCACert(block.Bytes)
 	if err != nil {
-		log.Fatalf("Bad CA cert: %v", err)
+		zap.S().Fatalf("Bad CA cert: %v", err)
 	}
 
 	return certPEM
@@ -96,7 +100,6 @@ func loadCACert() []byte {
 func getHostname() string {
 	hn, err := os.Hostname()
 	if err != nil {
-		log.Printf("Unable to get hostname: %v, using 'unknown'", err)
 		return "unknown"
 	}
 	return hn
@@ -105,34 +108,45 @@ func getHostname() string {
 func main() {
 	flag.Parse()
 
-	grpc.EnableTracing = true
-	util.Debugging = *debug
-
-	log.Printf("Agent version %s starting", version.String())
-
 	var err error
-	log.Printf("OS type: %s, CPU: %s, cores: %d", runtime.GOOS, runtime.GOARCH, runtime.NumCPU())
+
+	logger, err = zap.NewProduction()
+	if err != nil {
+		log.Fatalf("setting up logger: %v", err)
+	}
+	defer logger.Sync()
+	_ = zap.ReplaceGlobals(logger)
+	sl = logger.Sugar()
+
+	grpc.EnableTracing = true
+
+	sl.Infow("agent starting",
+		"version", version.String(),
+		"os", runtime.GOOS,
+		"arch", runtime.GOARCH,
+		"cores", runtime.NumCPU(),
+	)
 
 	namespace, ok := os.LookupEnv("POD_NAMESPACE")
 	if ok {
 		secretsLoader, err = secrets.MakeKubernetesSecretLoader(namespace)
 		if err != nil {
-			log.Fatal(err)
+			sl.Fatalf("loading Kubernetes secrets: %v", err)
 		}
 	} else {
-		log.Printf("POD_NAMESPACE not set.  Disabling Kubernetes secret handling.")
+		logger.Info("POD_NAMESPACE not set.  Disabling Kubernetes secret handling.")
 	}
 
 	c, err := loadConfig(*configFile)
 	if err != nil {
-		log.Fatalf("Error loading config: %v", err)
+		sl.Fatalf("loading config: %v", err)
 	}
 	config = c
-	log.Printf("controller hostname: %s", config.ControllerHostname)
+	sl.Infow("config", "controllerHostname", config.ControllerHostname)
 
 	agentServiceConfig, err := serviceconfig.LoadServiceConfig(config.ServicesConfigPath)
 	if err != nil {
-		log.Fatalf("Error loading services config: %v", err)
+		sl.Fatalf("loading services config: %v", err)
 	}
 
 	endpoints = serviceconfig.ConfigureEndpoints(secretsLoader, agentServiceConfig)
@@ -140,12 +154,12 @@ func main() {
 	// load client cert/key, cacert
 	clcert, err := tls.LoadX509KeyPair(config.CertFile, config.KeyFile)
 	if err != nil {
-		log.Fatalf("Unable to load agent certificate or key: %v", err)
+		sl.Fatalf("loading agent certificate or key: %v", err)
 	}
 	caCertPool := x509.NewCertPool()
 	cacert := loadCACert()
 	if ok := caCertPool.AppendCertsFromPEM(cacert); !ok {
-		log.Fatalf("Unable to append certificate to pool: %v", err)
+		sl.Fatalf("append certificate to pool: %v", err)
 	}
 
 	ta := credentials.NewTLS(&tls.Config{
@@ -170,21 +184,20 @@ func main() {
 	defer cancel()
 	conn, err := grpc.DialContext(ctx, config.ControllerHostname, opts...)
 	if err != nil {
-		log.Fatalf("Could not establish GRPC connection to %s: %v", config.ControllerHostname, err)
+		sl.Fatalw("Could not establish GRPC connection to",
+			"target", config.ControllerHostname,
+			"error", err)
 	}
 	defer conn.Close()
 
 	var wg sync.WaitGroup
 
-	log.Printf("Starting GRPC tunnel.")
 	wg.Add(1)
 	go runTunnel(&wg, sa, conn, endpoints, config.InsecureControllerAllowed, clcert)
 
-	log.Printf("Starting any local HTTP service listeners.")
 	for _, service := range agentServiceConfig.IncomingServices {
 		go serviceconfig.RunHTTPServer(routes, service)
 	}
 
 	wg.Wait()
-	log.Printf("Done.")
 }

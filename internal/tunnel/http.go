@@ -19,11 +19,11 @@ package tunnel
 import (
 	"context"
 	"io"
-	"log"
 	"net/http"
 	"strings"
 
 	"github.com/opsmx/oes-birger/internal/jwtutil"
+	"go.uber.org/zap"
 )
 
 var (
@@ -138,10 +138,10 @@ func makeResponse(id string, response *http.Response) (ret *MessageWrapper, err 
 
 // RunHTTPRequest will make a HTTP request, and send the data to the remote end.
 func RunHTTPRequest(client *http.Client, req *OpenHTTPTunnelRequest, httpRequest *http.Request, dataflow chan *MessageWrapper, baseURL string) {
-	log.Printf("Sending HTTP request: %s to %v", req.Method, baseURL+req.URI)
+	zap.S().Debugf("Sending HTTP request: %s to %v", req.Method, baseURL+req.URI)
 	httpResponse, err := client.Do(httpRequest)
 	if err != nil {
-		log.Printf("Failed to execute request for %s to %s: %v", req.Method, baseURL+req.URI, err)
+		zap.S().Warnf("Failed to execute request for %s to %s: %v", req.Method, baseURL+req.URI, err)
 		dataflow <- MakeBadGatewayResponse(req.Id)
 		return
 	}
@@ -149,7 +149,7 @@ func RunHTTPRequest(client *http.Client, req *OpenHTTPTunnelRequest, httpRequest
 	// First, send the headers.
 	response, err := makeResponse(req.Id, httpResponse)
 	if err != nil {
-		log.Printf("Failed to unmutate headers: %v", err)
+		zap.S().Warnf("Failed to unmutate headers: %v", err)
 		dataflow <- MakeBadGatewayResponse(req.Id)
 		return
 	}
@@ -167,11 +167,11 @@ func RunHTTPRequest(client *http.Client, req *OpenHTTPTunnelRequest, httpRequest
 			return
 		}
 		if err == context.Canceled {
-			log.Printf("Context cancelled, request ID %s", req.Id)
+			zap.S().Debugf("Context cancelled, request ID %s", req.Id)
 			return
 		}
 		if err != nil {
-			log.Printf("Got error on HTTP read: %v", err)
+			zap.S().Warnf("Got error on HTTP read: %v", err)
 			// todo: send an error message somehow.  For now, just send EOF
 			dataflow <- makeChunkedResponse(req.Id, emptyBytes)
 			return

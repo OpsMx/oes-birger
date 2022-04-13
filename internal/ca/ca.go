@@ -30,9 +30,10 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
-	"log"
 	"math/big"
 	"time"
+
+	"go.uber.org/zap"
 )
 
 const (
@@ -132,7 +133,9 @@ func ValidateCACert(certbytes []byte) error {
 		return fmt.Errorf("failed to parse certificate: %v", err)
 	}
 	if len(pc.Subject.Organization) > 0 {
-		log.Printf("CA loaded, %s, expires %v", pc.Subject.Organization[0], pc.NotAfter)
+		zap.L().Info("CA loaded",
+			zap.String("name", pc.Subject.Organization[0]),
+			zap.Time("expires", pc.NotAfter))
 	}
 	if !pc.IsCA {
 		return fmt.Errorf("CA certificate does not appear to be a proper CA (!IsCA)")

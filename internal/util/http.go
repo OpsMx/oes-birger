@@ -22,8 +22,9 @@ package util
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
+
+	"go.uber.org/zap"
 )
 
 type httpErrorMessage struct {
@@ -55,9 +56,9 @@ func FailRequest(w http.ResponseWriter, err error, code int) {
 	errmsg := httpError(err)
 	n, err := w.Write(errmsg)
 	if err != nil {
-		log.Printf("failed to write message in FailRequest: %v", err)
+		zap.S().Warnf("failed to write message in FailRequest: %v", err)
 	}
 	if n != len(errmsg) {
-		log.Printf("failed to write entire message in FailRequest: %d of %d bytes written", n, len(errmsg))
+		zap.S().Warnf("failed to write entire message in FailRequest: %d of %d bytes written", n, len(errmsg))
 	}
 }

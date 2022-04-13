@@ -18,10 +18,10 @@ package serviceconfig
 
 import (
 	"fmt"
-	"log"
 
 	"github.com/opsmx/oes-birger/internal/secrets"
 	"github.com/opsmx/oes-birger/internal/tunnel"
+	"go.uber.org/zap"
 	"gopkg.in/yaml.v2"
 )
 
@@ -75,12 +75,12 @@ func ConfigureEndpoints(secretsLoader secrets.SecretLoader, serviceConfig *Servi
 		if service.Enabled {
 			config, err := yaml.Marshal(service.Config)
 			if err != nil {
-				log.Fatal(err)
+				zap.S().Fatal(err)
 			}
 			switch service.Type {
 			case "kubernetes":
 				if secretsLoader == nil {
-					log.Fatalf("kuberenetes is disabled, but a kubernetes service is configured.")
+					zap.S().Fatalf("kuberenetes is disabled, but a kubernetes service is configured.")
 				}
 				instance, configured, err = MakeKubernetesEndpoint(service.Name, config)
 			case "aws":
@@ -91,12 +91,15 @@ func ConfigureEndpoints(secretsLoader secrets.SecretLoader, serviceConfig *Servi
 
 			// If the instance-specific make method returns an error, catch it here.
 			if err != nil {
-				log.Fatal(err)
+				zap.S().Fatal(err)
 			}
 
 			if len(service.Namespaces) == 0 {
 				// If it did not return an error, a nil instance means it is not fully configured.
-				log.Printf("Adding endpoint type %s, name %s, configured %v", service.Type, service.Name, configured)
+				zap.S().Infow("adding endpoint",
+					"endpointType", service.Type,
+					"endpointName", service.Name,
+					"endpointConfigured", configured)
 				endpoints = append(endpoints, ConfiguredEndpoint{
 					Type:       service.Type,
 					Name:       service.Name,
@@ -107,7 +110,11 @@ func ConfigureEndpoints(secretsLoader secrets.SecretLoader, serviceConfig *Servi
 				})
 			} else {
 				for _, ns := range service.Namespaces {
-					log.Printf("Adding endpoint type %s, name %s, configured %v, namespaces %v", service.Type, ns.Name, configured, ns.Namespaces)
+					zap.S().Infow("adding endpoint",
+						"endpointType", service.Type,
+						"endpointName", ns.Name,
+						"endpointNamespaces", ns.Namespaces,
+						"endpointConfigured", configured)
 					newep := ConfiguredEndpoint{
 						Type:       service.Type,
 						Name:       ns.Name,

@@ -49,7 +49,7 @@ import (
 
 var (
 	versionBuild = -1
-	version      = util.Versions{Major: 3, Minor: 2, Patch: 8, Build: versionBuild}
+	version      = util.Versions{Major: 3, Minor: 3, Patch: 0, Build: versionBuild}
 
 	configFile = flag.String("configFile", "/app/config/config.yaml", "The file with the controller config")
 	debug      = flag.Bool("debug", false, "enable debugging")
@@ -211,7 +211,6 @@ func main() {
 	flag.Parse()
 
 	grpc.EnableTracing = true
-	util.Debugging = *debug
 
 	log.Printf("Controller version %s starting", version.String())
 
