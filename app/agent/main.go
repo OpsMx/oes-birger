@@ -51,7 +51,7 @@ var (
 	tickTime   = flag.Int("tickTime", 30, "Time between sending Ping messages")
 	caCertFile = flag.String("caCertFile", "/app/config/ca.pem", "The file containing the CA certificate we will use to verify the controller's cert")
 	configFile = flag.String("configFile", "/app/config/config.yaml", "The file with the controller config")
-	debug      = flag.Bool("debug", false, "enable debugging")
+	//debug      = flag.Bool("debug", false, "enable debugging")
 
 	config *agentConfig
 
@@ -114,7 +114,9 @@ func main() {
 	if err != nil {
 		log.Fatalf("setting up logger: %v", err)
 	}
-	defer logger.Sync()
+	defer func() {
+		_ = logger.Sync()
+	}()
 	_ = zap.ReplaceGlobals(logger)
 	sl = logger.Sugar()
 

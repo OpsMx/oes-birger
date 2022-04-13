@@ -52,7 +52,7 @@ var (
 	version      = util.Versions{Major: 3, Minor: 3, Patch: 0, Build: versionBuild}
 
 	configFile = flag.String("configFile", "/app/config/config.yaml", "The file with the controller config")
-	debug      = flag.Bool("debug", false, "enable debugging")
+	//debug      = flag.Bool("debug", false, "enable debugging")
 
 	jwtKeyset     = jwk.NewSet()
 	jwtCurrentKey string
