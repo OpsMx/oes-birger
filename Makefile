@@ -83,7 +83,7 @@ bin/%:: ${all_deps}
 images-ma: buildtime $(addsuffix -ma.ts, $(addprefix buildtime/,$(IMAGE_TARGETS)))
 
 buildtime/%-ma.ts:: ${all_deps} Dockerfile.multi
-	$(eval dockerTags = $(shell ./build-tag.sh ${IMAGE_PREFIX}forwarder-$(patsubst %.ts,%,$(@F)) v${now}))
+	$(eval dockerTags = $(shell ./build-tag.sh ${IMAGE_PREFIX}forwarder-$(patsubst %-ma.ts,%,$(@F)) v${now}))
 	${BUILDX} \
 		${dockerTags} \
 		--target $(patsubst %-ma.ts,%,$(@F))-image \
