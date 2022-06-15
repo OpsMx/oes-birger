@@ -1,3 +1,5 @@
+agentInfo:
+  description: "demo agent"
 outgoingServices:
   - name: whoami
     type: whoami

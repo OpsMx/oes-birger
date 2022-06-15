@@ -73,7 +73,7 @@ func dataflowHandler(dataflow chan *tunnel.MessageWrapper, stream tunnel.GRPCEve
 	}
 }
 
-func runTunnel(wg *sync.WaitGroup, sa *serverContext, conn *grpc.ClientConn, endpoints []serviceconfig.ConfiguredEndpoint, insecure bool, clcert tls.Certificate) {
+func runTunnel(wg *sync.WaitGroup, sa *serverContext, conn *grpc.ClientConn, agentInfo *tunnel.AgentInfo, endpoints []serviceconfig.ConfiguredEndpoint, insecure bool, clcert tls.Certificate) {
 	defer wg.Done()
 
 	client := tunnel.NewAgentTunnelServiceClient(conn)
@@ -84,11 +84,13 @@ func runTunnel(wg *sync.WaitGroup, sa *serverContext, conn *grpc.ClientConn, end
 		zap.S().Fatalw("EventTunnel(_) = _", "client", client, "error", err)
 	}
 	pbEndpoints := serviceconfig.EndpointsToPB(endpoints)
+	pbAgentInfo := agentInfo.ToPB()
 	hello := &tunnel.MessageWrapper{
 		Event: &tunnel.MessageWrapper_Hello{
 			Hello: &tunnel.Hello{
 				Version:           version.String(),
 				Endpoints:         pbEndpoints,
+				AgentInfo:         pbAgentInfo,
 				Hostname:          hostname,
 				ClientCertificate: clcert.Certificate[0],
 			},

@@ -16,7 +16,11 @@
 
 package tunnelroute
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/opsmx/oes-birger/internal/tunnel"
+)
 
 // DirectlyConnectedRoute holds all the magic needed to implement a directly connected route,
 // such as an agent.
@@ -24,6 +28,7 @@ type DirectlyConnectedRoute struct {
 	Name            string
 	Session         string
 	Endpoints       []Endpoint
+	AgentInfo       tunnel.AgentInfo
 	Version         string
 	Hostname        string
 	InRequest       chan interface{}
@@ -95,6 +100,7 @@ type DirectlyConnectedRouteStatistics struct {
 	ConnectedAt uint64 `json:"connectedAt"`
 	LastPing    uint64 `json:"lastPing"`
 	LastUse     uint64 `json:"lastUse"`
+	AgentInfo   tunnel.AgentInfo
 }
 
 //
@@ -105,6 +111,7 @@ func (s *DirectlyConnectedRoute) GetStatistics() interface{} {
 		ConnectedAt: s.ConnectedAt,
 		LastPing:    s.LastPing,
 		LastUse:     s.LastUse,
+		AgentInfo:   s.AgentInfo,
 	}
 	ret.Name = s.Name
 	ret.Session = s.Session

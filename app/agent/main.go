@@ -38,6 +38,7 @@ import (
 	"github.com/opsmx/oes-birger/internal/ca"
 	"github.com/opsmx/oes-birger/internal/secrets"
 	"github.com/opsmx/oes-birger/internal/serviceconfig"
+	"github.com/opsmx/oes-birger/internal/tunnel"
 	"github.com/opsmx/oes-birger/internal/tunnelroute"
 	"github.com/opsmx/oes-birger/internal/util"
 
@@ -64,6 +65,8 @@ var (
 	routes = tunnelroute.MakeRoutes()
 	logger *zap.Logger
 	sl     *zap.SugaredLogger
+
+	agentInfo *tunnel.AgentInfo
 )
 
 func loadCACertPEM() []byte {
@@ -153,6 +156,12 @@ func main() {
 
 	endpoints = serviceconfig.ConfigureEndpoints(secretsLoader, agentServiceConfig)
 
+	// If the user supplied an agentInfo block in the service config file, load that as well.
+	agentInfo, err = loadAgentInfo(config.ServicesConfigPath)
+	if err != nil {
+		sl.Fatalf("loading agentInfo from services config: %v", err)
+	}
+
 	// load client cert/key, cacert
 	clcert, err := tls.LoadX509KeyPair(config.CertFile, config.KeyFile)
 	if err != nil {
@@ -195,7 +204,7 @@ func main() {
 	var wg sync.WaitGroup
 
 	wg.Add(1)
-	go runTunnel(&wg, sa, conn, endpoints, config.InsecureControllerAllowed, clcert)
+	go runTunnel(&wg, sa, conn, agentInfo, endpoints, config.InsecureControllerAllowed, clcert)
 
 	for _, service := range agentServiceConfig.IncomingServices {
 		go serviceconfig.RunHTTPServer(routes, service)

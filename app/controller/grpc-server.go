@@ -165,6 +165,7 @@ func (s *agentTunnelServer) EventTunnel(stream tunnel.AgentTunnelService_EventTu
 			state.Endpoints = reqToEndpoints(req.Endpoints)
 			state.Version = req.Version
 			state.Hostname = req.Hostname
+			state.AgentInfo = tunnel.AgentInfoFromPB(req.AgentInfo)
 			routes.Add(state)
 			s.sendWebhook(state, req.Endpoints)
 

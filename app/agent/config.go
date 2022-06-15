@@ -19,6 +19,7 @@ package main
 import (
 	"io/ioutil"
 
+	"github.com/opsmx/oes-birger/internal/tunnel"
 	"gopkg.in/yaml.v3"
 )
 
@@ -75,4 +76,23 @@ func loadConfig(filename string) (*agentConfig, error) {
 	config.applyDefaults()
 
 	return config, nil
+}
+
+type AgentInfoContainer struct {
+	AgentInfo tunnel.AgentInfo `yaml:"agentInfo,omitempty"`
+}
+
+func loadAgentInfo(filename string) (*tunnel.AgentInfo, error) {
+	buf, err := ioutil.ReadFile(filename)
+	if err != nil {
+		return nil, err
+	}
+
+	info := AgentInfoContainer{}
+	err = yaml.Unmarshal(buf, &info)
+	if err != nil {
+		return nil, err
+	}
+
+	return &info.AgentInfo, nil
 }

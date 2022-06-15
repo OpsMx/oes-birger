@@ -72,11 +72,16 @@ message EndpointHealth {
     string assumeRole = 6; // AWS
 }
 
+message AgentInformation {
+    string description = 1;
+}
+
 message Hello {
     repeated EndpointHealth endpoints = 1;
     string version = 2;
     string hostname = 3;
     bytes clientCertificate = 4; // used when we can't terminate SSL directly
+    AgentInformation agentInfo = 5;
 }
 
 message HttpTunnelControl {
