@@ -5,7 +5,7 @@ outgoingServices:
     type: whoami
     enabled: true
     config:
-      url: http://localhost:8300
+      url: https://whoami.rpi.flame.org
   - name: whoami-loop
     type: whoami
     enabled: true

@@ -65,24 +65,18 @@ func (s *DirectlyConnectedRoute) Close() {
 	close(s.InCancelRequest)
 }
 
-//
 // Send sends a message to a specific Route
-//
 func (s *DirectlyConnectedRoute) Send(message interface{}) string {
 	s.InRequest <- message
 	return s.Session
 }
 
-//
 // Cancel cancels a specific stream
-//
 func (s *DirectlyConnectedRoute) Cancel(id string) {
 	s.InCancelRequest <- id
 }
 
-//
 // HasEndpoint returns true if the endpoint is presend and configured.
-//
 func (s *DirectlyConnectedRoute) HasEndpoint(endpointType string, endpointName string) bool {
 	for _, ep := range s.Endpoints {
 		if ep.Type == endpointType && ep.Name == endpointName {
@@ -92,20 +86,16 @@ func (s *DirectlyConnectedRoute) HasEndpoint(endpointType string, endpointName s
 	return false
 }
 
-//
 // DirectlyConnectedRouteStatistics describes statistics for a directly connected route.
-//
 type DirectlyConnectedRouteStatistics struct {
 	BaseStatistics
-	ConnectedAt uint64 `json:"connectedAt"`
-	LastPing    uint64 `json:"lastPing"`
-	LastUse     uint64 `json:"lastUse"`
-	AgentInfo   tunnel.AgentInfo
+	ConnectedAt uint64           `json:"connectedAt,omitempty"`
+	LastPing    uint64           `json:"lastPing,omitempty"`
+	LastUse     uint64           `json:"lastUse,omitempty"`
+	AgentInfo   tunnel.AgentInfo `json:"agentInfo,omitempty"`
 }
 
-//
 // GetStatistics returns a set of stats for connected routes.
-//
 func (s *DirectlyConnectedRoute) GetStatistics() interface{} {
 	ret := &DirectlyConnectedRouteStatistics{
 		ConnectedAt: s.ConnectedAt,
