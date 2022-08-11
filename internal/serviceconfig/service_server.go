@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"strings"
 
 	"github.com/opsmx/oes-birger/internal/ca"
 	"github.com/opsmx/oes-birger/internal/jwtutil"
@@ -119,9 +120,22 @@ func extractEndpointFromCert(r *http.Request) (agentIdentity string, endpointTyp
 }
 
 func extractEndpointFromJWT(r *http.Request) (agentIdentity string, endpointType string, endpointName string, validated bool) {
+	// First check for our specific header.
 	authPassword := r.Header.Get("X-Opsmx-Token")
 	r.Header.Del("X-Opsmx-Token")
 
+	// First, check Bearer authentication type.
+	if authPassword == "" {
+		authHeader := r.Header.Get("Authorization")
+		items := strings.SplitN(authHeader, " ", 2)
+		if len(items) == 2 {
+			if items[0] == "Bearer" {
+				authPassword = items[1]
+			}
+		}
+	}
+
+	// If that fails, check HTTP Basic (ignoring the username)
 	if authPassword == "" {
 		var ok bool
 		if _, authPassword, ok = r.BasicAuth(); !ok {
