@@ -18,8 +18,7 @@
 # Install the latest versions of our mods.  This is done as a separate step
 # so it will pull from an image cache if possible, unless there are changes.
 #
-FROM golang:1.19-alpine AS buildmod
-ENV CGO_ENABLED=0
+FROM --platform=${BUILDPLATFORM} golang:1.19-alpine AS buildmod
 RUN mkdir /build
 WORKDIR /build
 COPY go.mod .
@@ -32,52 +31,51 @@ RUN go mod download
 FROM buildmod AS build-binaries
 COPY . .
 RUN touch internal/tunnel/tunnel.pb.go
-RUN mkdir /out /out/agent-binaries
-RUN go build -ldflags="-s -w" -o /out/agent app/agent/*.go
-RUN go build -ldflags="-s -w" -o /out/controller app/controller/*.go
-RUN go build -ldflags="-s -w" -o /out/make-ca app/make-ca/*.go
+ARG GIT_BRANCH
+ARG GIT_HASH
+ARG BUILD_TYPE
+ENV GIT_BRANCH=${GIT_BRANCH} GIT_HASH=${GIT_HASH} BUILD_TYPE=${BUILD_TYPE}
+ENV CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH}
+RUN mkdir /out
+RUN go build -ldflags="-X 'github.com/OpsMx/go-app-base/version.buildType=${BUILD_TYPE}' -X 'github.com/OpsMx/go-app-base/version.gitHash=${GIT_HASH}' -X 'github.com/OpsMx/go-app-base/version.gitBranch=${GIT_BRANCH}'" -o /out/forwarder-agent app/forwarder-agent/*.go
+RUN go build -ldflags="-X 'github.com/OpsMx/go-app-base/version.buildType=${BUILD_TYPE}' -X 'github.com/OpsMx/go-app-base/version.gitHash=${GIT_HASH}' -X 'github.com/OpsMx/go-app-base/version.gitBranch=${GIT_BRANCH}'" -o /out/forwarder-controller app/forwarder-controller/*.go
+RUN go build -ldflags="-X 'github.com/OpsMx/go-app-base/version.buildType=${BUILD_TYPE}' -X 'github.com/OpsMx/go-app-base/version.gitHash=${GIT_HASH}' -X 'github.com/OpsMx/go-app-base/version.gitBranch=${GIT_BRANCH}'" -o /out/forwarder-make-ca app/forwarder-make-ca/*.go
 
 #
 # Establish a base OS image used by all the applications.
 #
 FROM alpine:3 AS base-image
 RUN apk add --no-cache ca-certificates curl
-RUN update-ca-certificates
+# the exit 0 hack is a work-around to build on ARM64 apparently...
+RUN update-ca-certificates ; exit 0
 RUN mkdir /local /local/ca-certificates && rm -rf /usr/local/share/ca-certificates && ln -s  /local/ca-certificates /usr/local/share/ca-certificates
 COPY docker/run.sh /app/run.sh
 ENTRYPOINT ["/bin/sh", "/app/run.sh"]
 
 #
-# For a base image without an OS, this can be used:
-#
-#FROM scratch AS base-image
-#COPY --from=alpine:3 /etc/ssl/cert.pem /etc/ssl/cert.pem
-
-#
 # Build the agent image.  This should be a --target on docker build.
 #
-FROM base-image AS agent-image
+FROM base-image AS forwarder-agent-image
 WORKDIR /app
-COPY --from=build-binaries /out/agent /app
+COPY --from=build-binaries /out/forwarder-agent /app
 EXPOSE 9102
-CMD ["/app/agent"]
+CMD ["/app/forwarder-agent"]
 
 #
 # Build the controller image.  This should be a --target on docker build.
 # Note that the agent is also added, so the binary can be served from
 # the controller to auto-update the remote agent.
 #
-FROM base-image AS controller-image
+FROM base-image AS forwarder-controller-image
 WORKDIR /app
-COPY --from=build-binaries /out/controller /app
-COPY --from=build-binaries /out/agent-binaries /app/agent-binaries
+COPY --from=build-binaries /out/forwarder-controller /app
 EXPOSE 9001-9002 9102
-CMD ["/app/controller"]
+CMD ["/app/forwarder-controller"]
 
 #
 # Build the make-ca image.  This should be a --target on docker build.
 #
-FROM base-image AS make-ca-image
+FROM base-image AS forwarder-make-ca-image
 WORKDIR /app
-COPY --from=build-binaries /out/make-ca /app
-CMD ["/app/make-ca"]
+COPY --from=build-binaries /out/forwarder-make-ca /app
+CMD ["/app/forwarder-make-ca"]

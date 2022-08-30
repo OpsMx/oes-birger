@@ -3,6 +3,7 @@ module github.com/opsmx/oes-birger
 go 1.19
 
 require (
+	github.com/OpsMx/go-app-base v0.0.7
 	github.com/aws/aws-sdk-go v1.44.28
 	github.com/go-resty/resty/v2 v2.7.0
 	github.com/google/go-cmp v0.5.8
@@ -11,7 +12,7 @@ require (
 	github.com/prometheus/client_golang v1.12.2
 	github.com/skandragon/jwtregistry v1.0.0
 	github.com/soheilhy/cmux v0.1.5
-	github.com/stretchr/testify v1.7.1
+	github.com/stretchr/testify v1.8.0
 	github.com/tevino/abool v1.2.0
 	go.uber.org/zap v1.21.0
 	golang.org/x/net v0.0.0-20220531201128-c960675eff93
@@ -33,6 +34,7 @@ require (
 	github.com/emicklei/go-restful/v3 v3.8.0 // indirect
 	github.com/evanphx/json-patch v5.6.0+incompatible // indirect
 	github.com/go-logr/logr v1.2.3 // indirect
+	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-openapi/jsonpointer v0.19.5 // indirect
 	github.com/go-openapi/jsonreference v0.20.0 // indirect
 	github.com/go-openapi/swag v0.21.1 // indirect
@@ -64,11 +66,16 @@ require (
 	github.com/prometheus/procfs v0.7.3 // indirect
 	github.com/rogpeppe/go-internal v1.8.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
+	go.opentelemetry.io/otel v1.9.0 // indirect
+	go.opentelemetry.io/otel/exporters/jaeger v1.9.0 // indirect
+	go.opentelemetry.io/otel/exporters/stdout/stdouttrace v1.9.0 // indirect
+	go.opentelemetry.io/otel/sdk v1.9.0 // indirect
+	go.opentelemetry.io/otel/trace v1.9.0 // indirect
 	go.uber.org/atomic v1.9.0 // indirect
 	go.uber.org/multierr v1.8.0 // indirect
 	golang.org/x/crypto v0.0.0-20220525230936-793ad666bf5e // indirect
 	golang.org/x/oauth2 v0.0.0-20220524215830-622c5d57e401 // indirect
-	golang.org/x/sys v0.0.0-20220520151302-bc2c85ada10a // indirect
+	golang.org/x/sys v0.0.0-20220829200755-d48e67d00261 // indirect
 	golang.org/x/term v0.0.0-20220526004731-065cf7ba2467 // indirect
 	golang.org/x/text v0.3.7 // indirect
 	golang.org/x/time v0.0.0-20220411224347-583f2d630306 // indirect

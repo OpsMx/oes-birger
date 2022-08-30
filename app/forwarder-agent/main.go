@@ -35,26 +35,30 @@ import (
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 
+	"github.com/OpsMx/go-app-base/tracer"
+	"github.com/OpsMx/go-app-base/version"
 	"github.com/opsmx/oes-birger/internal/ca"
 	"github.com/opsmx/oes-birger/internal/secrets"
 	"github.com/opsmx/oes-birger/internal/serviceconfig"
 	"github.com/opsmx/oes-birger/internal/tunnel"
 	"github.com/opsmx/oes-birger/internal/tunnelroute"
-	"github.com/opsmx/oes-birger/internal/util"
 
 	"go.uber.org/zap"
 )
 
 var (
-	versionBuild = -1
-	version      = util.Versions{Major: 3, Minor: 3, Patch: 2, Build: versionBuild}
-
 	tickTime   = flag.Int("tickTime", 30, "Time between sending Ping messages")
 	caCertFile = flag.String("caCertFile", "/app/config/ca.pem", "The file containing the CA certificate we will use to verify the controller's cert")
 	configFile = flag.String("configFile", "/app/config/config.yaml", "The file with the controller config")
-	//debug      = flag.Bool("debug", false, "enable debugging")
 
-	config *agentConfig
+	// eg, http://localhost:14268/api/traces
+	jaegerEndpoint = flag.String("jaeger-endpoint", "", "Jaeger collector endpoint")
+	traceToStdout  = flag.Bool("traceToStdout", false, "log traces to stdout")
+	traceRatio     = flag.Float64("traceRatio", 0.01, "ratio of traces to create, if incoming request is not traced")
+	showversion    = flag.Bool("version", false, "show the version and exit")
+
+	config         *agentConfig
+	tracerProvider *tracer.TracerProvider
 
 	hostname = getHostname()
 
@@ -109,7 +113,11 @@ func getHostname() string {
 }
 
 func main() {
+	log.Printf("%s", version.VersionString())
 	flag.Parse()
+	if *showversion {
+		os.Exit(0)
+	}
 
 	var err error
 
@@ -126,7 +134,7 @@ func main() {
 	grpc.EnableTracing = true
 
 	sl.Infow("agent starting",
-		"version", version.String(),
+		"version", version.VersionString(),
 		"os", runtime.GOOS,
 		"arch", runtime.GOARCH,
 		"cores", runtime.NumCPU(),

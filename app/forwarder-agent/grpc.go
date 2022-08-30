@@ -7,6 +7,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/OpsMx/go-app-base/version"
 	"github.com/opsmx/oes-birger/internal/serviceconfig"
 	"github.com/opsmx/oes-birger/internal/tunnel"
 	"github.com/opsmx/oes-birger/internal/tunnelroute"
@@ -88,7 +89,7 @@ func runTunnel(wg *sync.WaitGroup, sa *serverContext, conn *grpc.ClientConn, age
 	hello := &tunnel.MessageWrapper{
 		Event: &tunnel.MessageWrapper_Hello{
 			Hello: &tunnel.Hello{
-				Version:           version.String(),
+				Version:           version.GitBranch(),
 				Endpoints:         pbEndpoints,
 				AgentInfo:         pbAgentInfo,
 				Hostname:          hostname,

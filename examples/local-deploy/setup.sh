@@ -7,4 +7,4 @@ set -e
     exit 1
 }
 
-../../bin/make-ca --withKubernetes=false --alsoAgentNamed=smith
+../../bin/forwarder-make-ca --withKubernetes=false --alsoAgentNamed=smith

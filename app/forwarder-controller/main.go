@@ -34,25 +34,30 @@ import (
 	"google.golang.org/grpc/peer"
 	"google.golang.org/grpc/status"
 
+	"github.com/OpsMx/go-app-base/tracer"
+	"github.com/OpsMx/go-app-base/version"
 	"github.com/lestrrat-go/jwx/jwa"
 	"github.com/lestrrat-go/jwx/jwk"
-	"github.com/opsmx/oes-birger/app/controller/cncserver"
+	"github.com/opsmx/oes-birger/app/forwarder-controller/cncserver"
 	"github.com/opsmx/oes-birger/internal/ca"
 	"github.com/opsmx/oes-birger/internal/jwtutil"
 	"github.com/opsmx/oes-birger/internal/secrets"
 	"github.com/opsmx/oes-birger/internal/serviceconfig"
 	"github.com/opsmx/oes-birger/internal/tunnelroute"
-	"github.com/opsmx/oes-birger/internal/util"
 	"github.com/opsmx/oes-birger/internal/webhook"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 var (
-	versionBuild = -1
-	version      = util.Versions{Major: 3, Minor: 3, Patch: 2, Build: versionBuild}
-
 	configFile = flag.String("configFile", "/app/config/config.yaml", "The file with the controller config")
-	//debug      = flag.Bool("debug", false, "enable debugging")
+
+	// eg, http://localhost:14268/api/traces
+	jaegerEndpoint = flag.String("jaeger-endpoint", "", "Jaeger collector endpoint")
+	traceToStdout  = flag.Bool("traceToStdout", false, "log traces to stdout")
+	traceRatio     = flag.Float64("traceRatio", 0.01, "ratio of traces to create, if incoming request is not traced")
+	showversion    = flag.Bool("version", false, "show the version and exit")
+
+	tracerProvider *tracer.TracerProvider
 
 	jwtKeyset     = jwk.NewSet()
 	jwtCurrentKey string
@@ -208,11 +213,13 @@ func parseConfig(filename string) (*ControllerConfig, error) {
 }
 
 func main() {
+	log.Printf("%s", version.VersionString())
 	flag.Parse()
+	if *showversion {
+		os.Exit(0)
+	}
 
 	grpc.EnableTracing = true
-
-	log.Printf("Controller version %s starting", version.String())
 
 	var err error
 
@@ -268,7 +275,7 @@ func main() {
 
 	endpoints = serviceconfig.ConfigureEndpoints(secretsLoader, &config.ServiceConfig)
 
-	cnc := cncserver.MakeCNCServer(config, authority, routes, version.String())
+	cnc := cncserver.MakeCNCServer(config, authority, routes, version.GitBranch())
 	go cnc.RunServer(*serverCert)
 
 	go runAgentGRPCServer(config.InsecureAgentConnections, *serverCert)

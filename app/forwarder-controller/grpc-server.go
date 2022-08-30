@@ -25,6 +25,7 @@ import (
 	"net"
 	"sync/atomic"
 
+	"github.com/OpsMx/go-app-base/version"
 	"github.com/opsmx/oes-birger/internal/serviceconfig"
 	"github.com/opsmx/oes-birger/internal/tunnel"
 	"github.com/opsmx/oes-birger/internal/tunnelroute"
@@ -213,7 +214,7 @@ func (s *agentTunnelServer) sendHello(stream tunnel.AgentTunnelService_EventTunn
 	hello := &tunnel.MessageWrapper{
 		Event: &tunnel.MessageWrapper_Hello{
 			Hello: &tunnel.Hello{
-				Version:   version.String(),
+				Version:   version.GitBranch(),
 				Endpoints: pbEndpoints,
 				Hostname:  "controller",
 			},

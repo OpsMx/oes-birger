@@ -2,5 +2,5 @@
 
 set -e
 
-../../bin/controller --configFile config/controller/config.yaml
+../../bin/forwarder-controller --configFile config/controller/config.yaml
 

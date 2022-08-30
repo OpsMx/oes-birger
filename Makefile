@@ -24,12 +24,13 @@ IMAGE_PREFIX=docker.flame.org/library/
 #
 
 # These are targets for "make local"
-BINARIES = agent controller make-ca get-creds
+BINARIES = forwarder-agent forwarder-controller forwarder-make-ca forwarder-get-creds
 
 # These are the targets for Docker images, used both for the multi-arch and
 # single (local) Docker builds.
 # Dockerfiles should have a target that ends in -image, e.g. agent-image.
-IMAGE_TARGETS = controller agent make-ca
+IMAGE_TARGETS = forwarder-controller forwarder-agent forwarder-make-ca
+
 #
 # Below here lies magic...
 #
@@ -55,6 +56,13 @@ buildtime:
 	[ ! -d buildtime ] && mkdir buildtime
 
 #
+# set git info details
+#
+set-git-info:
+	@$(eval GIT_BRANCH=$(shell git describe --tags))
+	@$(eval GIT_HASH=$(shell git rev-parse ${GIT_BRANCH}))
+
+#
 # Common components, like GRPC client code generation.
 #
 
@@ -72,38 +80,29 @@ internal/tunnel/tunnel.pb.go: go.mod internal/tunnel/tunnel.proto
 .PHONY: local
 local: $(addprefix bin/,$(BINARIES))
 
-bin/%:: ${all_deps}
+bin/%:: set-git-info ${all_deps}
 	@[ -d bin ] || mkdir bin
-	go build -ldflags="-s -w" -o $@ app/$(@F)/*.go
+	go build -o $@ \
+		-ldflags="-X github.com/OpsMx/go-app-base/version.buildType=dev' -X 'github.com/OpsMx/go-app-base/version.gitHash=${GIT_HASH}' -X 'github.com/OpsMx/go-app-base/version.gitBranch=${GIT_BRANCH}'" \
+		app/$(@F)/*.go
 
 #
 # Multi-architecture image builds
 #
-.PHONY: images-ma
-images-ma: buildtime $(addsuffix -ma.ts, $(addprefix buildtime/,$(IMAGE_TARGETS)))
+.PHONY: images
+images: buildtime $(addsuffix .ts, $(addprefix buildtime/,$(IMAGE_TARGETS)))
 
-buildtime/%-ma.ts:: ${all_deps} Dockerfile.multi
-	$(eval dockerTags = $(shell ./build-tag.sh ${IMAGE_PREFIX}forwarder-$(patsubst %-ma.ts,%,$(@F)) v${now}))
+buildtime/%.ts:: set-git-info ${all_deps} Dockerfile
 	${BUILDX} \
-		${dockerTags} \
-		--target $(patsubst %-ma.ts,%,$(@F))-image \
-		-f Dockerfile.multi \
+		--tag ${IMAGE_PREFIX}$(patsubst %.ts,%,$(@F)):latest \
+		--tag ${IMAGE_PREFIX}$(patsubst %.ts,%,$(@F)):${GIT_BRANCH} \
+		--target $(patsubst %.ts,%,$(@F))-image \
+		--build-arg GIT_HASH=${GIT_HASH} \
+		--build-arg GIT_BRANCH=${GIT_BRANCH} \
+		--build-arg BUILD_TYPE=release \
+		-f Dockerfile \
 		--push .
 	@touch $@
-
-#
-# Standard "whatever we are on now" image builds
-#
-.PHONY: images
-images: $(addsuffix .ts, $(addprefix buildtime/,$(IMAGE_TARGETS)))
-
-buildtime/%.ts:: buildtime ${all_deps} Dockerfile
-	$(eval dockerTags = $(shell ./build-tag.sh ${IMAGE_PREFIX}forwarder-$(patsubst %.ts,%,$(@F)) v${now}))
-	docker build --pull \
-		${dockerTags} \
-		--target $(patsubst %.ts,%,$(@F))-image \
-		.
-	touch $@
 
 #
 # Test targets
@@ -112,11 +111,6 @@ buildtime/%.ts:: buildtime ${all_deps} Dockerfile
 .PHONY: test
 test: ${pb_deps}
 	go test -race ./...
-
-
-.PHONY: testsuite
-testsuite: bin/agent bin/controller bin/make-ca bin/get-creds
-	docker build -t opsmx-agent-testsuite:latest -f Dockerfile.testsuite .
 
 #
 # Clean the world.
