@@ -34,8 +34,8 @@ dmitri.shuralyov.com/gpu/mtl v0.0.0-20190408044501-666a987793e9/go.mod h1:H6x//7
 github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
 github.com/BurntSushi/xgb v0.0.0-20160522181843-27f122750802/go.mod h1:IVnqGOEym/WlBOVXweHU+Q+/VP0lqqI8lqeDx9IjBqo=
 github.com/OneOfOne/xxhash v1.2.2/go.mod h1:HSdplMjZKSmBqAxg5vPj2TmRDmfkzw+cTzAElWljhcU=
-github.com/OpsMx/go-app-base v0.0.8 h1:PQuHKoT5StD70DjOek7r3nsGi4f+Oox1SdasiZYZm7I=
-github.com/OpsMx/go-app-base v0.0.8/go.mod h1:Be3/ggTSetiM4DkO7wvtWuDeIO3j27SJY2Evu5k6T9E=
+github.com/OpsMx/go-app-base v0.0.9 h1:62vgY44kRJL3tpJZyfR8ibGvV3R2PiBJcFQOYPB7O+4=
+github.com/OpsMx/go-app-base v0.0.9/go.mod h1:Be3/ggTSetiM4DkO7wvtWuDeIO3j27SJY2Evu5k6T9E=
 github.com/alecthomas/template v0.0.0-20160405071501-a0175ee3bccc/go.mod h1:LOuyumcjzFXgccqObfd/Ljyb9UuFJ6TxHnclSeseNhc=
 github.com/alecthomas/template v0.0.0-20190718012654-fb15b899a751/go.mod h1:LOuyumcjzFXgccqObfd/Ljyb9UuFJ6TxHnclSeseNhc=
 github.com/alecthomas/units v0.0.0-20151022065526-2efee857e7cf/go.mod h1:ybxpYRFXyAe+OPACYpWeL0wqObRcbAqCMya13uyzqw0=

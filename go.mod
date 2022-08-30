@@ -3,7 +3,7 @@ module github.com/opsmx/oes-birger
 go 1.19
 
 require (
-	github.com/OpsMx/go-app-base v0.0.8
+	github.com/OpsMx/go-app-base v0.0.9
 	github.com/aws/aws-sdk-go v1.44.87
 	github.com/go-resty/resty/v2 v2.7.0
 	github.com/google/go-cmp v0.5.8
