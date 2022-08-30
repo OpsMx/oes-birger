@@ -17,7 +17,7 @@
 package main
 
 import (
-	"io/ioutil"
+	"os"
 
 	"github.com/opsmx/oes-birger/internal/tunnel"
 	"gopkg.in/yaml.v3"
@@ -62,7 +62,7 @@ func (c *agentConfig) applyDefaults() {
 // loadConfig will load YAML configuration from the provided filename, and then apply
 // environment variables to override some subset of available options.
 func loadConfig(filename string) (*agentConfig, error) {
-	buf, err := ioutil.ReadFile(filename)
+	buf, err := os.ReadFile(filename)
 	if err != nil {
 		return nil, err
 	}
@@ -83,7 +83,7 @@ type AgentInfoContainer struct {
 }
 
 func loadAgentInfo(filename string) (*tunnel.AgentInfo, error) {
-	buf, err := ioutil.ReadFile(filename)
+	buf, err := os.ReadFile(filename)
 	if err != nil {
 		return nil, err
 	}
