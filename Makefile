@@ -93,6 +93,7 @@ bin/%:: set-git-info ${all_deps}
 images: buildtime $(addsuffix .ts, $(addprefix buildtime/,$(IMAGE_TARGETS)))
 
 buildtime/%.ts:: set-git-info ${all_deps} Dockerfile
+	touch ${pb_deps}
 	${BUILDX} \
 		--tag ${IMAGE_PREFIX}$(patsubst %.ts,%,$(@F)):latest \
 		--tag ${IMAGE_PREFIX}$(patsubst %.ts,%,$(@F)):${GIT_BRANCH} \
