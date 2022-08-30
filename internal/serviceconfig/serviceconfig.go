@@ -14,16 +14,14 @@
  * limitations under the License.
  */
 
-//
 // Package serviceconfig handles the top level agent configuration YAML handling.
 //
 // The service-level "Config" element is handled by the Make() methods on
 // each service endpoint type.
-//
 package serviceconfig
 
 import (
-	"io/ioutil"
+	"os"
 
 	"gopkg.in/yaml.v3"
 )
@@ -65,7 +63,7 @@ type ServiceConfig struct {
 
 // LoadServiceConfig loads a service configuration YAML file.
 func LoadServiceConfig(filename string) (*ServiceConfig, error) {
-	buf, err := ioutil.ReadFile(filename)
+	buf, err := os.ReadFile(filename)
 	if err != nil {
 		return nil, err
 	}

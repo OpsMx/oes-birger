@@ -19,7 +19,7 @@ package serviceconfig
 import (
 	"crypto/tls"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strings"
 
@@ -214,7 +214,7 @@ func runAPIHandler(routes *tunnelroute.ConnectedRoutes, ep tunnelroute.Search, w
 	apiRequestCounter.WithLabelValues(ep.Name, ep.EndpointName).Inc()
 	transactionID := ulid.GlobalContext.Ulid()
 
-	body, err := ioutil.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		zap.S().Errorf("unable to read entire message body")
 		w.WriteHeader(http.StatusServiceUnavailable)
