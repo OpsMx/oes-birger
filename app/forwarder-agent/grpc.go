@@ -3,7 +3,6 @@ package main
 import (
 	"crypto/tls"
 	"io"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -74,9 +73,7 @@ func dataflowHandler(dataflow chan *tunnel.MessageWrapper, stream tunnel.GRPCEve
 	}
 }
 
-func runTunnel(wg *sync.WaitGroup, sa *serverContext, conn *grpc.ClientConn, agentInfo *tunnel.AgentInfo, endpoints []serviceconfig.ConfiguredEndpoint, insecure bool, clcert tls.Certificate) {
-	defer wg.Done()
-
+func runTunnel(sa *serverContext, conn *grpc.ClientConn, agentInfo *tunnel.AgentInfo, endpoints []serviceconfig.ConfiguredEndpoint, insecure bool, clcert tls.Certificate) {
 	client := tunnel.NewAgentTunnelServiceClient(conn)
 	ctx := context.Background()
 

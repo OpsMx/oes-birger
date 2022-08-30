@@ -23,6 +23,7 @@ import (
 	"log"
 	"os"
 
+	"github.com/OpsMx/go-app-base/version"
 	"github.com/opsmx/oes-birger/internal/ca"
 )
 
@@ -32,6 +33,7 @@ var (
 	withKubernetes    = flag.Bool("withKubernetes", true, "also generate kubernetes manifests")
 	controlSecretName = flag.String("controlSecretName", "oes-control-secret", "the name of the secret for the control secret")
 	alsoAgentNamed    = flag.String("alsoAgentNamed", "", "also create an agent credential, in agent-cert.pem and agent-key.pem")
+	showversion       = flag.Bool("version", false, "show the version and exit")
 )
 
 func maybePrintNamespace(f *os.File) {
@@ -47,7 +49,11 @@ func check(err error) {
 }
 
 func main() {
+	log.Printf("%s", version.VersionString())
 	flag.Parse()
+	if *showversion {
+		os.Exit(0)
+	}
 
 	cacert, caPrivateKey, err := ca.MakeCertificateAuthority()
 	check(err)

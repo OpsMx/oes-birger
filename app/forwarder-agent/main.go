@@ -25,8 +25,9 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"os/signal"
 	"runtime"
-	"sync"
+	"syscall"
 	"time"
 
 	"golang.org/x/net/context"
@@ -36,6 +37,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/OpsMx/go-app-base/tracer"
+	"github.com/OpsMx/go-app-base/util"
 	"github.com/OpsMx/go-app-base/version"
 	"github.com/opsmx/oes-birger/internal/ca"
 	"github.com/opsmx/oes-birger/internal/secrets"
@@ -44,6 +46,10 @@ import (
 	"github.com/opsmx/oes-birger/internal/tunnelroute"
 
 	"go.uber.org/zap"
+)
+
+const (
+	appName = "forwarder-agent"
 )
 
 var (
@@ -150,6 +156,20 @@ func main() {
 		logger.Info("POD_NAMESPACE not set.  Disabling Kubernetes secret handling.")
 	}
 
+	sigchan := make(chan os.Signal, 1)
+	signal.Notify(sigchan, syscall.SIGTERM, syscall.SIGINT)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	if *jaegerEndpoint != "" {
+		*jaegerEndpoint = util.GetEnvar("JAEGER_TRACE_URL", "")
+	}
+
+	tracerProvider, err = tracer.NewTracerProvider(*jaegerEndpoint, *traceToStdout, version.GitHash(), appName, *traceRatio)
+	util.Check(err)
+	defer tracerProvider.Shutdown(ctx)
+
 	c, err := loadConfig(*configFile)
 	if err != nil {
 		sl.Fatalf("loading config: %v", err)
@@ -199,9 +219,9 @@ func main() {
 		opts = append(opts, grpc.WithTransportCredentials(ta))
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx2, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
-	conn, err := grpc.DialContext(ctx, config.ControllerHostname, opts...)
+	conn, err := grpc.DialContext(ctx2, config.ControllerHostname, opts...)
 	if err != nil {
 		sl.Fatalw("Could not establish GRPC connection to",
 			"target", config.ControllerHostname,
@@ -209,14 +229,12 @@ func main() {
 	}
 	defer conn.Close()
 
-	var wg sync.WaitGroup
-
-	wg.Add(1)
-	go runTunnel(&wg, sa, conn, agentInfo, endpoints, config.InsecureControllerAllowed, clcert)
+	go runTunnel(sa, conn, agentInfo, endpoints, config.InsecureControllerAllowed, clcert)
 
 	for _, service := range agentServiceConfig.IncomingServices {
 		go serviceconfig.RunHTTPServer(routes, service)
 	}
 
-	wg.Wait()
+	<-sigchan
+	log.Printf("Exiting Cleanly")
 }

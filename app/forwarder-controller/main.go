@@ -26,7 +26,9 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
 	"path/filepath"
+	"syscall"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -35,6 +37,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/OpsMx/go-app-base/tracer"
+	"github.com/OpsMx/go-app-base/util"
 	"github.com/OpsMx/go-app-base/version"
 	"github.com/lestrrat-go/jwx/jwa"
 	"github.com/lestrrat-go/jwx/jwk"
@@ -46,6 +49,10 @@ import (
 	"github.com/opsmx/oes-birger/internal/tunnelroute"
 	"github.com/opsmx/oes-birger/internal/webhook"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+)
+
+const (
+	appName = "forwarder-controller"
 )
 
 var (
@@ -223,6 +230,20 @@ func main() {
 
 	var err error
 
+	sigchan := make(chan os.Signal, 1)
+	signal.Notify(sigchan, syscall.SIGTERM, syscall.SIGINT)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	if *jaegerEndpoint != "" {
+		*jaegerEndpoint = util.GetEnvar("JAEGER_TRACE_URL", "")
+	}
+
+	tracerProvider, err = tracer.NewTracerProvider(*jaegerEndpoint, *traceToStdout, version.GitHash(), appName, *traceRatio)
+	util.Check(err)
+	defer tracerProvider.Shutdown(ctx)
+
 	config, err = parseConfig(*configFile)
 	if err != nil {
 		log.Fatalf("%v", err)
@@ -295,5 +316,8 @@ func main() {
 		}
 	}
 
-	runPrometheusHTTPServer(config.PrometheusListenPort)
+	go runPrometheusHTTPServer(config.PrometheusListenPort)
+
+	<-sigchan
+	log.Printf("Exiting Cleanly")
 }

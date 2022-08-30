@@ -23,6 +23,7 @@ import (
 	"log"
 	"os"
 
+	"github.com/OpsMx/go-app-base/version"
 	"github.com/go-resty/resty/v2"
 	"github.com/opsmx/oes-birger/internal/fwdapi"
 )
@@ -36,6 +37,7 @@ var (
 	agentIdentity = flag.String("agent", "", "agent name")
 	endpointType  = flag.String("type", "", "endpoint type")
 	action        = flag.String("action", "", "action, one of: kubectl, agent-manifest, service, or control")
+	showversion   = flag.Bool("version", false, "show the version and exit")
 )
 
 func usage(message string) {
@@ -161,7 +163,11 @@ func insist(s *string, name string, expected bool) {
 }
 
 func main() {
+	log.Printf("%s", version.VersionString())
 	flag.Parse()
+	if *showversion {
+		os.Exit(0)
+	}
 
 	switch *action {
 	case "kubectl":
