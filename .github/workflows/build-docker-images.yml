@@ -27,8 +27,8 @@ jobs:
     - name: Login to docker
       uses: docker/login-action@v2
       with:
-        registry: ${{ secrets.DOCKER_FLAME_HOSTNAME }}
-        username: ${{ secrets.DOCKER_FLAME_USERNAME }}
-        password: ${{ secrets.DOCKER_FLAME_PASSWORD }}
+        registry: ${{ secrets.DOCKER_PUBLIC_HOSTNAME }}
+        username: ${{ secrets.DOCKER_PUBLIC_USERNAME }}
+        password: ${{ secrets.DOCKER_PUBLIC_PASSWORD }}
     - name: Build the Docker image
-      run: make images
+      run: make IMAGE_PREFIX=quay.io/opsmxpublic/ images 
