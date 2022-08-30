@@ -19,7 +19,6 @@ package main
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 
 	"gopkg.in/yaml.v3"
@@ -63,7 +62,7 @@ type serviceAuthConfig struct {
 // and then apply environment variables to override some subset of
 // available options.
 func LoadConfig(f io.Reader) (*ControllerConfig, error) {
-	buf, err := ioutil.ReadAll(f)
+	buf, err := io.ReadAll(f)
 	if err != nil {
 		return nil, err
 	}
@@ -159,9 +158,7 @@ func (c *ControllerConfig) GetControlListenPort() uint16 {
 	return c.ControlListenPort
 }
 
-//
 // Dump will display MOST of the controller's configuration.
-//
 func (c *ControllerConfig) Dump() {
 	log.Println("ControllerConfig:")
 	log.Printf("ServerNames:")
