@@ -14,16 +14,13 @@
  * limitations under the License.
  */
 
-//
 // Package kubeconfig parses a kubeconfig file, extracting basic information
 // such as user keys, tokens, and the default context.
-//
 package kubeconfig
 
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 
 	"gopkg.in/yaml.v3"
 )
@@ -79,7 +76,7 @@ type UserDetails struct {
 
 // ReadKubeConfig will read in the YAML config located in $HOME/.kube/config
 func ReadKubeConfig(contents io.Reader) (*KubeConfig, error) {
-	buf, err := ioutil.ReadAll(contents)
+	buf, err := io.ReadAll(contents)
 	if err != nil {
 		return nil, err
 	}

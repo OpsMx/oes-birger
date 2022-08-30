@@ -22,7 +22,6 @@ import (
 	"encoding/base64"
 	"encoding/pem"
 	"flag"
-	"io/ioutil"
 	"log"
 	"os"
 	"os/signal"
@@ -80,7 +79,7 @@ var (
 )
 
 func loadCACertPEM() []byte {
-	cert, err := ioutil.ReadFile(*caCertFile)
+	cert, err := os.ReadFile(*caCertFile)
 	if err == nil {
 		return cert
 	}

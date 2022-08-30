@@ -22,7 +22,7 @@ import (
 	"crypto/x509/pkix"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -216,7 +216,7 @@ func TestCNCServer_generateKubectlComponents(t *testing.T) {
 				t.Errorf("Expected content-type to be application/json, not %s", ct)
 			}
 
-			resultBody, err := ioutil.ReadAll(w.Result().Body)
+			resultBody, err := io.ReadAll(w.Result().Body)
 			if err != nil {
 				panic(err)
 			}
@@ -289,7 +289,7 @@ func TestCNCServer_generateAgentManifestComponents(t *testing.T) {
 				t.Errorf("Expected content-type to be application/json, not %s", ct)
 			}
 
-			resultBody, err := ioutil.ReadAll(w.Result().Body)
+			resultBody, err := io.ReadAll(w.Result().Body)
 			if err != nil {
 				panic(err)
 			}
@@ -428,7 +428,7 @@ func TestCNCServer_generateServiceCredentials(t *testing.T) {
 			assert.Equal(t, tt.wantStatus, w.Result().StatusCode)
 			assert.Equal(t, "application/json", w.Result().Header.Get("content-type"), "incorrect returned content type")
 
-			resultBody, err := ioutil.ReadAll(w.Result().Body)
+			resultBody, err := io.ReadAll(w.Result().Body)
 			if err != nil {
 				panic(err)
 			}
@@ -500,7 +500,7 @@ func TestCNCServer_generateControlCredentials(t *testing.T) {
 				t.Errorf("Expected content-type to be application/json, not %s", ct)
 			}
 
-			resultBody, err := ioutil.ReadAll(w.Result().Body)
+			resultBody, err := io.ReadAll(w.Result().Body)
 			if err != nil {
 				panic(err)
 			}
@@ -528,7 +528,7 @@ func TestCNCServer_getStatistics(t *testing.T) {
 			t.Errorf("Expected content-type to be application/json, not %s", ct)
 		}
 
-		resultBody, err := ioutil.ReadAll(w.Result().Body)
+		resultBody, err := io.ReadAll(w.Result().Body)
 		if err != nil {
 			panic(err)
 		}
