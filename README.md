@@ -2,6 +2,33 @@
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/opsmx/oes-birger)](https://goreportcard.com/report/github.com/opsmx/oes-birger)
 
+# Generic HTTP proxy
+
+This is a slightly protocol aware HTTP proxy, which securely crosses
+security domains.  The primary use case is for a SaaS install of some
+central software which needs to reach into a customer's cloud in some
+secure way.  VPNs could be used, which requires out of band configuration
+and likely more complexity and teams.
+
+Birger allows an agent to be run in a Kubernetes cluster, configured
+with security tokens for various services.  Access to these services
+are provided to the controller, which can be contacted in a secure
+way to access the agent-provided services.
+
+The credentials used by the agent to contact services (kubernetes, jenkins,
+etc) are never provided to the controller.  This allows secure, customer
+regulated access to internal services and changing credentials as needed.
+
+## Using the Services
+
+The controller has a HTTPS port open which accepts service requests.
+These may be a controller-CA provided certificate, or a controller-provided
+JWT token in an `Authentication` header.  For Kubernetes, certificates
+are used, while for other HTTP-based services, the Bearer or Basic auth method
+and the JWT token should be used.
+
+# Kubernetes Service
+
 This implements a service where, by running an agent inside a Kubernetes
 cluster, API calls can still be sent to it even if the cluster is
 behind a firewall.
@@ -53,11 +80,7 @@ has a very small security footprint.
 
 # Running
 
-Start the controller:
-`$ go run controller/controller.go`
-
-Start a agent:
-`$ go run agent/agent.go -identity skan1`
+See the examples in the `examples/local-deploy` directory.
 
 # Certificates
 
@@ -70,5 +93,18 @@ server certificate on startup with all the defined server names it may be using.
 It will also use this to generate additional keys for control,
 kubernetes API requests, and agents on request.
 
-The certificates issued by the controller's built-in CA have a specific OID which
+The certificates issued by the controller's built-in CA have a specific tag which
 describes the endpoint type when connecting.  This is required.
+
+# Service Registry
+
+| Service Type | Support Level | Location | Description |
+| --- | --- | --- | --- |
+| aws | Partial | Agent | AWS API |
+| clouddriver | Full | Agent | Spinnaker Cloud Driver API.  Special handling of the HTTP messages. |
+| front50 | Full | Controller | Spinnaker Front50 API.  Special handling of the HTTP messages. |
+| fiat | Full | Controller | Spinnaker Fiat API. Special handling of the HTTP messages. |
+| jenkins | Full | Either | Jenkins CI API |
+| kuberetes | Full | Agent | Kubernetes API endpoint |
+
+Types not listed here should not be used.  Local or custom types (without any special handling needed, just usual HTTP protocol proxy) can be named with a `x-` prefix, such as `x-my-api`.
