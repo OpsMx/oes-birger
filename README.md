@@ -108,3 +108,19 @@ describes the endpoint type when connecting.  This is required.
 | kuberetes | Full | Agent | Kubernetes API endpoint |
 
 Types not listed here should not be used.  Local or custom types (without any special handling needed, just usual HTTP protocol proxy) can be named with a `x-` prefix, such as `x-my-api`.
+
+# Annotations
+
+A list of annotations, which are `key: value` pairs in the YAML configuration, can be added to any
+`outgoingService` or `agentInfo`.  See `examples/local-deploy/config/agent/config.yaml` and
+`examples/local-deploy/config/agent/services.yaml`.
+
+## Annotation Registry
+
+While any annotataion can be listed and retrieved via the controller's API, some have special
+meaning.
+
+| Name | Context | Description |
+| --- | --- | --- |
+| description | any | A description of this object, perhaps to be displayed in the UI and log messages. |
+| uiUrl | service type argocd | In the ISD UI, this will be used to display a direct link to the argocd instance.  This will be displayed exactly as-is in the user's browser, so it should be whatever name users would normally use to reach this instance. If this is blank, no UI link will be provided. |
