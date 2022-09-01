@@ -32,6 +32,7 @@ import (
 	"github.com/opsmx/oes-birger/internal/ulid"
 	"github.com/opsmx/oes-birger/internal/util"
 	"github.com/soheilhy/cmux"
+	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 )
@@ -240,7 +241,7 @@ func handleHTTPControl(in *tunnel.MessageWrapper, httpids *util.SessionList, end
 			}
 		}
 		if !found {
-			log.Printf("Request for unsupported HTTP tunnel type=%s name=%s", req.Type, req.Name)
+			zap.S().Warnf("Request for unsupported HTTP tunnel type=%s name=%s", req.Type, req.Name)
 			dataflow <- tunnel.MakeBadGatewayResponse(req.Id)
 		}
 	case *tunnel.HttpTunnelControl_HttpTunnelResponse:
@@ -253,7 +254,7 @@ func handleHTTPControl(in *tunnel.MessageWrapper, httpids *util.SessionList, end
 				httpids.RemoveUnlocked(resp.Id)
 			}
 		} else {
-			log.Printf("Got response to unknown HTTP request id %s", resp.Id)
+			zap.S().Warnf("Got response to unknown HTTP request id %s", resp.Id)
 		}
 		httpids.Unlock()
 	case *tunnel.HttpTunnelControl_HttpTunnelChunkedResponse:
@@ -266,13 +267,13 @@ func handleHTTPControl(in *tunnel.MessageWrapper, httpids *util.SessionList, end
 				httpids.RemoveUnlocked(resp.Id)
 			}
 		} else {
-			log.Printf("Got response to unknown HTTP request id %s", resp.Id)
+			zap.S().Debugf("Got response to unknown HTTP request id %s", resp.Id)
 		}
 		httpids.Unlock()
 	case nil:
 		return
 	default:
-		log.Printf("Received unknown HttpControl type: %T", controlMessage)
+		zap.S().Warnf("Received unknown HttpControl type: %T", controlMessage)
 	}
 }
 

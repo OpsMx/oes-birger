@@ -285,7 +285,7 @@ func handleTunnelControl(ep tunnelroute.Search, state *apiHandlerState, tunnelCo
 		copyHeaders(resp, w)
 		w.WriteHeader(int(resp.Status))
 		if !httputil.StatusCodeOK(int(resp.Status)) {
-			zap.S().Infow("Non-2xx response", "destination", ep.Name, "service", ep.EndpointName, "serviceType", ep.EndpointType, "session", ep.Session)
+			zap.S().Infow("Non-2xx response", "code", resp.Status, "destination", ep.Name, "service", ep.EndpointName, "serviceType", ep.EndpointType, "session", ep.Session)
 		}
 		if resp.ContentLength == 0 {
 			state.cleanClose.Set()
