@@ -27,14 +27,15 @@ import (
 
 // ConfiguredEndpoint defines an endpoint we have loaded, and have a request processor attached.
 type ConfiguredEndpoint struct {
-	Name       string   `json:"name,omitempty"`
-	Type       string   `json:"type,omitempty"`
-	Configured bool     `json:"configured,omitempty"`
-	Namespace  []string `json:"namespace,omitempty"`
-	AccountID  string   `json:"accountId,omitempty"`
-	AssumeRole string   `json:"assumeRole,omitempty"`
+	Name        string            `json:"name,omitempty"`
+	Type        string            `json:"type,omitempty"`
+	Configured  bool              `json:"configured,omitempty"`
+	Annotations map[string]string `json:"annotations,omitempty"`
+	Namespace   []string          `json:"namespace,omitempty"`
+	AccountID   string            `json:"accountId,omitempty"`
+	AssumeRole  string            `json:"assumeRole,omitempty"`
 
-	Instance httpRequestProcessor
+	Instance httpRequestProcessor `json:"_"`
 }
 
 type httpRequestProcessor interface {
@@ -50,13 +51,18 @@ func (e *ConfiguredEndpoint) String() string {
 func EndpointsToPB(endpoints []ConfiguredEndpoint) []*tunnel.EndpointHealth {
 	pbEndpoints := make([]*tunnel.EndpointHealth, len(endpoints))
 	for i, ep := range endpoints {
+		annotations := []*tunnel.Annotation{}
+		for k, v := range ep.Annotations {
+			annotations = append(annotations, &tunnel.Annotation{Name: k, Value: v})
+		}
 		endp := &tunnel.EndpointHealth{
-			Name:       ep.Name,
-			Type:       ep.Type,
-			Configured: ep.Configured,
-			Namespaces: ep.Namespace,
-			AccountID:  ep.AccountID,
-			AssumeRole: ep.AssumeRole,
+			Name:        ep.Name,
+			Type:        ep.Type,
+			Configured:  ep.Configured,
+			Annotations: annotations,
+			Namespaces:  ep.Namespace,
+			AccountID:   ep.AccountID,
+			AssumeRole:  ep.AssumeRole,
 		}
 		pbEndpoints[i] = endp
 	}
@@ -99,14 +105,16 @@ func ConfigureEndpoints(secretsLoader secrets.SecretLoader, serviceConfig *Servi
 				zap.S().Infow("adding endpoint",
 					"endpointType", service.Type,
 					"endpointName", service.Name,
-					"endpointConfigured", configured)
+					"endpointConfigured", configured,
+					"annotations", service.Annotations)
 				endpoints = append(endpoints, ConfiguredEndpoint{
-					Type:       service.Type,
-					Name:       service.Name,
-					Configured: configured,
-					Instance:   instance,
-					AccountID:  service.AccountID,
-					AssumeRole: service.AssumeRole,
+					Type:        service.Type,
+					Name:        service.Name,
+					Configured:  configured,
+					Annotations: service.Annotations,
+					Instance:    instance,
+					AccountID:   service.AccountID,
+					AssumeRole:  service.AssumeRole,
 				})
 			} else {
 				for _, ns := range service.Namespaces {

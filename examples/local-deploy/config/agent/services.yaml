@@ -1,16 +1,21 @@
 agentInfo:
-  description: "demo agent"
+  annotations:
+    description: demo agent
 outgoingServices:
   - name: whoami
     type: whoami
     enabled: true
     config:
       url: https://whoami.svc.rpi.flame.org
+    annotations:
+      description: Whoami on my raspberry pi cluster of doom!
   - name: whoami-loop
     type: whoami
     enabled: true
     config:
-      url: http://localhost:8006 # loop back to our own port here
+      url: http://localhost:8014 # loop back to our own port here
+    annotations:
+      description: Whoami looped back to our own port
 incomingServices:
   - name: controller-whoami
     serviceType: whoami

@@ -17,20 +17,26 @@
 package tunnel
 
 type AgentInfo struct {
-	Description string `json:"description,omitempty" yaml:"description,omitempty"`
+	Annotations map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
 }
 
 func (ai *AgentInfo) ToPB() *AgentInformation {
+	annotations := []*Annotation{}
+	for k, v := range ai.Annotations {
+		annotations = append(annotations, &Annotation{Name: k, Value: v})
+	}
+
 	return &AgentInformation{
-		Description: ai.Description,
+		Annotations: annotations,
 	}
 }
 
-func AgentInfoFromPB(p *AgentInformation) AgentInfo {
-	if p == nil {
-		return AgentInfo{}
+func (ai *AgentInformation) FromPB() AgentInfo {
+	annotations := map[string]string{}
+	for _, annotation := range ai.Annotations {
+		annotations[annotation.Name] = annotation.Value
 	}
 	return AgentInfo{
-		Description: p.Description,
+		Annotations: annotations,
 	}
 }

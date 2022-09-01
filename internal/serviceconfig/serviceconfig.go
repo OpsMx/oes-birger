@@ -41,13 +41,14 @@ type IncomingServiceConfig struct {
 
 // OutgoingServiceConfig defines a way to reach out to another service, such as Jenkins.
 type OutgoingServiceConfig struct {
-	Enabled    bool                        `yaml:"enabled"`
-	Name       string                      `yaml:"name"`
-	Type       string                      `yaml:"type"`
-	Config     map[interface{}]interface{} `yaml:"config,omitempty"`
-	Namespaces []serviceNamespace          `yaml:"namespaces,omitempty"`
-	AccountID  string                      `yaml:"accountId,omitempty"`
-	AssumeRole string                      `yaml:"assumeRole,omitempty"`
+	Enabled     bool                        `yaml:"enabled"`
+	Name        string                      `yaml:"name"`
+	Type        string                      `yaml:"type"`
+	Config      map[interface{}]interface{} `yaml:"config,omitempty"`
+	Annotations map[string]string           `yaml:"annotations,omitempty"`
+	Namespaces  []serviceNamespace          `yaml:"namespaces,omitempty"`
+	AccountID   string                      `yaml:"accountId,omitempty"`
+	AssumeRole  string                      `yaml:"assumeRole,omitempty"`
 }
 
 type serviceNamespace struct {

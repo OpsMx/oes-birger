@@ -43,11 +43,18 @@ func (s *agentTunnelServer) sendWebhook(state tunnelroute.Route, endpoints []*tu
 	}
 	eh := make([]tunnelroute.Endpoint, len(endpoints))
 	for i, ep := range endpoints {
+		annotations := map[string]string{}
+		if ep.Annotations != nil {
+			for _, a := range ep.Annotations {
+				annotations[a.Name] = a.Value
+			}
+		}
 		eh[i] = tunnelroute.Endpoint{
-			Name:       ep.Name,
-			Type:       ep.Type,
-			Configured: ep.Configured,
-			Namespaces: ep.Namespaces,
+			Name:        ep.Name,
+			Type:        ep.Type,
+			Configured:  ep.Configured,
+			Namespaces:  ep.Namespaces,
+			Annotations: annotations,
 		}
 	}
 	req := &tunnelroute.BaseStatistics{
@@ -167,7 +174,7 @@ func (s *agentTunnelServer) EventTunnel(stream tunnel.AgentTunnelService_EventTu
 			state.Endpoints = reqToEndpoints(req.Endpoints)
 			state.Version = req.Version
 			state.Hostname = req.Hostname
-			state.AgentInfo = tunnel.AgentInfoFromPB(req.AgentInfo)
+			state.AgentInfo = req.AgentInfo.FromPB()
 			routes.Add(state)
 			s.sendWebhook(state, req.Endpoints)
 
@@ -199,13 +206,20 @@ func getAgentNameFromBytes(data []byte) (name string, err error) {
 func reqToEndpoints(health []*tunnel.EndpointHealth) []tunnelroute.Endpoint {
 	endpoints := make([]tunnelroute.Endpoint, len(health))
 	for i, ep := range health {
+		annotations := map[string]string{}
+		if ep.Annotations != nil {
+			for _, a := range ep.Annotations {
+				annotations[a.Name] = a.Value
+			}
+		}
 		endpoints[i] = tunnelroute.Endpoint{
-			Name:       ep.Name,
-			Type:       ep.Type,
-			Configured: ep.Configured,
-			Namespaces: ep.Namespaces,
-			AccountID:  ep.AccountID,
-			AssumeRole: ep.AssumeRole,
+			Name:        ep.Name,
+			Type:        ep.Type,
+			Configured:  ep.Configured,
+			Annotations: annotations,
+			Namespaces:  ep.Namespaces,
+			AccountID:   ep.AccountID,
+			AssumeRole:  ep.AssumeRole,
 		}
 	}
 	return endpoints
