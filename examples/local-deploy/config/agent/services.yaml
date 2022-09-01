@@ -5,7 +5,7 @@ outgoingServices:
     type: whoami
     enabled: true
     config:
-      url: https://whoami.rpi.flame.org
+      url: https://whoami.svc.rpi.flame.org
   - name: whoami-loop
     type: whoami
     enabled: true
