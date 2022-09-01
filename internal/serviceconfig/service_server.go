@@ -239,9 +239,9 @@ func runAPIHandler(routes *tunnelroute.ConnectedRoutes, ep tunnelroute.Search, w
 		Body:    body,
 	}
 	message := &tunnelroute.HTTPMessage{Out: make(chan *tunnel.MessageWrapper), Cmd: req}
-	sessionID, found := routes.Send(ep, message)
-	if !found {
-		zap.S().Warnw("No such route", "destination", ep.Name, "service", ep.EndpointName, "serviceType", ep.EndpointType)
+	sessionID, err := routes.Send(ep, message)
+	if err != nil {
+		zap.S().Warnw("cannot-send", "error", err, "destination", ep.Name, "service", ep.EndpointName, "serviceType", ep.EndpointType)
 		w.WriteHeader(http.StatusBadGateway)
 		return
 	}

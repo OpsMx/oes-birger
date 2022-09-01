@@ -153,13 +153,13 @@ func (s *MySuite) TestConnectedAgents(c *C) {
 	///
 
 	// send to non-existent agent
-	session, found := agents.Send(Search{Name: "agent19", EndpointType: "type1", EndpointName: "ep1"}, 5)
-	c.Assert(found, Equals, false)
+	session, err := agents.Send(Search{Name: "agent19", EndpointType: "type1", EndpointName: "ep1"}, 5)
+	c.Assert(err, NotNil)
 	c.Assert(session, Equals, "")
 
 	// working
-	session, found = agents.Send(Search{Name: "agent1", EndpointType: "type1", EndpointName: "ep1"}, 5)
-	c.Assert(found, Equals, true)
+	session, err = agents.Send(Search{Name: "agent1", EndpointType: "type1", EndpointName: "ep1"}, 5)
+	c.Assert(err, Equals, nil)
 	c.Assert(session, Equals, "agent1.session2")
 	c.Assert(agent1Session2.lastMessage, Equals, 5)
 

@@ -35,5 +35,5 @@ services:
       serviceType: x-notthere
       port: 8013
       useHTTP: true
-      destination: controller
+      destination: nosuchagent
       destionalService: controller-nosuchservice

@@ -29,11 +29,9 @@ var (
 	rnd = rand.New(rand.NewSource(time.Now().UnixNano())) // not used for crypto
 )
 
-//
 // BaseStatistics defines the standard statistics returned for every
 // route type.  This should be included in the specific route types,
 // such as "directly connected" or "on other controller" route connections.
-//
 type BaseStatistics struct {
 	Name           string     `json:"name,omitempty"`
 	Session        string     `json:"session,omitempty"`
@@ -43,10 +41,8 @@ type BaseStatistics struct {
 	Hostname       string     `json:"hostname,omitempty"`
 }
 
-//
 // Route is a thing that looks like a connected route (agent), either directly connected or
 // through another controller.
-//
 type Route interface {
 	Close()
 	Send(interface{}) string
@@ -59,18 +55,14 @@ type Route interface {
 	GetStatistics() interface{}
 }
 
-//
 // ConnectedRoutes holds a list of all currently connected or known routes (agents)
-//
 type ConnectedRoutes struct {
 	sync.RWMutex
 	m map[string][]Route
 }
 
-//
 // GetStatistics returns statistics for all routes currently connected.
 // The statistics returned is an opaque object, intended to be rendered to JSON.
-//
 func (s *ConnectedRoutes) GetStatistics() interface{} {
 	ret := make([]interface{}, 0)
 	s.RLock()
@@ -83,10 +75,8 @@ func (s *ConnectedRoutes) GetStatistics() interface{} {
 	return ret
 }
 
-//
 // MakeRoutes returns a new Routes object which will manage (safely) routes, such as agents,
 // connected directly or indirectly.
-//
 func MakeRoutes() *ConnectedRoutes {
 	return &ConnectedRoutes{
 		m: make(map[string][]Route),
@@ -102,9 +92,7 @@ func sliceIndex(limit int, predicate func(i int) bool) int {
 	return -1
 }
 
-//
 // Add will add a new route to our list.
-//
 func (s *ConnectedRoutes) Add(state Route) {
 	s.Lock()
 	defer s.Unlock()
@@ -130,13 +118,11 @@ func (s *ConnectedRoutes) Add(state Route) {
 	connectedRoutesGauge.WithLabelValues(state.GetName()).Inc()
 }
 
-//
 // Remove will remove a route and signal to it that closing down is started.
 //
 // Rather than return an error here, we will just log it.  This is because we
 // won't likely care in the caller, so there's no need to burden them with
 // an if statement just to check it.
-//
 func (s *ConnectedRoutes) Remove(state Route) {
 	s.Lock()
 	defer s.Unlock()
@@ -185,25 +171,20 @@ func (s *ConnectedRoutes) findService(ep Search) (Route, error) {
 	return routeList[selected], nil
 }
 
-//
 // Send will search for the specific route and endpoint. send a message to an route, and return true if a route
 // was found.
-//
-func (s *ConnectedRoutes) Send(ep Search, message interface{}) (string, bool) {
+func (s *ConnectedRoutes) Send(ep Search, message interface{}) (string, error) {
 	s.RLock()
 	defer s.RUnlock()
 	route, err := s.findService(ep)
 	if err != nil {
-		zap.S().Warnf("%v", err)
-		return "", false
+		return "", err
 	}
 	session := route.Send(message)
-	return session, true
+	return session, nil
 }
 
-//
 // Cancel will cancel an ongoing request.
-//
 func (s *ConnectedRoutes) Cancel(ep Search, id string) error {
 	// The session must be set, if not this is an error.
 	if len(ep.Session) == 0 {
