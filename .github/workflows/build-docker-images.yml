@@ -31,4 +31,17 @@ jobs:
         username: ${{ secrets.DOCKER_PUBLIC_USERNAME }}
         password: ${{ secrets.DOCKER_PUBLIC_PASSWORD }}
     - name: Build the Docker image
-      run: make IMAGE_PREFIX=quay.io/opsmxpublic/ images 
+      id: dockerbuild
+      run: make IMAGE_PREFIX=quay.io/opsmxpublic/ clean images images-names
+    - name: Send custom JSON data to Slack workflow
+      id: slack
+      uses: slackapi/slack-github-action@v1.18.0
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_BUILD_EVENTS_WEBHOOK_URL }}
+      with:
+        payload: |
+          {
+            "imageNames": "${{ steps.dockerbuild.outputs.imageNames }}",
+            "actor": "${{ github.actor }}",
+            "status": "${{ job.status }}"
+          }
