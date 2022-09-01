@@ -227,6 +227,7 @@ func main() {
 			"error", err)
 	}
 	defer conn.Close()
+	sl.Info("controller-connection", "established", true)
 
 	go runTunnel(sa, conn, agentInfo, endpoints, config.InsecureControllerAllowed, clcert)
 
