@@ -23,6 +23,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/OpsMx/go-app-base/httputil"
 	"github.com/opsmx/oes-birger/internal/ca"
 	"github.com/opsmx/oes-birger/internal/jwtutil"
 	"github.com/opsmx/oes-birger/internal/tunnel"
@@ -240,6 +241,7 @@ func runAPIHandler(routes *tunnelroute.ConnectedRoutes, ep tunnelroute.Search, w
 	message := &tunnelroute.HTTPMessage{Out: make(chan *tunnel.MessageWrapper), Cmd: req}
 	sessionID, found := routes.Send(ep, message)
 	if !found {
+		zap.S().Warnw("No such route", "destination", ep.Name, "service", ep.EndpointName, "serviceType", ep.EndpointType)
 		w.WriteHeader(http.StatusBadGateway)
 		return
 	}
@@ -254,7 +256,7 @@ func runAPIHandler(routes *tunnelroute.ConnectedRoutes, ep tunnelroute.Search, w
 		in, more := <-message.Out
 		if !more {
 			if !handlerState.seenHeader {
-				zap.S().Errorf("Request timed out sending to agent")
+				zap.S().Warnw("timeout sending", "destination", ep.Name, "service", ep.EndpointName, "serviceType", ep.EndpointType, "session", ep.Session)
 				w.WriteHeader(http.StatusBadGateway)
 			}
 			handlerState.cleanClose.Set()
@@ -263,7 +265,7 @@ func runAPIHandler(routes *tunnelroute.ConnectedRoutes, ep tunnelroute.Search, w
 
 		switch x := in.Event.(type) {
 		case *tunnel.MessageWrapper_HttpTunnelControl:
-			if handleTunnelControl(handlerState, x.HttpTunnelControl, w, r) {
+			if handleTunnelControl(ep, handlerState, x.HttpTunnelControl, w, r) {
 				return
 			}
 		case nil:
@@ -274,15 +276,17 @@ func runAPIHandler(routes *tunnelroute.ConnectedRoutes, ep tunnelroute.Search, w
 	}
 }
 
-func handleTunnelControl(state *apiHandlerState, tunnelControl *tunnel.HttpTunnelControl, w http.ResponseWriter, r *http.Request) bool {
+func handleTunnelControl(ep tunnelroute.Search, state *apiHandlerState, tunnelControl *tunnel.HttpTunnelControl, w http.ResponseWriter, r *http.Request) bool {
 	switch controlMessage := tunnelControl.ControlType.(type) {
 	case *tunnel.HttpTunnelControl_HttpTunnelResponse:
 		resp := controlMessage.HttpTunnelResponse
 		state.seenHeader = true
 		state.isChunked = resp.ContentLength < 0
 		copyHeaders(resp, w)
-		// TODO: unmutate headers
 		w.WriteHeader(int(resp.Status))
+		if !httputil.StatusCodeOK(int(resp.Status)) {
+			zap.S().Infow("Non-2xx response", "destination", ep.Name, "service", ep.EndpointName, "serviceType", ep.EndpointType, "session", ep.Session)
+		}
 		if resp.ContentLength == 0 {
 			state.cleanClose.Set()
 			return true
@@ -290,7 +294,7 @@ func handleTunnelControl(state *apiHandlerState, tunnelControl *tunnel.HttpTunne
 	case *tunnel.HttpTunnelControl_HttpTunnelChunkedResponse:
 		resp := controlMessage.HttpTunnelChunkedResponse
 		if !state.seenHeader {
-			zap.S().Debugf("got ChunkedResponse before HttpResponse")
+			zap.S().Warnf("got ChunkedResponse before HttpResponse")
 			w.WriteHeader(http.StatusBadGateway)
 			return true
 		}
