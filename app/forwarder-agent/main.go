@@ -136,14 +136,14 @@ func main() {
 	_ = zap.ReplaceGlobals(logger)
 	sl = logger.Sugar()
 
-	grpc.EnableTracing = true
-
 	sl.Infow("agent starting",
 		"version", version.VersionString(),
 		"os", runtime.GOOS,
 		"arch", runtime.GOARCH,
 		"cores", runtime.NumCPU(),
 	)
+
+	grpc.EnableTracing = true
 
 	namespace, ok := os.LookupEnv("POD_NAMESPACE")
 	if ok {

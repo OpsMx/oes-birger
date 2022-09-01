@@ -27,8 +27,10 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"runtime"
 	"syscall"
 
+	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
@@ -73,6 +75,8 @@ var (
 	hook          *webhook.Runner
 	routes        = tunnelroute.MakeRoutes()
 	endpoints     []serviceconfig.ConfiguredEndpoint
+	logger        *zap.Logger
+	sl            *zap.SugaredLogger
 )
 
 func getAgentNameFromContext(ctx context.Context) (string, error) {
@@ -225,9 +229,26 @@ func main() {
 		os.Exit(0)
 	}
 
-	grpc.EnableTracing = true
-
 	var err error
+
+	logger, err = zap.NewProduction()
+	if err != nil {
+		log.Fatalf("setting up logger: %v", err)
+	}
+	defer func() {
+		_ = logger.Sync()
+	}()
+	_ = zap.ReplaceGlobals(logger)
+	sl = logger.Sugar()
+
+	sl.Infow("controller starting",
+		"version", version.VersionString(),
+		"os", runtime.GOOS,
+		"arch", runtime.GOARCH,
+		"cores", runtime.NumCPU(),
+	)
+
+	grpc.EnableTracing = true
 
 	sigchan := make(chan os.Signal, 1)
 	signal.Notify(sigchan, syscall.SIGTERM, syscall.SIGINT)
