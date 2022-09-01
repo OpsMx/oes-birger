@@ -21,13 +21,19 @@ services:
   incomingServices:
     - name: agent-whoami
       serviceType: whoami
-      port: 8004
+      port: 8011
       useHTTP: true
       destination: smith
       destinationService: whoami
     - name: agent-whoami-loop
       serviceType: whoami
-      port: 8005
+      port: 8012
       useHTTP: true
       destination: smith
       destinationService: whoami-loop
+    - name: controller-nosuchsercvice
+      serviceType: x-notthere
+      port: 8013
+      useHTTP: true
+      destination: controller
+      destionalService: controller-nosuchservice
