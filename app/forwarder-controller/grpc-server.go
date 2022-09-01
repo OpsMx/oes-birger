@@ -175,6 +175,7 @@ func (s *agentTunnelServer) EventTunnel(stream tunnel.AgentTunnelService_EventTu
 				routes.Remove(state)
 				return err
 			}
+			log.Printf("Route %s fully connected.", state)
 		case *tunnel.MessageWrapper_HttpTunnelControl:
 			handleHTTPControl(in, httpids, s.endpoints, dataflow)
 		case nil:
