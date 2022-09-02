@@ -32,6 +32,9 @@ func (ai *AgentInfo) ToPB() *AgentInformation {
 }
 
 func (ai *AgentInformation) FromPB() AgentInfo {
+	if ai == nil {
+		return AgentInfo{}
+	}
 	annotations := map[string]string{}
 	if ai.Annotations != nil {
 		for _, annotation := range ai.Annotations {
