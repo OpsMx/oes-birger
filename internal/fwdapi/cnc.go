@@ -14,10 +14,8 @@
  * limitations under the License.
  */
 
-//
 // Package fwdapi handles all the types and some minimal validation of
 // the control API endpoints.
-//
 package fwdapi
 
 // Endpoint paths
@@ -29,17 +27,13 @@ const (
 	ControlEndpoint    = "/api/v1/generateControlCredentials"
 )
 
-//
 // KubeConfigRequest defines the request for the KubeconfigEndpoint
-//
 type KubeConfigRequest struct {
 	AgentName string `json:"agentName,omitempty"`
 	Name      string `json:"name,omitempty"`
 }
 
-//
 // KubeConfigResponse defines the response for the KubeconfigEndpoint
-//
 type KubeConfigResponse struct {
 	AgentName       string `json:"agentName,omitempty"`
 	Name            string `json:"name,omitempty"`
@@ -49,37 +43,30 @@ type KubeConfigResponse struct {
 	CACert          string `json:"caCert,omitempty"`
 }
 
-//
 // ManifestRequest defines the request for the ManifestEndpoint
-//
 type ManifestRequest struct {
 	AgentName string `json:"agentName,omitempty"`
 }
 
-//
 // ManifestResponse defines the response for the ManifestEndpoint
-//
 type ManifestResponse struct {
 	AgentName        string `json:"agentName,omitempty"`
 	ServerHostname   string `json:"serverHostname,omitempty"`
 	ServerPort       uint16 `json:"serverPort,omitempty"`
 	AgentCertificate string `json:"agentCertificate,omitempty"`
+	AgentVersion     string `json:"agentVersion,omitempty"`
 	AgentKey         string `json:"agentKey,omitempty"`
 	CACert           string `json:"caCert,omitempty"`
 }
 
-//
 // StatisticsResponse defines the response for the StatisticsEndpoint
-//
 type StatisticsResponse struct {
 	ServerTime      uint64      `json:"serverTime,omitempty"`
 	Version         string      `json:"version,omitempty"`
 	ConnectedAgents interface{} `json:"connectedAgents,omitempty"`
 }
 
-//
 // ServiceCredentialRequest defines the request for the ServiceEndpoint
-//
 type ServiceCredentialRequest struct {
 	AgentName string `json:"agentName,omitempty"`
 	Type      string `json:"type,omitempty"`
@@ -88,9 +75,7 @@ type ServiceCredentialRequest struct {
 	OldName   string `json:"Name,omitempty"` // depricated
 }
 
-//
 // ServiceCredentialResponse defines the response for the ServiceEndpoint
-//
 type ServiceCredentialResponse struct {
 	AgentName      string      `json:"agentName,omitempty"`
 	Name           string      `json:"name,omitempty"`
@@ -115,16 +100,12 @@ type AwsCredentialResponse struct {
 	AwsSecretAccessKey string `json:"awsSecretAccessKey,omitempty"`
 }
 
-//
 // ControlCredentialsRequest defines the request for the ControlEndpoint
-//
 type ControlCredentialsRequest struct {
 	Name string `json:"name,omitempty"`
 }
 
-//
 // ControlCredentialsResponse defines the response for the ControlEndpoint
-//
 type ControlCredentialsResponse struct {
 	Name        string `json:"name,omitempty"`
 	URL         string `json:"url,omitempty"`

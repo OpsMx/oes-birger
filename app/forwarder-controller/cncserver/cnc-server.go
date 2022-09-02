@@ -14,11 +14,9 @@
  * limitations under the License.
  */
 
-//
 // Package cncserver implements all the control endpoints needed to
 // request various types of secrets and statistics about the running
 // controller.
-//
 package cncserver
 
 import (
@@ -28,6 +26,7 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/OpsMx/go-app-base/version"
 	"github.com/oklog/ulid/v2"
 	"github.com/opsmx/oes-birger/internal/ca"
 	"github.com/opsmx/oes-birger/internal/fwdapi"
@@ -60,7 +59,6 @@ type CNCServer struct {
 	version       string
 }
 
-//
 // MakeCNCServer will return a server that implenets the endpoints for command and control,
 // and and
 func MakeCNCServer(
@@ -184,8 +182,12 @@ func (s *CNCServer) generateAgentManifestComponents() http.HandlerFunc {
 			ServerHostname:   s.cfg.GetAgentHostname(),
 			ServerPort:       s.cfg.GetAgentAdvertisePort(),
 			AgentCertificate: user64,
+			AgentVersion:     version.GitBranch(),
 			AgentKey:         key64,
 			CACert:           ca64,
+		}
+		if version.BuildType() != "release" {
+			ret.AgentVersion = "latest"
 		}
 		json, err := json.Marshal(ret)
 		if err != nil {
