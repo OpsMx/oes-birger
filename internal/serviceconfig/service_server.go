@@ -164,6 +164,8 @@ func extractEndpoint(r *http.Request) (agentIdentity string, endpointType string
 		return agentIdentity, endpointType, endpointName, nil
 	}
 
+	zap.S().Warnw("invalid-credentials", "remote", r.RemoteAddr, "url", r.URL)
+
 	return "", "", "", fmt.Errorf("no valid credentials or JWT found")
 }
 
