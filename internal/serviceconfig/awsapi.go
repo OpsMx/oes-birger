@@ -112,7 +112,7 @@ func MakeAwsEndpoint(name string, configBytes []byte, secretsLoader secrets.Secr
 
 // ExecuteHTTPRequest does the actual call to connect to HTTP, and will send the data back over the
 // tunnel.
-func (a *AwsEndpoint) ExecuteHTTPRequest(dataflow chan *tunnel.MessageWrapper, req *tunnel.OpenHTTPTunnelRequest) {
+func (a *AwsEndpoint) ExecuteHTTPRequest(_ string, dataflow chan *tunnel.MessageWrapper, req *tunnel.OpenHTTPTunnelRequest) {
 	zap.S().Debugf("Running request %v", req)
 	tlsConfig := &tls.Config{
 		MinVersion: tls.VersionTLS12,

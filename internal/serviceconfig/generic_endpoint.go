@@ -207,7 +207,7 @@ func (ep *GenericEndpoint) unmutateURI(typ string, method string, uri string, cl
 
 // ExecuteHTTPRequest does the actual call to connect to HTTP, and will send the data back over the
 // tunnel.
-func (ep *GenericEndpoint) ExecuteHTTPRequest(dataflow chan *tunnel.MessageWrapper, req *tunnel.OpenHTTPTunnelRequest) {
+func (ep *GenericEndpoint) ExecuteHTTPRequest(agentName string, dataflow chan *tunnel.MessageWrapper, req *tunnel.OpenHTTPTunnelRequest) {
 	zap.S().Debugf("Running request %v", req)
 	tlsConfig := &tls.Config{
 		MinVersion: tls.VersionTLS12,
@@ -248,6 +248,10 @@ func (ep *GenericEndpoint) ExecuteHTTPRequest(dataflow chan *tunnel.MessageWrapp
 		zap.S().Errorf("failed to copy headers: %v", err)
 		dataflow <- tunnel.MakeBadGatewayResponse(req.Id)
 		return
+	}
+
+	if agentName != "" {
+		httpRequest.Header.Set("x-opsmx-agent-name", agentName)
 	}
 
 	creds := ep.config.Credentials

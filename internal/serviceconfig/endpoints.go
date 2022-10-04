@@ -39,7 +39,7 @@ type ConfiguredEndpoint struct {
 }
 
 type httpRequestProcessor interface {
-	ExecuteHTTPRequest(chan *tunnel.MessageWrapper, *tunnel.OpenHTTPTunnelRequest)
+	ExecuteHTTPRequest(agentName string, dataflow chan *tunnel.MessageWrapper, req *tunnel.OpenHTTPTunnelRequest)
 }
 
 func (e *ConfiguredEndpoint) String() string {
