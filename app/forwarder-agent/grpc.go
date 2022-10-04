@@ -192,7 +192,7 @@ func handleHTTPControl(in *tunnel.MessageWrapper, httpids *util.SessionList, end
 		found := false
 		for _, endpoint := range endpoints {
 			if endpoint.Configured && endpoint.Type == req.Type && endpoint.Name == req.Name {
-				go endpoint.Instance.ExecuteHTTPRequest(dataflow, req)
+				go endpoint.Instance.ExecuteHTTPRequest("", dataflow, req)
 				found = true
 				break
 			}

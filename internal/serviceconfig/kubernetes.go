@@ -212,7 +212,7 @@ func (ke *KubernetesEndpoint) loadServiceAccount() (*kubeContext, error) {
 
 // ExecuteHTTPRequest does the actual call to connect to HTTP, and will send the data back over the
 // tunnel.
-func (ke *KubernetesEndpoint) ExecuteHTTPRequest(dataflow chan *tunnel.MessageWrapper, req *tunnel.OpenHTTPTunnelRequest) {
+func (ke *KubernetesEndpoint) ExecuteHTTPRequest(_ string, dataflow chan *tunnel.MessageWrapper, req *tunnel.OpenHTTPTunnelRequest) {
 	c := ke.makeServerContextFields()
 
 	// TODO: A ServerCA is technically optional, but we might want to fail if it's not present...

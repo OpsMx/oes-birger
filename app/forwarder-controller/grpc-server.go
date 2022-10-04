@@ -189,7 +189,7 @@ func (s *agentTunnelServer) EventTunnel(stream tunnel.AgentTunnelService_EventTu
 			}
 			zap.S().Infow("agent-handshake-complete", "route", state.String())
 		case *tunnel.MessageWrapper_HttpTunnelControl:
-			handleHTTPControl(in, httpids, s.endpoints, dataflow)
+			handleHTTPControl(state.Name, in, httpids, s.endpoints, dataflow)
 		case nil:
 			// ignore for now
 		default:
@@ -243,7 +243,7 @@ func (s *agentTunnelServer) sendHello(stream tunnel.AgentTunnelService_EventTunn
 	return stream.Send(hello)
 }
 
-func handleHTTPControl(in *tunnel.MessageWrapper, httpids *util.SessionList, endpoints []serviceconfig.ConfiguredEndpoint, dataflow chan *tunnel.MessageWrapper) {
+func handleHTTPControl(agentName string, in *tunnel.MessageWrapper, httpids *util.SessionList, endpoints []serviceconfig.ConfiguredEndpoint, dataflow chan *tunnel.MessageWrapper) {
 	tunnelControl := in.GetHttpTunnelControl() // caller ensures this will work
 	switch controlMessage := tunnelControl.ControlType.(type) {
 	case *tunnel.HttpTunnelControl_CancelRequest:
@@ -253,7 +253,7 @@ func handleHTTPControl(in *tunnel.MessageWrapper, httpids *util.SessionList, end
 		found := false
 		for _, endpoint := range endpoints {
 			if endpoint.Configured && endpoint.Type == req.Type && endpoint.Name == req.Name {
-				go endpoint.Instance.ExecuteHTTPRequest(dataflow, req)
+				go endpoint.Instance.ExecuteHTTPRequest(agentName, dataflow, req)
 				found = true
 				break
 			}
