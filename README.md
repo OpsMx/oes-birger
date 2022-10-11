@@ -100,6 +100,7 @@ describes the endpoint type when connecting.  This is required.
 
 | Service Type | Support Level | Location | Description |
 | --- | --- | --- | --- |
+| argocd | Full | Agent | Provides access to an ArgoCD instance.  Only Bearer Tokens are supported for authentication against a local Argo user. |
 | aws | Partial | Agent | AWS API |
 | clouddriver | Full | Agent | Spinnaker Cloud Driver API.  Special handling of the HTTP messages. |
 | front50 | Full | Controller | Spinnaker Front50 API.  Special handling of the HTTP messages. |
