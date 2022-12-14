@@ -22,6 +22,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/OpsMx/go-app-base/httputil"
 	"github.com/opsmx/oes-birger/internal/jwtutil"
 	"go.uber.org/zap"
 )
@@ -138,7 +139,8 @@ func makeResponse(id string, response *http.Response) (ret *MessageWrapper, err 
 
 // RunHTTPRequest will make a HTTP request, and send the data to the remote end.
 func RunHTTPRequest(client *http.Client, req *OpenHTTPTunnelRequest, httpRequest *http.Request, dataflow chan *MessageWrapper, baseURL string) {
-	zap.S().Debugf("Sending HTTP request: %s to %v", req.Method, baseURL+req.URI)
+	requestURI := baseURL + req.URI
+	zap.S().Debugf("Sending HTTP request: %s to %s", req.Method, requestURI)
 	httpResponse, err := client.Do(httpRequest)
 	if err != nil {
 		zap.S().Warnw("failed to execute request",
@@ -157,6 +159,10 @@ func RunHTTPRequest(client *http.Client, req *OpenHTTPTunnelRequest, httpRequest
 		return
 	}
 	dataflow <- response
+
+	if !httputil.StatusCodeOK(httpResponse.StatusCode) {
+		zap.S().Warnw("non-2xx status for request", "method", req.Method, "url", requestURI)
+	}
 
 	// Now, send one or more data packet.
 	for {
