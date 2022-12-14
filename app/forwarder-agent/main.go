@@ -155,9 +155,6 @@ func main() {
 		logger.Info("POD_NAMESPACE not set.  Disabling Kubernetes secret handling.")
 	}
 
-	sigchan := make(chan os.Signal, 1)
-	signal.Notify(sigchan, syscall.SIGTERM, syscall.SIGINT)
-
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -218,13 +215,24 @@ func main() {
 		opts = append(opts, grpc.WithTransportCredentials(ta))
 	}
 
-	ctx2, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-	conn, err := grpc.DialContext(ctx2, config.ControllerHostname, opts...)
-	if err != nil {
-		sl.Fatalw("Could not establish GRPC connection to",
+	var conn *grpc.ClientConn
+	for i := 1; i <= c.DialMaxRetries; i++ {
+		conn, err = retryDial(ctx, config.ControllerHostname, opts)
+		if err == nil {
+			break
+		}
+		sl.Warnw("Could not establish GRPC connection",
 			"target", config.ControllerHostname,
+			"attempt", i,
+			"maxRetries", c.DialMaxRetries,
+			"retrySeconds", c.DialRetryTime,
 			"error", err)
+		if i < c.DialMaxRetries {
+			time.Sleep(time.Duration(c.DialRetryTime) * time.Second)
+		}
+	}
+	if err != nil {
+		sl.Fatalf("Could not establish GRPC connection, exiting")
 	}
 	defer conn.Close()
 	sl.Infow("controller-connection", "established", true)
@@ -235,6 +243,15 @@ func main() {
 		go serviceconfig.RunHTTPServer(routes, service)
 	}
 
+	sigchan := make(chan os.Signal, 1)
+	signal.Notify(sigchan, syscall.SIGTERM, syscall.SIGINT)
+
 	<-sigchan
 	log.Printf("Exiting Cleanly")
+}
+
+func retryDial(ctx context.Context, hostname string, opts []grpc.DialOption) (*grpc.ClientConn, error) {
+	ctx2, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	return grpc.DialContext(ctx2, config.ControllerHostname, opts...)
 }

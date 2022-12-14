@@ -27,18 +27,22 @@ const (
 	defaultCertPath       = "/app/secrets/agent/tls.crt"
 	defaultKeyPath        = "/app/secrets/agent/tls.key"
 	defaultUserconfigPath = "/app/config/services.yaml"
+	defaultDialMaxRetries = 10
+	defaultDialRetryTime  = 10
 )
 
 // agentConfig holds all the configuration for the agent.  The
 // configuration file is loaded from disk first, and then any
 // environment variables are applied.
 type agentConfig struct {
-	ControllerHostname        string  `yaml:"controllerHostname,omitempty"`
-	CACert64                  *string `yaml:"caCert64,omitempty"`
-	CertFile                  string  `yaml:"certFile,omitempty"`
-	KeyFile                   string  `yaml:"keyFile,omitempty"`
-	ServicesConfigPath        string  `yaml:"servicesConfigPath,omitempty"`
-	InsecureControllerAllowed bool    `yaml:"insecureControllerAllowed,omitempty"`
+	ControllerHostname        string  `yaml:"controllerHostname,omitempty" json:"controllerHostname,omitempty"`
+	CACert64                  *string `yaml:"caCert64,omitempty" json:"caCert64,omitempty"`
+	CertFile                  string  `yaml:"certFile,omitempty" json:"certFile,omitempty"`
+	KeyFile                   string  `yaml:"keyFile,omitempty" json:"keyFile,omitempty"`
+	ServicesConfigPath        string  `yaml:"servicesConfigPath,omitempty" json:"servicesConfigPath,omitempty"`
+	InsecureControllerAllowed bool    `yaml:"insecureControllerAllowed,omitempty" json:"insecureControllerAllowed,omitempty"`
+	DialMaxRetries            int     `json:"dialMaxRetries,omitempty" yaml:"dialMaxRetries,omitempty"`
+	DialRetryTime             int     `json:"dialRetryTime,omitempty" yaml:"dialRetryTime,omitempty"`
 }
 
 func (c *agentConfig) applyDefaults() {
@@ -56,6 +60,14 @@ func (c *agentConfig) applyDefaults() {
 
 	if len(c.ServicesConfigPath) == 0 {
 		c.ServicesConfigPath = defaultUserconfigPath
+	}
+
+	if c.DialMaxRetries == 0 {
+		c.DialMaxRetries = defaultDialMaxRetries
+	}
+
+	if c.DialRetryTime == 0 {
+		c.DialRetryTime = defaultDialRetryTime
 	}
 }
 
