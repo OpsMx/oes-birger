@@ -165,6 +165,7 @@ func RunHTTPRequest(client *http.Client, req *OpenHTTPTunnelRequest, httpRequest
 	}
 
 	// Now, send one or more data packet.
+	defer httpResponse.Body.Close()
 	for {
 		buf := make([]byte, 10240)
 		n, err := httpResponse.Body.Read(buf)
