@@ -151,6 +151,8 @@ func RunHTTPRequest(client *http.Client, req *OpenHTTPTunnelRequest, httpRequest
 		return
 	}
 
+	defer httpResponse.Body.Close()
+
 	// First, send the headers.
 	response, err := makeResponse(req.Id, httpResponse)
 	if err != nil {
