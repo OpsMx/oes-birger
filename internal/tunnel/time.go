@@ -14,10 +14,8 @@
  * limitations under the License.
  */
 
-//
 // Package tunnel defines and puts some helper functions on the GRPC
 // protocol used across the system.
-//
 package tunnel
 
 import (
