@@ -14,9 +14,7 @@
  * limitations under the License.
  */
 
-//
 // Package jwtutil simplifies generating properly formatted web tokens for our use.
-//
 package jwtutil
 
 import (

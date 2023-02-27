@@ -14,10 +14,8 @@
  * limitations under the License.
  */
 
-//
 // Package ulid is a wrapper to make using ulids in a thread-safe way
 // easier.
-//
 package ulid
 
 import (

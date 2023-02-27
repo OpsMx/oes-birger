@@ -14,9 +14,7 @@
  * limitations under the License.
  */
 
-//
 // Package ca implements a simple certificate authority.
-//
 package ca
 
 import (
@@ -52,18 +50,14 @@ type CertPoolGenerator interface {
 	MakeCertPool() (*x509.CertPool, error)
 }
 
-//
 // CA holds the state for the certificate authority.
-//
 type CA struct {
 	config *Config
 	caCert tls.Certificate
 }
 
-//
 // Config holds the filenames for a CA, and has mappings for loading from
 // YAML or JSON.
-//
 type Config struct {
 	CACertFile string `yaml:"caCertFile,omitempty" json:"caCertFile,omitempty"`
 	CAKeyFile  string `yaml:"caKeyFile,omitempty" json:"caKeyFile,omitempty"`
@@ -87,9 +81,7 @@ func (c *CA) loadCertificate() error {
 	return nil
 }
 
-//
 // LoadCAFromFile will load an existing authority.
-//
 func LoadCAFromFile(c Config) (*CA, error) {
 	c.applyDefaults()
 
@@ -108,10 +100,8 @@ func LoadCAFromFile(c Config) (*CA, error) {
 	return ca, nil
 }
 
-//
 // MakeCAFromData does approximately the same thing as LoadCAFromFile() except the CA
 // contents are loaded from PEM strings.
-//
 func MakeCAFromData(certPEM []byte, certPrivKeyPEM []byte) (*CA, error) {
 	caCert, err := tls.X509KeyPair(certPEM, certPrivKeyPEM)
 	if err != nil {
@@ -150,9 +140,7 @@ func ValidateCACert(certbytes []byte) error {
 	return nil
 }
 
-//
 // GetCACertificate returns the public certificate for the CA.
-//
 func (c *CA) GetCACertificate() []byte {
 	return c.caCert.Certificate[0]
 }
@@ -169,9 +157,7 @@ func toPEM(data []byte, t string) ([]byte, error) {
 	return p.Bytes(), nil
 }
 
-//
 // MakeCertificateAuthority generates a new certificate authority key, and self-signs it.
-//
 func MakeCertificateAuthority() ([]byte, []byte, error) {
 	now := time.Now().UTC()
 	rootTemplate := &x509.Certificate{
@@ -213,10 +199,8 @@ func MakeCertificateAuthority() ([]byte, []byte, error) {
 	return certPEM, certPrivKeyPEM, nil
 }
 
-//
 // MakeServerCert will generate a new server certificate, signed with the authority,
 // with a validity period of 1 year.  The DNS names will be applied.
-//
 func (c *CA) MakeServerCert(names []string) (*tls.Certificate, error) {
 	now := time.Now().UTC()
 
@@ -266,10 +250,8 @@ func (c *CA) MakeServerCert(names []string) (*tls.Certificate, error) {
 	return &serverCert, nil
 }
 
-//
 // CertificateName holds the items we will encode in the certificate, so we can determine what
 // endpoint is being requested.
-//
 type CertificateName struct {
 	Name    string `json:"name,omitempty"`
 	Type    string `json:"type,omitempty"`
@@ -299,10 +281,8 @@ func GetCertificateNameFromCert(cert *x509.Certificate) (*CertificateName, error
 	return &name, nil
 }
 
-//
 // GenerateCertificate will make a new certificate, and return a base64 encoded
 // string for the certificate, key, and authority certificate.
-//
 func (c *CA) GenerateCertificate(name CertificateName) (string, string, string, error) {
 	now := time.Now().UTC()
 	jsonName, err := json.Marshal(name)
@@ -371,9 +351,7 @@ func bytesTo64(prefix string, data []byte) (string, error) {
 	return base64.StdEncoding.EncodeToString(p), nil
 }
 
-//
 // MakeCertPool will return a certificate pool with our CA installed.
-//
 func (c *CA) MakeCertPool() (*x509.CertPool, error) {
 	caCertPool := x509.NewCertPool()
 	for _, cert := range c.caCert.Certificate {

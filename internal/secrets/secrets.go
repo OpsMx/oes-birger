@@ -14,10 +14,8 @@
  * limitations under the License.
  */
 
-//
 // Package secrets loads secrets from various sources, such as Kubernetes
 // secrets.
-//
 package secrets
 
 import (

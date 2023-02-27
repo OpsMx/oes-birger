@@ -183,7 +183,7 @@ func (s *agentTunnelServer) EventTunnel(stream tunnel.AgentTunnelService_EventTu
 			s.sendWebhook(state, req.Endpoints)
 
 			if err = s.sendHello(stream); err != nil {
-				zap.S().Warnw("unable to responsd with hello, closing", "route", state.String(), "error", err)
+				zap.S().Warnw("unable to respond with hello, closing", "route", state.String(), "error", err)
 				routes.Remove(state)
 				return err
 			}
