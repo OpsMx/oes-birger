@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 
-//
 // Package webhook will
 package webhook
 
@@ -26,14 +25,12 @@ import (
 	"go.uber.org/zap"
 )
 
-//
 // Runner holds state for the specific runner.
 type Runner struct {
 	url string
 	rc  chan interface{}
 }
 
-//
 // NewRunner returns a new webhook runner.  Call `Close` when done.
 func NewRunner(url string) *Runner {
 	return &Runner{
@@ -42,25 +39,19 @@ func NewRunner(url string) *Runner {
 	}
 }
 
-//
 // Close will close the webhook goroutine down.
-//
 func (wr *Runner) Close() {
 	close(wr.rc)
 }
 
-//
 // Send will queue a webhook request.  It will run at some time in the
 // future, perhaps on a new goroutine.  There is no return status,
 // and errors are logged but otherwise silently ignored.
-//
 func (wr *Runner) Send(msg interface{}) {
 	wr.rc <- msg
 }
 
-//
 // Run starts a goroutine to process incoming web requests.
-//
 func (wr *Runner) Run() {
 	for {
 		event, more := <-wr.rc
@@ -71,9 +62,7 @@ func (wr *Runner) Run() {
 	}
 }
 
-//
 // Perform an actual web request
-//
 func (wr *Runner) perform(msg interface{}) {
 	jsonString, err := json.Marshal(msg)
 	if err != nil {

@@ -166,11 +166,11 @@ func main() {
 	util.Check(err)
 	defer tracerProvider.Shutdown(ctx)
 
-	c, err := loadConfig(*configFile)
-	if err != nil {
+	if c, err := loadConfig(*configFile); err != nil {
 		sl.Fatalf("loading config: %v", err)
+	} else {
+		config = c
 	}
-	config = c
 	sl.Infow("config", "controllerHostname", config.ControllerHostname)
 
 	agentServiceConfig, err := serviceconfig.LoadServiceConfig(config.ServicesConfigPath)
@@ -215,27 +215,8 @@ func main() {
 		opts = append(opts, grpc.WithTransportCredentials(ta))
 	}
 
-	var conn *grpc.ClientConn
-	for i := 1; i <= c.DialMaxRetries; i++ {
-		conn, err = retryDial(ctx, config.ControllerHostname, opts)
-		if err == nil {
-			break
-		}
-		sl.Warnw("Could not establish GRPC connection",
-			"target", config.ControllerHostname,
-			"attempt", i,
-			"maxRetries", c.DialMaxRetries,
-			"retrySeconds", c.DialRetryTime,
-			"error", err)
-		if i < c.DialMaxRetries {
-			time.Sleep(time.Duration(c.DialRetryTime) * time.Second)
-		}
-	}
-	if err != nil {
-		sl.Fatalf("Could not establish GRPC connection, exiting")
-	}
+	conn := makeConnection(ctx, config.ControllerHostname, opts)
 	defer conn.Close()
-	sl.Infow("controller-connection", "established", true)
 
 	go runTunnel(sa, conn, agentInfo, endpoints, config.InsecureControllerAllowed, clcert)
 
@@ -248,6 +229,27 @@ func main() {
 
 	<-sigchan
 	log.Printf("Exiting Cleanly")
+}
+
+func makeConnection(ctx context.Context, hostname string, opts []grpc.DialOption) *grpc.ClientConn {
+	for i := 1; i <= config.DialMaxRetries; i++ {
+		conn, err := retryDial(ctx, config.ControllerHostname, opts)
+		if err == nil {
+			sl.Infow("controller-connection", "established", true)
+			return conn
+		}
+		sl.Warnw("Could not establish GRPC connection",
+			"target", config.ControllerHostname,
+			"attempt", i,
+			"maxRetries", config.DialMaxRetries,
+			"retrySeconds", config.DialRetryTime,
+			"error", err)
+		if i < config.DialMaxRetries {
+			time.Sleep(time.Duration(config.DialRetryTime) * time.Second)
+		}
+	}
+	sl.Fatalf("Could not establish GRPC connection, exiting")
+	return nil
 }
 
 func retryDial(ctx context.Context, hostname string, opts []grpc.DialOption) (*grpc.ClientConn, error) {

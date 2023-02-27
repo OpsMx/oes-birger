@@ -14,9 +14,7 @@
  * limitations under the License.
  */
 
-//
 // Package util is a kitchen sink.  Sorry.
-//
 package util
 
 import (
