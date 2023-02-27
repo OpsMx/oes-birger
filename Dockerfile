@@ -47,7 +47,8 @@ RUN go build -ldflags="-X 'github.com/OpsMx/go-app-base/version.buildType=${BUIL
 # Establish a base OS image used by all the applications.
 #
 FROM alpine:3 AS base-image
-RUN apk add --no-cache ca-certificates curl
+RUN apk update && apk upgrade --no-cache && \
+    apk add --no-cache ca-certificates curl
 # the exit 0 hack is a work-around to build on ARM64 apparently...
 RUN update-ca-certificates ; exit 0
 RUN mkdir /local /local/ca-certificates && rm -rf /usr/local/share/ca-certificates && ln -s  /local/ca-certificates /usr/local/share/ca-certificates
