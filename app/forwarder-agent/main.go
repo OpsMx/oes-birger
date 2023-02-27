@@ -167,9 +167,9 @@ func main() {
 	defer tracerProvider.Shutdown(ctx)
 
 	if c, err := loadConfig(*configFile); err != nil {
-		config = c
-	} else {
 		sl.Fatalf("loading config: %v", err)
+	} else {
+		config = c
 	}
 	sl.Infow("config", "controllerHostname", config.ControllerHostname)
 
