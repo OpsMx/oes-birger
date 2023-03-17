@@ -1,5 +1,5 @@
 #
-# Copyright 2021 OpsMx, Inc.
+# Copyright 2021-2023 OpsMx, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License")
 # you may not use this file except in compliance with the License.
@@ -24,12 +24,12 @@ IMAGE_PREFIX=docker.flame.org/library/
 #
 
 # These are targets for "make local"
-BINARIES = forwarder-agent forwarder-controller forwarder-make-ca forwarder-get-creds
+BINARIES = client server make-ca get-creds
 
 # These are the targets for Docker images, used both for the multi-arch and
 # single (local) Docker builds.
 # Dockerfiles should have a target that ends in -image, e.g. agent-image.
-IMAGE_TARGETS = forwarder-controller forwarder-agent forwarder-make-ca
+IMAGE_TARGETS = agent-client agent-controller
 
 #
 # Below here lies magic...
@@ -39,7 +39,7 @@ IMAGE_TARGETS = forwarder-controller forwarder-agent forwarder-make-ca
 # actually change.  With the many targets, this is just so much easier,
 # and it also ensures the Docker images have identical timestamp-based tags.
 pb_deps = internal/tunnel/tunnel.pb.go internal/tunnel/tunnel_grpc.pb.go
-all_deps := ${pb_deps} $(shell find * -name '*.go' | grep -v _test) Makefile build-tag.sh
+all_deps := ${pb_deps} $(shell find app internal -name '*.go' | grep -v _test) Makefile
 
 now := $(shell date -u +%Y%m%dT%H%M%S)
 

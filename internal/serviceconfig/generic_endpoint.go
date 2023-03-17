@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 OpsMx, Inc.
+ * Copyright 2021-2023 OpsMx, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License")
  * you may not use this file except in compliance with the License.
@@ -18,19 +18,21 @@ package serviceconfig
 
 import (
 	"bytes"
+	"context"
 	"crypto/tls"
 	"encoding/base64"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 	"time"
 
-	"github.com/lestrrat-go/jwx/jwt"
+	"github.com/OpsMx/go-app-base/httputil"
+	"github.com/lestrrat-go/jwx/v2/jwt"
 	"github.com/opsmx/oes-birger/internal/jwtutil"
+	"github.com/opsmx/oes-birger/internal/logging"
 	"github.com/opsmx/oes-birger/internal/secrets"
-	"github.com/opsmx/oes-birger/internal/tunnel"
-	"go.uber.org/zap"
-	"golang.org/x/net/context"
+	pb "github.com/opsmx/oes-birger/internal/tunnel"
 	"gopkg.in/yaml.v3"
 )
 
@@ -153,7 +155,8 @@ func (ep *GenericEndpoint) loadKubernetesSecrets(secretsLoader secrets.SecretLoa
 }
 
 // MakeGenericEndpoint returns a generic HTTP endpoint which allows calling a HTTP service.
-func MakeGenericEndpoint(endpointType string, endpointName string, configBytes []byte, secretsLoader secrets.SecretLoader) (*GenericEndpoint, bool, error) {
+func MakeGenericEndpoint(ctx context.Context, endpointType string, endpointName string, configBytes []byte, secretsLoader secrets.SecretLoader) (*GenericEndpoint, bool, error) {
+	logger := logging.WithContext(ctx).Sugar()
 	ep := &GenericEndpoint{
 		endpointType: endpointType,
 		endpointName: endpointName,
@@ -168,12 +171,12 @@ func MakeGenericEndpoint(endpointType string, endpointName string, configBytes [
 
 	err = ep.loadSecrets(secretsLoader)
 	if err != nil {
-		zap.S().Errorf("Unable to load secret: %v", err)
+		logger.Errorf("Unable to load secret: %v", err)
 		return nil, false, nil
 	}
 
 	if ep.config.URL == "" {
-		zap.S().Errorf("url not set for %s/%s", endpointType, endpointName)
+		logger.Errorf("url not set for %s/%s", endpointType, endpointName)
 		return nil, false, nil
 	}
 
@@ -207,16 +210,17 @@ func (ep *GenericEndpoint) unmutateURI(typ string, method string, uri string, cl
 
 // ExecuteHTTPRequest does the actual call to connect to HTTP, and will send the data back over the
 // tunnel.
-func (ep *GenericEndpoint) ExecuteHTTPRequest(agentName string, dataflow chan *tunnel.MessageWrapper, req *tunnel.OpenHTTPTunnelRequest) {
-	zap.S().Debugf("Running request %v", req)
+func (ep *GenericEndpoint) ExecuteHTTPRequest(ctx context.Context, agentName string, echo HTTPEcho, req *pb.TunnelRequest) error {
+	logger := logging.WithContext(ctx).Sugar()
+	logger.Debugf("Running request %v", req)
 	tlsConfig := &tls.Config{
 		MinVersion: tls.VersionTLS12,
 	}
 	tr := &http.Transport{
-		MaxIdleConns:       10,
-		IdleConnTimeout:    30 * time.Second,
-		DisableCompression: true,
-		TLSClientConfig:    tlsConfig,
+		MaxIdleConns:    5,
+		IdleConnTimeout: 5 * time.Second,
+		//DisableCompression: true,
+		TLSClientConfig: tlsConfig,
 	}
 	if ep.config.Insecure {
 		tr.TLSClientConfig.InsecureSkipVerify = true
@@ -227,27 +231,27 @@ func (ep *GenericEndpoint) ExecuteHTTPRequest(agentName string, dataflow chan *t
 
 	uri, err := ep.unmutateURI(req.Type, req.Method, req.URI, nil)
 	if err != nil {
-		zap.S().Errorf("Failed to unmutate URI %s to %s: %v", req.Method, ep.config.URL+req.URI, err)
-		dataflow <- tunnel.MakeBadGatewayResponse(req.Id)
-		return
+		err = fmt.Errorf("Failed to unmutate URI %s to %s: %v", req.Method, ep.config.URL+req.URI, err)
+		logger.Error(err)
+		return echo.Fail(ctx, http.StatusBadGateway, err)
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	tunnel.RegisterCancelFunction(req.Id, cancel)
-	defer tunnel.UnregisterCancelFunction(req.Id)
-
+	ctx, cancel := context.WithCancel(ctx)
 	httpRequest, err := http.NewRequestWithContext(ctx, req.Method, ep.config.URL+uri, bytes.NewBuffer(req.Body))
 	if err != nil {
-		zap.S().Errorf("Failed to build request for %s to %s: %v", req.Method, ep.config.URL+uri, err)
-		dataflow <- tunnel.MakeBadGatewayResponse(req.Id)
-		return
+		err = fmt.Errorf("Failed to build request for %s to %s: %v", req.Method, ep.config.URL+uri, err)
+		logger.Error(err)
+		cancel()
+		return echo.Fail(ctx, http.StatusBadGateway, err)
+
 	}
 
-	err = tunnel.CopyHeaders(req.Headers, &httpRequest.Header)
+	err = PBHEadersToHTTP(req.Headers, &httpRequest.Header)
 	if err != nil {
-		zap.S().Errorf("failed to copy headers: %v", err)
-		dataflow <- tunnel.MakeBadGatewayResponse(req.Id)
-		return
+		err = fmt.Errorf("failed to copy headers: %v", err)
+		logger.Error(err)
+		cancel()
+		return echo.Fail(ctx, http.StatusBadGateway, err)
 	}
 
 	if agentName != "" {
@@ -259,26 +263,119 @@ func (ep *GenericEndpoint) ExecuteHTTPRequest(agentName string, dataflow chan *t
 	case "basic":
 		u := strings.TrimSpace(creds.rawUsername)
 		if u != creds.rawUsername {
-			zap.S().Infof("warning: trimming whitespace from username for %s/%s", ep.endpointType, ep.endpointName)
+			logger.Infof("warning: trimming whitespace from username for %s/%s", ep.endpointType, ep.endpointName)
 		}
 		p := strings.TrimSpace(creds.rawPassword)
 		if p != creds.rawPassword {
-			zap.S().Infof("warning: trimming whitespace from password for %s/%s", ep.endpointType, ep.endpointName)
+			logger.Infof("warning: trimming whitespace from password for %s/%s", ep.endpointType, ep.endpointName)
 		}
 		httpRequest.SetBasicAuth(u, p)
 	case "bearer":
 		t := strings.TrimSpace(creds.rawToken)
 		if t != creds.rawToken {
-			zap.S().Infof("warning: trimming whitespace from token for %s/%s", ep.endpointType, ep.endpointName)
+			logger.Infof("warning: trimming whitespace from token for %s/%s", ep.endpointType, ep.endpointName)
 		}
 		httpRequest.Header.Set("Authorization", "Bearer "+creds.rawToken)
 	case "token":
 		t := strings.TrimSpace(creds.rawToken)
 		if t != creds.rawToken {
-			zap.S().Infof("warning: trimming whitespace from token for %s/%s", ep.endpointType, ep.endpointName)
+			logger.Infof("warning: trimming whitespace from token for %s/%s", ep.endpointType, ep.endpointName)
 		}
 		httpRequest.Header.Set("Authorization", "Token "+creds.rawToken)
 	}
 
-	tunnel.RunHTTPRequest(client, req, httpRequest, dataflow, ep.config.URL)
+	RunHTTPRequest(ctx, cancel, client, req, httpRequest, echo, ep.config.URL)
+	return nil
+}
+
+func makeResponse(id string, response *http.Response) (*pb.TunnelHeaders, error) {
+	headers, err := HTTPHeadersToPB(response.Header)
+	if err != nil {
+		return nil, err
+	}
+	ret := &pb.TunnelHeaders{
+		StreamId:      id,
+		StatusCode:    int32(response.StatusCode),
+		ContentLength: response.ContentLength,
+		Headers:       headers,
+	}
+	return ret, err
+}
+
+func RunHTTPRequest(ctx context.Context, cancel context.CancelFunc, client *http.Client, req *pb.TunnelRequest, httpRequest *http.Request, echo HTTPEcho, baseURL string) {
+	logger := logging.WithContext(ctx).Sugar()
+	defer cancel()
+
+	requestURI := baseURL + req.URI
+	logger.Debugf("Sending HTTP request: %s to %s", req.Method, requestURI)
+	httpResponse, err := client.Do(httpRequest)
+	if err != nil {
+		logger.Warnw("failed to execute request",
+			"method", req.Method,
+			"uri", baseURL+req.URI,
+			"error", err)
+		if err2 := echo.Fail(ctx, http.StatusBadGateway, err); err2 != nil {
+			logger.Warn(err2)
+		}
+		return
+	}
+	defer httpResponse.Body.Close()
+
+	// First, send the headers.
+	response, err := makeResponse(req.StreamId, httpResponse)
+	if err != nil {
+		err = fmt.Errorf("Failed to unmutate headers: %v", err)
+		logger.Warn(err)
+		if err2 := echo.Fail(ctx, http.StatusBadGateway, err); err2 != nil {
+			logger.Warn(err2)
+		}
+		return
+	}
+	if err := echo.Headers(ctx, response); err != nil {
+		logger.Warn(err)
+		if err2 := echo.Fail(ctx, http.StatusServiceUnavailable, err); err2 != nil {
+			logger.Warn(err2)
+		}
+		return
+	}
+
+	if !httputil.StatusCodeOK(httpResponse.StatusCode) {
+		logger.Warnw("non-2xx status for request", "method", req.Method, "url", requestURI)
+	}
+
+	// Now, send one or more data packet.
+	buf := make([]byte, 10240)
+	for {
+		select {
+		case <-ctx.Done():
+			logger.Infof("context canceled: %v", ctx.Err())
+			if err2 := echo.Cancel(ctx); err2 != nil {
+				logger.Warn(err)
+				return
+			}
+		default:
+		}
+		n, err := httpResponse.Body.Read(buf)
+		if n > 0 {
+			if err2 := echo.Data(ctx, buf[:n]); err2 != nil {
+				logger.Warn(err)
+				return
+			}
+		}
+		if err == io.EOF {
+			if err2 := echo.Done(ctx); err2 != nil {
+				logger.Warn(err2)
+			}
+			echo.Shutdown(ctx)
+			return
+		}
+		if err != nil {
+			err = fmt.Errorf("Got error on HTTP read: %v", err)
+			logger.Warn(err)
+			if err2 := echo.Fail(ctx, http.StatusBadGateway, err); err2 != nil {
+				logger.Warn(err2)
+			}
+			return
+		}
+	}
 }

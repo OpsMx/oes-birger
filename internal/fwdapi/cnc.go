@@ -50,13 +50,12 @@ type ManifestRequest struct {
 
 // ManifestResponse defines the response for the ManifestEndpoint
 type ManifestResponse struct {
-	AgentName        string `json:"agentName,omitempty"`
-	ServerHostname   string `json:"serverHostname,omitempty"`
-	ServerPort       uint16 `json:"serverPort,omitempty"`
-	AgentCertificate string `json:"agentCertificate,omitempty"`
-	AgentVersion     string `json:"agentVersion,omitempty"`
-	AgentKey         string `json:"agentKey,omitempty"`
-	CACert           string `json:"caCert,omitempty"`
+	AgentName      string `json:"agentName,omitempty"`
+	ServerHostname string `json:"serverHostname,omitempty"`
+	ServerPort     uint16 `json:"serverPort,omitempty"`
+	AgentVersion   string `json:"agentVersion,omitempty"`
+	AgentToken     string `json:"agentToken,omitempty"`
+	CACert         string `json:"caCert,omitempty"`
 }
 
 // StatisticsResponse defines the response for the StatisticsEndpoint
@@ -80,8 +79,6 @@ type ServiceCredentialResponse struct {
 	AgentName      string      `json:"agentName,omitempty"`
 	Name           string      `json:"name,omitempty"`
 	Type           string      `json:"type,omitempty"`
-	Username       string      `json:"username,omitempty"`
-	Password       string      `json:"password,omitempty"`
 	CredentialType string      `json:"credentialType,omitempty"`
 	Credential     interface{} `json:"credential,omitempty"`
 	URL            string      `json:"url,omitempty"`

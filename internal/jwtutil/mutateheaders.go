@@ -20,10 +20,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/lestrrat-go/jwx/jwk"
-	"github.com/lestrrat-go/jwx/jwt"
+	"github.com/lestrrat-go/jwx/v2/jwk"
+	"github.com/lestrrat-go/jwx/v2/jwt"
 
-	"github.com/skandragon/jwtregistry"
+	"github.com/skandragon/jwtregistry/v2"
 )
 
 // Process header mutation.  This is currently only done on X-Spinnaker-User header

@@ -18,11 +18,12 @@
 package util
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 
-	"go.uber.org/zap"
+	"github.com/opsmx/oes-birger/internal/logging"
 )
 
 type httpErrorMessage struct {
@@ -49,14 +50,16 @@ func httpError(err error) []byte {
 // FailRequest marks a request as failed.  This will set the provided status code,
 // and write to the message body a JSON format error message.  The http.ResponseWriter
 // should not have been used, or be used after calling FailRequest.
-func FailRequest(w http.ResponseWriter, err error, code int) {
+func FailRequest(ctx context.Context, w http.ResponseWriter, err error, code int) {
+	logger := logging.WithContext(ctx).Sugar()
 	w.WriteHeader(code)
 	errmsg := httpError(err)
 	n, err := w.Write(errmsg)
 	if err != nil {
-		zap.S().Warnf("failed to write message in FailRequest: %v", err)
+		logger.Warnf("failed to write message in FailRequest: %v", err)
+		return
 	}
 	if n != len(errmsg) {
-		zap.S().Warnf("failed to write entire message in FailRequest: %d of %d bytes written", n, len(errmsg))
+		logger.Warnf("failed to write entire message in FailRequest: %d of %d bytes written", n, len(errmsg))
 	}
 }

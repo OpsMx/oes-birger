@@ -17,11 +17,10 @@
 package jwtutil
 
 import (
-	"log"
 	"testing"
 
-	"github.com/lestrrat-go/jwx/jwt"
-	"github.com/skandragon/jwtregistry"
+	"github.com/lestrrat-go/jwx/v2/jwt"
+	"github.com/skandragon/jwtregistry/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -56,7 +55,6 @@ func Test_MutateHeader(t *testing.T) {
 				t.Errorf("mutateHeader() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			log.Printf("%s", got)
 			assert.Equal(t, tt.want, got)
 		})
 	}

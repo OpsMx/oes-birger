@@ -9,20 +9,13 @@ outgoingServices:
       url: https://whoami.svc.rpi.flame.org
     annotations:
       description: Whoami on my raspberry pi cluster of doom!
-  - name: whoami-loop
-    type: whoami
-    enabled: true
-    config:
-      url: http://localhost:8014 # loop back to our own port here
-    annotations:
-      description: Whoami looped back to our own port
 incomingServices:
   - name: controller-whoami
     serviceType: whoami
     port: 8014
     destination: controller
     destinationService: whoami
-  - name: controller-nosuchsercvice
+  - name: controller-nosuchservice
     serviceType: x-notthere
     port: 8015
     destination: controller

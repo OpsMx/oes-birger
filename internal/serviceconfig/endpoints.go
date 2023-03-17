@@ -17,12 +17,13 @@
 package serviceconfig
 
 import (
+	"context"
 	"fmt"
 
+	"github.com/opsmx/oes-birger/internal/logging"
 	"github.com/opsmx/oes-birger/internal/secrets"
-	"github.com/opsmx/oes-birger/internal/tunnel"
-	"go.uber.org/zap"
-	"gopkg.in/yaml.v2"
+	pb "github.com/opsmx/oes-birger/internal/tunnel"
+	"gopkg.in/yaml.v3"
 )
 
 // ConfiguredEndpoint defines an endpoint we have loaded, and have a request processor attached.
@@ -32,14 +33,12 @@ type ConfiguredEndpoint struct {
 	Configured  bool              `json:"configured,omitempty"`
 	Annotations map[string]string `json:"annotations,omitempty"`
 	Namespace   []string          `json:"namespace,omitempty"`
-	AccountID   string            `json:"accountId,omitempty"`
-	AssumeRole  string            `json:"assumeRole,omitempty"`
 
 	Instance httpRequestProcessor `json:"_"`
 }
 
 type httpRequestProcessor interface {
-	ExecuteHTTPRequest(agentName string, dataflow chan *tunnel.MessageWrapper, req *tunnel.OpenHTTPTunnelRequest)
+	ExecuteHTTPRequest(ctx context.Context, agentName string, echo HTTPEcho, req *pb.TunnelRequest) error
 }
 
 func (e *ConfiguredEndpoint) String() string {
@@ -48,21 +47,19 @@ func (e *ConfiguredEndpoint) String() string {
 
 // EndpointsToPB builds the protobuf component of the "hello" message to advertise the
 // endpoints we have defined.
-func EndpointsToPB(endpoints []ConfiguredEndpoint) []*tunnel.EndpointHealth {
-	pbEndpoints := make([]*tunnel.EndpointHealth, len(endpoints))
+func EndpointsToPB(endpoints []ConfiguredEndpoint) []*pb.EndpointHealth {
+	pbEndpoints := make([]*pb.EndpointHealth, len(endpoints))
 	for i, ep := range endpoints {
-		annotations := []*tunnel.Annotation{}
+		annotations := []*pb.Annotation{}
 		for k, v := range ep.Annotations {
-			annotations = append(annotations, &tunnel.Annotation{Name: k, Value: v})
+			annotations = append(annotations, &pb.Annotation{Name: k, Value: v})
 		}
-		endp := &tunnel.EndpointHealth{
+		endp := &pb.EndpointHealth{
 			Name:        ep.Name,
 			Type:        ep.Type,
 			Configured:  ep.Configured,
 			Annotations: annotations,
 			Namespaces:  ep.Namespace,
-			AccountID:   ep.AccountID,
-			AssumeRole:  ep.AssumeRole,
 		}
 		pbEndpoints[i] = endp
 	}
@@ -71,7 +68,8 @@ func EndpointsToPB(endpoints []ConfiguredEndpoint) []*tunnel.EndpointHealth {
 
 // ConfigureEndpoints will load services from the config, attach a processor, and return the configured
 // list.
-func ConfigureEndpoints(secretsLoader secrets.SecretLoader, serviceConfig *ServiceConfig) []ConfiguredEndpoint {
+func ConfigureEndpoints(ctx context.Context, secretsLoader secrets.SecretLoader, serviceConfig *ServiceConfig) []ConfiguredEndpoint {
+	logger := logging.WithContext(ctx).Sugar()
 	// For each service, if it is enabled, find and create an instance.
 	endpoints := []ConfiguredEndpoint{}
 	for _, service := range serviceConfig.OutgoingServices {
@@ -81,28 +79,30 @@ func ConfigureEndpoints(secretsLoader secrets.SecretLoader, serviceConfig *Servi
 		if service.Enabled {
 			config, err := yaml.Marshal(service.Config)
 			if err != nil {
-				zap.S().Fatal(err)
+				logger.Fatal(err)
 			}
 			switch service.Type {
-			case "kubernetes":
-				if secretsLoader == nil {
-					zap.S().Fatalf("kuberenetes is disabled, but a kubernetes service is configured.")
-				}
-				instance, configured, err = MakeKubernetesEndpoint(service.Name, config)
-			case "aws":
-				instance, configured, err = MakeAwsEndpoint(service.Name, config, secretsLoader)
+			// TODO: implement kubernetes endpoint again
+			//case "kubernetes":
+			//if secretsLoader == nil {
+			//	zap.S().Fatalf("kuberenetes is disabled, but a kubernetes service is configured.")
+			//}
+			//instance, configured, err = MakeKubernetesEndpoint(service.Name, config)
+			// TODO: implement aws endpoint again
+			//			case "aws":
+			//				instance, configured, err = MakeAwsEndpoint(service.Name, config, secretsLoader)
 			default:
-				instance, configured, err = MakeGenericEndpoint(service.Type, service.Name, config, secretsLoader)
+				instance, configured, err = MakeGenericEndpoint(ctx, service.Type, service.Name, config, secretsLoader)
 			}
 
 			// If the instance-specific make method returns an error, catch it here.
 			if err != nil {
-				zap.S().Fatal(err)
+				logger.Fatal(err)
 			}
 
 			if len(service.Namespaces) == 0 {
 				// If it did not return an error, a nil instance means it is not fully configured.
-				zap.S().Infow("adding endpoint",
+				logger.Infow("adding endpoint",
 					"endpointType", service.Type,
 					"endpointName", service.Name,
 					"endpointConfigured", configured,
@@ -113,12 +113,10 @@ func ConfigureEndpoints(secretsLoader secrets.SecretLoader, serviceConfig *Servi
 					Configured:  configured,
 					Annotations: service.Annotations,
 					Instance:    instance,
-					AccountID:   service.AccountID,
-					AssumeRole:  service.AssumeRole,
 				})
 			} else {
 				for _, ns := range service.Namespaces {
-					zap.S().Infow("adding endpoint",
+					logger.Infow("adding endpoint",
 						"endpointType", service.Type,
 						"endpointName", ns.Name,
 						"endpointNamespaces", ns.Namespaces,

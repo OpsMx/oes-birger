@@ -19,31 +19,33 @@ package jwtutil
 import (
 	"testing"
 
-	"github.com/lestrrat-go/jwx/jwa"
-	"github.com/lestrrat-go/jwx/jwk"
+	"github.com/lestrrat-go/jwx/v2/jwa"
+	"github.com/lestrrat-go/jwx/v2/jwk"
 )
 
 // LoadTestKeys is a helper method to load test keys, which obviously should
 // not be used in production...
 func LoadTestKeys(t *testing.T) jwk.Set {
 	keyset := jwk.NewSet()
-	keyset.Add(makekey(t, "key1", "this is a key"))
-	keyset.Add(makekey(t, "key2", "this is a key2"))
+	if err := keyset.AddKey(makekey(t, "key1", "this is a key")); err != nil {
+		panic(err)
+	}
+	if err := keyset.AddKey(makekey(t, "key2", "this is a key2")); err != nil {
+		panic(err)
+	}
 	return keyset
 }
 
 func makekey(t *testing.T, name string, content string) jwk.Key {
-	key, err := jwk.New([]byte(content))
+	key, err := jwk.FromRaw([]byte(content))
 	if err != nil {
 		t.Error(err)
 		t.FailNow()
 	}
-	err = key.Set(jwk.KeyIDKey, name)
-	if err != nil {
+	if err := key.Set(jwk.KeyIDKey, name); err != nil {
 		panic(err)
 	}
-	err = key.Set(jwk.AlgorithmKey, jwa.HS256)
-	if err != nil {
+	if err := key.Set(jwk.AlgorithmKey, jwa.HS256); err != nil {
 		panic(err)
 	}
 	return key

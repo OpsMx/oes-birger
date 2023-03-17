@@ -17,10 +17,11 @@ package fwdapi
  */
 
 import (
+	"context"
 	"fmt"
 	"regexp"
 
-	"go.uber.org/zap"
+	"github.com/opsmx/oes-birger/internal/logging"
 )
 
 // NamePresent ensures the string is not null.
@@ -29,18 +30,19 @@ func namePresent(n string) bool {
 }
 
 // TypeValid ensures type is valid, that is, lowercase alphanumeric only
-func typeValid(n string) bool {
+func typeValid(ctx context.Context, n string) bool {
+	logger := logging.WithContext(ctx).Sugar()
 	matched, err := regexp.MatchString("^[a-z0-9]+$", n)
 	if err != nil {
 		// TODO: handle this better
-		zap.S().Warnf("matching service type: %v", err)
+		logger.Warnf("matching service type: %v", err)
 		return false
 	}
 	return matched
 }
 
 // Validate ensures that the required fields are set to reasonable values, usually just non-empty strings.
-func (req *ServiceCredentialRequest) Validate() error {
+func (req *ServiceCredentialRequest) Validate(ctx context.Context) error {
 	if !namePresent(req.AgentName) {
 		return fmt.Errorf("'agentName' is invalid")
 	}
@@ -49,7 +51,7 @@ func (req *ServiceCredentialRequest) Validate() error {
 		return fmt.Errorf("'name' is invalid")
 	}
 
-	if !typeValid(req.Type) {
+	if !typeValid(ctx, req.Type) {
 		return fmt.Errorf("'type' is invalid")
 	}
 

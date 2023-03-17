@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 OpsMx, Inc.
+ * Copyright 2021-2023 OpsMx, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License")
  * you may not use this file except in compliance with the License.
@@ -14,54 +14,11 @@
  * limitations under the License.
  */
 
- syntax = "proto3";
+syntax = "proto3";
 
 package tunnel;
 
 option go_package = "./;tunnel";
-
-message PingRequest {
-    uint64 ts = 1;
-}
-
-message PingResponse {
-    uint64 ts = 1;
-    uint64 echoedTs = 2;
-}
-
-message HttpHeader {
-    string name = 1;
-    repeated string values = 2;
-}
-
-message OpenHTTPTunnelRequest {
-    string id = 1;
-    string name = 2;
-    string type = 3;
-    string method = 4;
-    string URI = 5;
-    repeated HttpHeader headers = 6;
-    bytes body = 7;
-}
-
-message CancelRequest {
-    string id = 1;
-}
-
-// This is the initial response sent to the controller from the agent.
-// The body is sent back in a series of HttpChunkedResponse messages,
-// with a zero length meaning EOF.
-message HttpTunnelResponse {
-    string id = 1;
-    int32 status = 2;
-    repeated HttpHeader headers = 3;
-    int64 contentLength = 4;
-}
-
-message HttpTunnelChunkedResponse {
-    string id = 1;
-    bytes body = 2;
-}
 
 message Annotation {
     string name = 1;
@@ -73,46 +30,104 @@ message EndpointHealth {
     string type = 2;
     bool configured = 3;
     repeated string namespaces = 4; // used for kubernetes mostly
-    string accountID = 5; // AWS
-    string assumeRole = 6; // AWS
     repeated Annotation annotations = 7;
 }
 
-message AgentInformation {
-    repeated Annotation annotations = 2;
+message HelloRequest {
+    repeated EndpointHealth endpoints = 3;
+    string version = 4;
+    AgentInfo agentInfo = 5;
+    string hostname = 6;
 }
 
-message Hello {
-    repeated EndpointHealth endpoints = 1;
-    string version = 2;
-    string hostname = 3;
-    bytes clientCertificate = 4; // used when we can't terminate SSL directly
-    AgentInformation agentInfo = 5;
+message AgentInfo {
+    repeated Annotation annotations = 1;
 }
 
-message HttpTunnelControl {
-    oneof controlType {
-        OpenHTTPTunnelRequest openHTTPTunnelRequest = 1;
-        CancelRequest cancelRequest = 2;
-        HttpTunnelResponse httpTunnelResponse = 3;
-        HttpTunnelChunkedResponse httpTunnelChunkedResponse = 4;
-    }
+message HelloResponse {
+    string agentId = 1;
+    string instanceId = 2;
+    repeated EndpointHealth endpoints = 3;
+    string version = 4;
+    repeated Annotation annotations = 5;
 }
 
-// Messages sent from controller to agent, or agent to controller
-message MessageWrapper {
+message Data {
+    string streamId = 1;
+    bytes data = 3;
+}
+
+message TunnelHeaders {
+    string streamId = 1;
+    int32 statusCode = 3;
+    repeated HttpHeader headers = 4;
+    int64 contentLength = 5;
+}
+
+message HttpHeader {
+    string name = 1;
+    repeated string values = 2;
+}
+
+message WaitForRequestArgs {}
+
+// TunnelRequest causes the receiving side to begin an HTTP tunnel.
+message TunnelRequest {
+    string streamId = 1;
+    string name = 3;
+    string type = 4;
+    string method = 5;
+    string URI = 6;
+    repeated HttpHeader headers = 7;
+    bytes body = 8;
+}
+
+message StartTunnelResponse {
+    string streamId = 1;
+}
+
+message Cancel {}
+
+message Done {}
+
+message StreamFlow {
     oneof event {
-        PingRequest pingRequest = 1;
-        PingResponse pingResponse = 2;
-        Hello hello = 3;
-        HttpTunnelControl httpTunnelControl = 4;
+        string streamId = 1;
+        TunnelHeaders headers = 2;
+        Data data = 3;
+        Cancel cancel = 4;
+        Done done = 5;
     }
 }
 
-//
-// Service (runs on the controller)
-//
+message StreamFlowResponse {}
 
-service AgentTunnelService {
-    rpc EventTunnel(stream MessageWrapper) returns (stream MessageWrapper) {}
+message PingRequest {
+    uint64 ts = 3;
+}
+
+message PingResponse {
+    uint64 ts = 3;
+    uint64 echoedTs = 4;
+}
+
+// Service (runs on the controller)
+service TunnelService {
+    // Initial handshake, sent from agent to controller on the control connection, before any other messages.
+    rpc Hello(HelloRequest) returns (HelloResponse) {}
+
+    // Keep alive, sent from the agent to the controller, on control and data connections.
+    rpc Ping(PingRequest) returns (PingResponse) {}
+
+    // The agent will call StartRequest() when it wants the controller to perform
+    // an HTTP fetch.
+    rpc StartTunnel(TunnelRequest) returns (TunnelHeaders) {}
+
+    // The agent will perform a long-running call to WaitForRequest() and handle
+    // any HTTP request found.
+    rpc WaitForRequest(WaitForRequestArgs) returns (stream TunnelRequest) {}
+
+    // DataFlowAgentToController is the conduit for an agent to send and manage the
+    // flow of data for a specific HTTP response.
+    rpc DataFlowAgentToController(stream StreamFlow) returns (StreamFlowResponse) {}
 }
