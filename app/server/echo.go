@@ -19,14 +19,19 @@ package main
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"sync"
+	"time"
 
+	"github.com/opsmx/oes-birger/internal/logging"
+	"github.com/opsmx/oes-birger/internal/serviceconfig"
 	pb "github.com/opsmx/oes-birger/internal/tunnel"
 )
 
 type ServerEcho struct {
 	sync.Mutex
 	streamID    string
+	ep          serviceconfig.SearchSpec
 	headersChan chan *pb.TunnelHeaders
 	dataChan    chan []byte
 	doneChan    chan bool
@@ -34,9 +39,10 @@ type ServerEcho struct {
 	closed      bool
 }
 
-func MakeIncomingEchoer(ctx context.Context, streamID string) *ServerEcho {
+func MakeIncomingEchoer(ctx context.Context, ep serviceconfig.SearchSpec, streamID string) *ServerEcho {
 	e := &ServerEcho{
 		streamID:    streamID,
+		ep:          ep,
 		headersChan: make(chan *pb.TunnelHeaders),
 		dataChan:    make(chan []byte),
 		doneChan:    make(chan bool),
@@ -103,4 +109,83 @@ func (e *ServerEcho) Cancel(ctx context.Context) error {
 	}
 	e.doneChan <- true
 	return nil
+}
+
+func (e *ServerEcho) RunRequest(ctx context.Context, dest serviceconfig.Destination, body []byte, w http.ResponseWriter, r *http.Request) {
+	logger := logging.WithContext(ctx).Sugar()
+	headersSent := false
+	flusher := w.(http.Flusher)
+	interMessageTime := 10 * time.Second
+	t := time.NewTimer(10 * interMessageTime)
+
+	pbh, err := serviceconfig.HTTPHeadersToPB(r.Header)
+	if err != nil {
+		logger.Errorf("unable to convert headers")
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	session, ok := dest.(*AgentContext)
+	if !ok {
+		logger.Errorf("coding error: expected AgentContext, got %T", dest)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	session.requestChan <- serviceRequest{
+		req: &pb.TunnelRequest{
+			StreamId: e.streamID,
+			Name:     e.ep.ServiceName,
+			Type:     e.ep.ServiceType,
+			Method:   r.Method,
+			URI:      r.RequestURI,
+			Body:     body,
+			Headers:  pbh,
+		},
+		echo: e,
+	}
+	for {
+		select {
+		case <-t.C:
+			logger.Infof("stream timed out")
+			return
+		case <-r.Context().Done():
+			logger.Debugf("client closed, stopping data flow")
+			// TODO: send cancel event over gRPC
+			return
+		case <-e.doneChan:
+			return
+		case code := <-e.failChan:
+			if !headersSent {
+				w.WriteHeader(code)
+			}
+			return
+		case data := <-e.dataChan:
+			t.Reset(interMessageTime)
+			n, err := w.Write(data)
+			if err != nil {
+				// TODO: send cancel over gRPC
+				logger.Warnf("send to client: %v", err)
+				return
+			}
+			if n != len(data) {
+				// TODO: send cancel over gRPC
+				logger.Warnf("short send to client: wrote %d, wanted to write %d bytes", n, len(data))
+				return
+			}
+			flusher.Flush()
+		case headers := <-e.headersChan:
+			t.Reset(interMessageTime)
+			headersSent = true
+			for name := range w.Header() {
+				w.Header().Del(name)
+			}
+			for _, header := range headers.Headers {
+				for _, value := range header.Values {
+					w.Header().Add(header.Name, value)
+				}
+			}
+			w.WriteHeader(int(headers.StatusCode))
+		}
+	}
 }

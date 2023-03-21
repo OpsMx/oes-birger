@@ -38,7 +38,7 @@ type ConfiguredEndpoint struct {
 }
 
 type httpRequestProcessor interface {
-	ExecuteHTTPRequest(ctx context.Context, agentName string, echo HTTPEcho, req *pb.TunnelRequest) error
+	ExecuteHTTPRequest(ctx context.Context, agentName string, echo Echo, req *pb.TunnelRequest) error
 }
 
 func (e *ConfiguredEndpoint) String() string {

@@ -34,7 +34,7 @@ type AgentEcho struct {
 	closed      bool
 }
 
-func MakeEcho(ctx context.Context, c pb.TunnelServiceClient, streamID string, doneChan chan bool) serviceconfig.HTTPEcho {
+func MakeEcho(ctx context.Context, c pb.TunnelServiceClient, streamID string, doneChan chan bool) serviceconfig.Echo {
 	e := &AgentEcho{
 		streamID: streamID,
 		c:        c,

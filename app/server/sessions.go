@@ -23,26 +23,20 @@ import (
 	"time"
 
 	"github.com/opsmx/oes-birger/internal/logging"
+	"github.com/opsmx/oes-birger/internal/serviceconfig"
 	pb "github.com/opsmx/oes-birger/internal/tunnel"
 	"go.uber.org/zap"
 )
 
-type Endpoint struct {
-	Name        string            `json:"name,omitempty"`
-	Type        string            `json:"type,omitempty"`
-	Configured  bool              `json:"configured,omitempty"`
-	Annotations map[string]string `json:"annotations,omitempty"`
-}
-
 type AgentContext struct {
 	AgentKey
-	Endpoints   []Endpoint    `json:"endpoints,omitempty"`
-	AgentInfo   *pb.AgentInfo `json:"agentInfo,omitempty"`
-	Version     string        `json:"version,omitempty"`
-	Hostname    string        `json:"hostname,omitempty"`
-	ConnectedAt int64         `json:"connectedAt,omitempty"`
-	LastPing    int64         `json:"lastPing,omitempty"`
-	LastUse     int64         `json:"lastUse,omitempty"`
+	ConfiguredEndpoints []serviceconfig.Endpoint `json:"endpoints,omitempty"`
+	AgentInfo           *pb.AgentInfo            `json:"agentInfo,omitempty"`
+	Version             string                   `json:"version,omitempty"`
+	Hostname            string                   `json:"hostname,omitempty"`
+	ConnectedAt         int64                    `json:"connectedAt,omitempty"`
+	LastPing            int64                    `json:"lastPing,omitempty"`
+	LastUse             int64                    `json:"lastUse,omitempty"`
 
 	requestChan chan serviceRequest
 }
@@ -66,13 +60,13 @@ func makeAgentSessions() *AgentSessions {
 func newSessionContext(agentID string, sessionID string, hostname string, version string, agentInfo *pb.AgentInfo, endpoints []*pb.EndpointHealth) (*AgentContext, AgentKey) {
 	key := AgentKey{AgentID: agentID, SessionID: sessionID}
 	now := time.Now().UnixNano()
-	eps := []Endpoint{}
+	eps := []serviceconfig.Endpoint{}
 	for _, ep := range endpoints {
 		annotations := map[string]string{}
 		for _, a := range ep.Annotations {
 			annotations[a.Name] = a.Value
 		}
-		eps = append(eps, Endpoint{
+		eps = append(eps, serviceconfig.Endpoint{
 			Name:        ep.Name,
 			Type:        ep.Type,
 			Configured:  ep.Configured,
@@ -80,31 +74,25 @@ func newSessionContext(agentID string, sessionID string, hostname string, versio
 		})
 	}
 	session := &AgentContext{
-		AgentKey:    key,
-		requestChan: make(chan serviceRequest),
-		LastUse:     now,
-		ConnectedAt: now,
-		Hostname:    hostname,
-		Version:     version,
-		AgentInfo:   agentInfo,
-		Endpoints:   eps,
+		AgentKey:            key,
+		requestChan:         make(chan serviceRequest),
+		LastUse:             now,
+		ConnectedAt:         now,
+		Hostname:            hostname,
+		Version:             version,
+		AgentInfo:           agentInfo,
+		ConfiguredEndpoints: eps,
 	}
 	return session, key
 }
 
-type SessionSearch struct {
-	AgentID     string
-	ServiceName string
-	ServiceType string
-}
-
-func (a *AgentSessions) find(ctx context.Context, target SessionSearch) *AgentContext {
+func (a *AgentSessions) Search(ctx context.Context, spec serviceconfig.SearchSpec) serviceconfig.Destination {
 	a.RLock()
 	defer a.RUnlock()
 	for _, agent := range a.agents {
-		if agent.AgentID == target.AgentID {
-			for _, ep := range agent.Endpoints {
-				if ep.Configured && ep.Name == target.ServiceName && ep.Type == target.ServiceType {
+		if agent.AgentID == spec.Destination {
+			for _, ep := range agent.ConfiguredEndpoints {
+				if ep.Configured && ep.Name == spec.ServiceName && ep.Type == spec.ServiceType {
 					return agent
 				}
 			}
@@ -199,18 +187,18 @@ func (a *AgentSessions) GetStatistics() interface{} {
 }
 
 type AgentContextStatistics struct {
-	AgentID        string        `json:"agentId,omitempty"`
-	SessionID      string        `json:"session,omitempty"`
-	Name           string        `json:"name,omitempty"`      // depricated
-	Session        string        `json:"sessionId,omitempty"` // depricated
-	ConnectionType string        `json:"connectionType,omitempty"`
-	Endpoints      []Endpoint    `json:"endpoints,omitempty"`
-	Version        string        `json:"version,omitempty"`
-	Hostname       string        `json:"hostname,omitempty"`
-	ConnectedAt    uint64        `json:"connectedAt,omitempty"`
-	LastPing       uint64        `json:"lastPing,omitempty"`
-	LastUse        uint64        `json:"lastUse,omitempty"`
-	AgentInfo      *pb.AgentInfo `json:"agentInfo,omitempty"`
+	AgentID        string                   `json:"agentId,omitempty"`
+	SessionID      string                   `json:"session,omitempty"`
+	Name           string                   `json:"name,omitempty"`      // depricated
+	Session        string                   `json:"sessionId,omitempty"` // depricated
+	ConnectionType string                   `json:"connectionType,omitempty"`
+	Endpoints      []serviceconfig.Endpoint `json:"endpoints,omitempty"`
+	Version        string                   `json:"version,omitempty"`
+	Hostname       string                   `json:"hostname,omitempty"`
+	ConnectedAt    uint64                   `json:"connectedAt,omitempty"`
+	LastPing       uint64                   `json:"lastPing,omitempty"`
+	LastUse        uint64                   `json:"lastUse,omitempty"`
+	AgentInfo      *pb.AgentInfo            `json:"agentInfo,omitempty"`
 }
 
 func (ac *AgentContext) GetStatistics() interface{} {
@@ -225,7 +213,7 @@ func (ac *AgentContext) GetStatistics() interface{} {
 	ret.Name = ac.AgentID      // depricated
 	ret.Session = ac.SessionID // depricated
 	ret.ConnectionType = "direct"
-	ret.Endpoints = ac.Endpoints
+	ret.Endpoints = ac.ConfiguredEndpoints
 	ret.Version = ac.Version
 	ret.Hostname = ac.Hostname
 	return ret

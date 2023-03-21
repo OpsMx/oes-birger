@@ -31,7 +31,7 @@ type StreamManager struct {
 type Stream struct {
 	agentID   string
 	sessionID string
-	echo      serviceconfig.HTTPEcho
+	echo      serviceconfig.Echo
 	closechan chan bool
 }
 
@@ -41,7 +41,7 @@ func NewStreamManager() *StreamManager {
 	}
 }
 
-func (sm *StreamManager) Register(ctx context.Context, session *AgentContext, streamID string, closechan chan bool, echo serviceconfig.HTTPEcho) {
+func (sm *StreamManager) Register(ctx context.Context, session *AgentContext, streamID string, closechan chan bool, echo serviceconfig.Echo) {
 	sm.Lock()
 	defer sm.Unlock()
 	sm.streams[streamID] = &Stream{

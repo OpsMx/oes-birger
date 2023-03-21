@@ -312,8 +312,10 @@ func main() {
 
 	go runAgentGRPCServer(ctx, config.AgentUseTLS, serverCert)
 
+	echoManager := &ServerEchoManager{}
+
 	// Always listen on our well-known port, and always use HTTPS for this one.
-	go RunHTTPSServer(ctx, agents, authority, *serverCert, serviceconfig.IncomingServiceConfig{
+	go serviceconfig.RunHTTPSServer(ctx, echoManager, agents, authority, *serverCert, serviceconfig.IncomingServiceConfig{
 		Name: "_services",
 		Port: config.ServiceListenPort,
 	})
@@ -323,9 +325,9 @@ func main() {
 	// Now, add all the others defined by our config.
 	for _, service := range config.ServiceConfig.IncomingServices {
 		if service.UseHTTP {
-			go RunHTTPServer(ctx, agents, service)
+			go serviceconfig.RunHTTPServer(ctx, echoManager, agents, service)
 		} else {
-			go RunHTTPSServer(ctx, agents, authority, *serverCert, service)
+			go serviceconfig.RunHTTPSServer(ctx, echoManager, agents, authority, *serverCert, service)
 		}
 	}
 

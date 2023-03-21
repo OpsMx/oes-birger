@@ -210,7 +210,7 @@ func (ep *GenericEndpoint) unmutateURI(typ string, method string, uri string, cl
 
 // ExecuteHTTPRequest does the actual call to connect to HTTP, and will send the data back over the
 // tunnel.
-func (ep *GenericEndpoint) ExecuteHTTPRequest(ctx context.Context, agentName string, echo HTTPEcho, req *pb.TunnelRequest) error {
+func (ep *GenericEndpoint) ExecuteHTTPRequest(ctx context.Context, agentName string, echo Echo, req *pb.TunnelRequest) error {
 	logger := logging.WithContext(ctx).Sugar()
 	logger.Debugf("Running request %v", req)
 	tlsConfig := &tls.Config{
@@ -302,7 +302,7 @@ func makeResponse(id string, response *http.Response) (*pb.TunnelHeaders, error)
 	return ret, err
 }
 
-func RunHTTPRequest(ctx context.Context, cancel context.CancelFunc, client *http.Client, req *pb.TunnelRequest, httpRequest *http.Request, echo HTTPEcho, baseURL string) {
+func RunHTTPRequest(ctx context.Context, cancel context.CancelFunc, client *http.Client, req *pb.TunnelRequest, httpRequest *http.Request, echo Echo, baseURL string) {
 	logger := logging.WithContext(ctx).Sugar()
 	defer cancel()
 

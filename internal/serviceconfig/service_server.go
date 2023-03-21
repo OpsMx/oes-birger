@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package main
+package serviceconfig
 
 import (
 	"context"
@@ -28,15 +28,34 @@ import (
 
 	"github.com/opsmx/oes-birger/internal/ca"
 	"github.com/opsmx/oes-birger/internal/jwtutil"
-	"github.com/opsmx/oes-birger/internal/serviceconfig"
-	pb "github.com/opsmx/oes-birger/internal/tunnel"
+	"github.com/opsmx/oes-birger/internal/logging"
 	"github.com/opsmx/oes-birger/internal/ulid"
 )
 
+type Endpoint struct {
+	Name        string            `json:"name,omitempty"`
+	Type        string            `json:"type,omitempty"`
+	Configured  bool              `json:"configured,omitempty"`
+	Annotations map[string]string `json:"annotations,omitempty"`
+}
+
+type Destination interface {
+}
+
+type Destinations interface {
+	Search(ctx context.Context, spec SearchSpec) Destination
+}
+
+type SearchSpec struct {
+	Destination string
+	ServiceName string
+	ServiceType string
+}
+
 // RunHTTPSServer will listen for incoming service requests on a provided port, and
 // currently will use certificates or JWT to identify the destination.
-func RunHTTPSServer(ctx context.Context, routes *AgentSessions, ca *ca.CA, serverCert tls.Certificate, service serviceconfig.IncomingServiceConfig) {
-	_, logger := loggerFromContext(ctx)
+func RunHTTPSServer(ctx context.Context, em EchoManager, routes Destinations, ca *ca.CA, serverCert tls.Certificate, service IncomingServiceConfig) {
+	logger := logging.WithContext(ctx).Sugar()
 	logger.Infof("Running service HTTPS listener on port %d", service.Port)
 
 	certPool, err := ca.MakeCertPool()
@@ -53,7 +72,7 @@ func RunHTTPSServer(ctx context.Context, routes *AgentSessions, ca *ca.CA, serve
 
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("/", secureAPIHandlerMaker(routes, service))
+	mux.HandleFunc("/", secureAPIHandlerMaker(em, routes, service))
 
 	server := &http.Server{
 		Addr:      fmt.Sprintf(":%d", service.Port),
@@ -66,13 +85,13 @@ func RunHTTPSServer(ctx context.Context, routes *AgentSessions, ca *ca.CA, serve
 
 // RunHTTPServer will listen on an unencrypted HTTP only port, and will always forward
 // incoming requests to the hard-coded configured destination.
-func RunHTTPServer(ctx context.Context, routes *AgentSessions, service serviceconfig.IncomingServiceConfig) {
-	_, logger := loggerFromContext(ctx)
+func RunHTTPServer(ctx context.Context, em EchoManager, routes Destinations, service IncomingServiceConfig) {
+	logger := logging.WithContext(ctx).Sugar()
 	logger.Infof("Running service HTTP listener on port %d", service.Port)
 
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("/", fixedIdentityAPIHandlerMaker(routes, service))
+	mux.HandleFunc("/", fixedIdentityAPIHandlerMaker(em, routes, service))
 
 	server := &http.Server{
 		Addr:    fmt.Sprintf(":%d", service.Port),
@@ -88,19 +107,19 @@ func addDefaults(ctx context.Context, server *http.Server) {
 	server.ReadHeaderTimeout = 4 * time.Second
 }
 
-func fixedIdentityAPIHandlerMaker(routes *AgentSessions, service serviceconfig.IncomingServiceConfig) func(http.ResponseWriter, *http.Request) {
+func fixedIdentityAPIHandlerMaker(em EchoManager, routes Destinations, service IncomingServiceConfig) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
-		ep := SessionSearch{
-			AgentID:     service.Destination,
+		ep := SearchSpec{
+			Destination: service.Destination,
 			ServiceType: service.ServiceType,
 			ServiceName: service.DestinationService,
 		}
-		runAPIHandler(routes, ep, w, r)
+		runAPIHandler(em, routes, ep, w, r)
 	}
 }
 
 func extractEndpointFromCert(r *http.Request) (agentIdentity string, endpointType string, endpointName string, validated bool) {
-	_, logger := loggerFromContext(r.Context())
+	logger := logging.WithContext(r.Context()).Sugar()
 
 	if len(r.TLS.PeerCertificates) == 0 {
 		return "", "", "", false
@@ -120,7 +139,7 @@ func extractEndpointFromCert(r *http.Request) (agentIdentity string, endpointTyp
 }
 
 func extractEndpointFromJWT(r *http.Request) (agentIdentity string, endpointType string, endpointName string, validated bool) {
-	_, logger := loggerFromContext(r.Context())
+	logger := logging.WithContext(r.Context()).Sugar()
 
 	// First check for our specific header.
 	authPassword := r.Header.Get("X-Opsmx-Token")
@@ -155,7 +174,7 @@ func extractEndpointFromJWT(r *http.Request) (agentIdentity string, endpointType
 }
 
 func extractEndpoint(r *http.Request) (agentIdentity string, endpointType string, endpointName string, err error) {
-	_, logger := loggerFromContext(r.Context())
+	logger := logging.WithContext(r.Context()).Sugar()
 	agentIdentity, endpointType, endpointName, found := extractEndpointFromCert(r)
 	if found {
 		return agentIdentity, endpointType, endpointName, nil
@@ -171,7 +190,7 @@ func extractEndpoint(r *http.Request) (agentIdentity string, endpointType string
 	return "", "", "", fmt.Errorf("no valid credentials or JWT found")
 }
 
-func secureAPIHandlerMaker(routes *AgentSessions, service serviceconfig.IncomingServiceConfig) func(http.ResponseWriter, *http.Request) {
+func secureAPIHandlerMaker(em EchoManager, routes Destinations, service IncomingServiceConfig) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		agentIdentity, endpointType, endpointName, err := extractEndpoint(r)
 		if err != nil {
@@ -179,21 +198,22 @@ func secureAPIHandlerMaker(routes *AgentSessions, service serviceconfig.Incoming
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
-		ep := SessionSearch{
-			AgentID:     agentIdentity,
+		ep := SearchSpec{
+			Destination: agentIdentity,
 			ServiceType: endpointType,
 			ServiceName: endpointName,
 		}
-		runAPIHandler(routes, ep, w, r)
+		runAPIHandler(em, routes, ep, w, r)
 	}
 }
 
-func runAPIHandler(routes *AgentSessions, ep SessionSearch, w http.ResponseWriter, r *http.Request) {
-	ctx, logger := loggerFromContext(r.Context())
+func runAPIHandler(em EchoManager, routes Destinations, ep SearchSpec, w http.ResponseWriter, r *http.Request) {
+	ctx := logging.NewContext(r.Context())
+	logger := logging.WithContext(ctx).Sugar()
 
-	session := routes.find(ctx, ep)
+	session := routes.Search(ctx, ep)
 	if session == nil {
-		logger.Warnw("no such agent for service request", "agentID", ep.AgentID, "serviceName", ep.ServiceName, "serviceType", ep.ServiceType)
+		logger.Warnw("no such destination for service request", "destination", ep.Destination, "serviceName", ep.ServiceName, "serviceType", ep.ServiceType)
 		w.WriteHeader(http.StatusBadGateway)
 		return
 	}
@@ -207,82 +227,9 @@ func runAPIHandler(routes *AgentSessions, ep SessionSearch, w http.ResponseWrite
 	}
 	r.Body.Close()
 
-	headers, err := serviceconfig.HTTPHeadersToPB(r.Header)
-	if err != nil {
-		logger.Errorf("unable to convert headers")
-		w.WriteHeader(http.StatusServiceUnavailable)
-		return
-	}
-
 	streamID := ulid.GlobalContext.Ulid()
-	echo := MakeIncomingEchoer(ctx, streamID)
-
-	session.requestChan <- serviceRequest{
-		req: &pb.TunnelRequest{
-			StreamId: streamID,
-			Name:     ep.ServiceName,
-			Type:     ep.ServiceType,
-			Method:   r.Method,
-			URI:      r.RequestURI,
-			Body:     body,
-			Headers:  headers,
-		},
-		echo: echo,
-	}
+	echo := em.MakeRequester(ctx, ep, streamID)
 
 	defer echo.Shutdown(ctx)
-	runEcho(ctx, echo, w, r)
-}
-
-func runEcho(ctx context.Context, echo *ServerEcho, w http.ResponseWriter, r *http.Request) {
-	_, logger := loggerFromContext(ctx)
-	headersSent := false
-	flusher := w.(http.Flusher)
-	interMessageTime := 10 * time.Second
-	t := time.NewTimer(10 * interMessageTime)
-
-	for {
-		select {
-		case <-t.C:
-			logger.Infof("stream timed out")
-			return
-		case <-r.Context().Done():
-			logger.Debugf("client closed, stopping data flow")
-			// TODO: send cancel event over gRPC
-			return
-		case <-echo.doneChan:
-			return
-		case code := <-echo.failChan:
-			if !headersSent {
-				w.WriteHeader(code)
-			}
-			return
-		case data := <-echo.dataChan:
-			t.Reset(interMessageTime)
-			n, err := w.Write(data)
-			if err != nil {
-				// TODO: send cancel over gRPC
-				logger.Warnf("send to client: %v", err)
-				return
-			}
-			if n != len(data) {
-				// TODO: send cancel over gRPC
-				logger.Warnf("short send to client: wrote %d, wanted to write %d bytes", n, len(data))
-				return
-			}
-			flusher.Flush()
-		case headers := <-echo.headersChan:
-			t.Reset(interMessageTime)
-			headersSent = true
-			for name := range w.Header() {
-				w.Header().Del(name)
-			}
-			for _, header := range headers.Headers {
-				for _, value := range header.Values {
-					w.Header().Add(header.Name, value)
-				}
-			}
-			w.WriteHeader(int(headers.StatusCode))
-		}
-	}
+	echo.RunRequest(ctx, session, body, w, r)
 }

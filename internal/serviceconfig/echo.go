@@ -18,11 +18,12 @@ package serviceconfig
 
 import (
 	"context"
+	"net/http"
 
 	pb "github.com/opsmx/oes-birger/internal/tunnel"
 )
 
-// HTTPEcho is an interface that makes generic http services possible.  For
+// Echo is an interface that makes generic http services possible.  For
 // the "agent" side and "controller" side, different implementations can handle
 // an incoming or outgoing HTTP client and the underlying RPC calls needed to
 // exchange data.
@@ -34,7 +35,7 @@ import (
 //
 // After Done() is called, no other calls should be made.
 // After Fail() is called, no other calls should be made.
-type HTTPEcho interface {
+type Echo interface {
 	// Headers is called once to send the appropriate headers.
 	Headers(ctx context.Context, h *pb.TunnelHeaders) error
 	// Data is called one or more times to send data.
@@ -53,4 +54,14 @@ type HTTPEcho interface {
 	// Shutdown cleans anything up if needed.  It should not do anything that can
 	// cause an error, since it doesn't return one.
 	Shutdown(context context.Context)
+}
+
+type EchoRequester interface {
+	Echo
+	// RunRequest runs an echo, which has a connected http client and its request.
+	RunRequest(ctx context.Context, session Destination, body []byte, w http.ResponseWriter, r *http.Request) 
+}
+
+type EchoManager interface {
+	MakeRequester(ctx context.Context, ep SearchSpec, streamID string) EchoRequester
 }

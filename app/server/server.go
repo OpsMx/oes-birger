@@ -46,7 +46,7 @@ type server struct {
 
 type serviceRequest struct {
 	req       *pb.TunnelRequest
-	echo      serviceconfig.HTTPEcho
+	echo      serviceconfig.Echo
 	closechan chan bool
 }
 
