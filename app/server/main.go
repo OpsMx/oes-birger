@@ -27,6 +27,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"syscall"
 	"time"
 
@@ -38,6 +39,7 @@ import (
 	"github.com/opsmx/oes-birger/app/server/cncserver"
 	"github.com/opsmx/oes-birger/internal/ca"
 	"github.com/opsmx/oes-birger/internal/jwtutil"
+	"github.com/opsmx/oes-birger/internal/logging"
 	"github.com/opsmx/oes-birger/internal/serviceconfig"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"google.golang.org/grpc/keepalive"
@@ -56,6 +58,7 @@ var (
 	traceRatio     = flag.Float64("traceRatio", 0.01, "ratio of traces to create, if incoming request is not traced")
 	showversion    = flag.Bool("version", false, "show the version and exit")
 	profile        = flag.Bool("profile", false, "enable memory and CPU profiling")
+	jwtAgentNames  = flag.String("jwt-agent-names", "", "Debugging: list of agent names to make JWTs for and log them on startup")
 
 	tracerProvider *tracer.TracerProvider
 
@@ -333,12 +336,22 @@ func main() {
 
 	go runPrometheusHTTPServer(ctx, config.PrometheusListenPort, *profile)
 
-	agentJWT, err := jwtutil.MakeAgentJWT("smith", nil)
-	if err != nil {
-		logger.Fatalf("cannot make sample agent JWT")
+	if len(*jwtAgentNames) != 0 {
+		makeAgentJWTs(ctx, *jwtAgentNames)
 	}
-	logger.Infow("sample agent JWT", "jwt", agentJWT, "name", "smith")
-
 	<-sigchan
 	logger.Infof("Exiting Cleanly")
+}
+
+func makeAgentJWTs(ctx context.Context, nameList string) {
+	logger := logging.WithContext(ctx).Sugar()
+	names := strings.Split(nameList, ",")
+
+	for _, name := range names {
+		agentJWT, err := jwtutil.MakeAgentJWT(name, nil)
+		if err != nil {
+			logger.Fatalf("cannot make sample agent JWT")
+		}
+		logger.Infow("sample agent JWT", "jwt", agentJWT, "name", name)
+	}
 }
