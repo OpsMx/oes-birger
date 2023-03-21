@@ -311,7 +311,6 @@ func loadAgentInfo(filename string) (*pb.AgentInfo, error) {
 }
 
 func healthcheck(w http.ResponseWriter, r *http.Request) {
-	return
 }
 
 func runPrometheusHTTPServer(ctx context.Context, port uint16, profile bool) {

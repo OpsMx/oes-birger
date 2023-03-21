@@ -83,7 +83,7 @@ func (sm *StreamManager) flushUnlocked(ctx context.Context, session *AgentContex
 	}
 	for _, target := range targets {
 		stream := sm.streams[target]
-		stream.echo.Cancel(ctx)
+		_ = stream.echo.Cancel(ctx)
 		delete(sm.streams, target)
 		logger.Infof("flushed agent %s session %s stream %s", session.AgentID, session.SessionID, target)
 	}
