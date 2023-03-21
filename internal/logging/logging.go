@@ -25,28 +25,63 @@ import (
 
 type loggerKeyType int
 
-const loggerKey loggerKeyType = iota
+const (
+	loggerKey loggerKeyType = iota
+	fieldsKey
+)
 
-var logger *zap.Logger
+type loggerWrapper struct {
+	logger *zap.Logger
+	fields map[string]zap.Field
+}
+
+var defaultLogger *loggerWrapper
 
 func init() {
 	l, err := zap.NewProduction()
 	if err != nil {
 		log.Fatalf("unable to create zap logger: %v", err)
 	}
-	logger = l
+	defaultLogger = &loggerWrapper{
+		logger: l,
+		fields: map[string]zap.Field{},
+	}
+}
+
+func values(fields map[string]zap.Field) []zap.Field {
+	ret := []zap.Field{}
+	for _, v := range fields {
+		ret = append(ret, v)
+	}
+	return ret
 }
 
 func NewContext(ctx context.Context, fields ...zap.Field) context.Context {
-	return context.WithValue(ctx, loggerKey, WithContext(ctx).With(fields...))
+	logger := withContext(ctx)
+	newfields := map[string]zap.Field{}
+	for k, v := range newfields {
+		newfields[k] = v
+	}
+	for _, field := range fields {
+		newfields[field.Key] = field
+	}
+	newLogger := &loggerWrapper{
+		logger: logger.logger.With(values(newfields)...),
+		fields: newfields,
+	}
+	return context.WithValue(ctx, loggerKey, newLogger)
+}
+
+func withContext(ctx context.Context) *loggerWrapper {
+	if ctx == nil {
+		return defaultLogger
+	}
+	if ctxLogger, ok := ctx.Value(loggerKey).(*loggerWrapper); ok {
+		return ctxLogger
+	}
+	return defaultLogger
 }
 
 func WithContext(ctx context.Context) *zap.Logger {
-	if ctx == nil {
-		return logger
-	}
-	if ctxLogger, ok := ctx.Value(loggerKey).(*zap.Logger); ok {
-		return ctxLogger
-	}
-	return logger
+	return withContext(ctx).logger
 }
