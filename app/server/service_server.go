@@ -21,8 +21,10 @@ import (
 	"crypto/tls"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/opsmx/oes-birger/internal/ca"
 	"github.com/opsmx/oes-birger/internal/jwtutil"
@@ -58,7 +60,7 @@ func RunHTTPSServer(ctx context.Context, routes *AgentSessions, ca *ca.CA, serve
 		TLSConfig: tlsConfig,
 		Handler:   mux,
 	}
-
+	addDefaults(ctx, server)
 	logger.Fatal(server.ListenAndServeTLS("", ""))
 }
 
@@ -76,8 +78,14 @@ func RunHTTPServer(ctx context.Context, routes *AgentSessions, service serviceco
 		Addr:    fmt.Sprintf(":%d", service.Port),
 		Handler: mux,
 	}
-
+	addDefaults(ctx, server)
 	logger.Fatal(server.ListenAndServe())
+}
+
+func addDefaults(ctx context.Context, server *http.Server) {
+	server.BaseContext = func(net.Listener) context.Context { return ctx }
+	server.IdleTimeout = 4 * time.Second
+	server.ReadHeaderTimeout = 4 * time.Second
 }
 
 func fixedIdentityAPIHandlerMaker(routes *AgentSessions, service serviceconfig.IncomingServiceConfig) func(http.ResponseWriter, *http.Request) {
@@ -209,7 +217,7 @@ func runAPIHandler(routes *AgentSessions, ep SessionSearch, w http.ResponseWrite
 	streamID := ulid.GlobalContext.Ulid()
 	echo := MakeIncomingEchoer(ctx, streamID)
 
-	session.out <- serviceRequest{
+	session.requestChan <- serviceRequest{
 		req: &pb.TunnelRequest{
 			StreamId: streamID,
 			Name:     ep.ServiceName,
@@ -221,6 +229,8 @@ func runAPIHandler(routes *AgentSessions, ep SessionSearch, w http.ResponseWrite
 		},
 		echo: echo,
 	}
+
+	defer echo.Shutdown(ctx)
 	runEcho(ctx, echo, w, r)
 }
 
@@ -228,9 +238,14 @@ func runEcho(ctx context.Context, echo *ServerEcho, w http.ResponseWriter, r *ht
 	_, logger := loggerFromContext(ctx)
 	headersSent := false
 	flusher := w.(http.Flusher)
+	interMessageTime := 10 * time.Second
+	t := time.NewTimer(10 * interMessageTime)
 
 	for {
 		select {
+		case <-t.C:
+			logger.Infof("stream timed out")
+			return
 		case <-r.Context().Done():
 			logger.Debugf("client closed, stopping data flow")
 			// TODO: send cancel event over gRPC
@@ -243,6 +258,7 @@ func runEcho(ctx context.Context, echo *ServerEcho, w http.ResponseWriter, r *ht
 			}
 			return
 		case data := <-echo.dataChan:
+			t.Reset(interMessageTime)
 			n, err := w.Write(data)
 			if err != nil {
 				// TODO: send cancel over gRPC
@@ -256,6 +272,7 @@ func runEcho(ctx context.Context, echo *ServerEcho, w http.ResponseWriter, r *ht
 			}
 			flusher.Flush()
 		case headers := <-echo.headersChan:
+			t.Reset(interMessageTime)
 			headersSent = true
 			for name := range w.Header() {
 				w.Header().Del(name)

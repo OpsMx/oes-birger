@@ -96,7 +96,7 @@ func (s *server) WaitForRequest(in *pb.WaitForRequestArgs, stream pb.TunnelServi
 			logger.Infow("closed connection")
 			s.closeAgentSession(ctx, session)
 			return status.Error(codes.Canceled, "client closed connection")
-		case sr := <-session.out:
+		case sr := <-session.requestChan:
 			s.streamManager.Register(ctx, session, sr.req.StreamId, sr.closechan, sr.echo)
 			if err := stream.Send(sr.req); err != nil {
 				s.closeAgentSession(ctx, session)
@@ -129,7 +129,6 @@ func (s *server) getStreamAndID(ctx context.Context, event *pb.StreamFlow) (stri
 
 func (s *server) DataFlowAgentToController(rpcstream pb.TunnelService_DataFlowAgentToControllerServer) error {
 	ctx := rpcstream.Context()
-
 	event, err := rpcstream.Recv()
 	if err != nil {
 		return status.Error(codes.InvalidArgument, "unable to read streamID")

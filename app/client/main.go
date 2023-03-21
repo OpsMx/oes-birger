@@ -30,9 +30,11 @@ import (
 	pprofhttp "net/http/pprof"
 	"os"
 	"runtime"
+	"runtime/pprof"
 	"strings"
 	"time"
 
+	"github.com/OpsMx/go-app-base/httputil"
 	"github.com/OpsMx/go-app-base/tracer"
 	"github.com/OpsMx/go-app-base/util"
 	"github.com/OpsMx/go-app-base/version"
@@ -153,12 +155,13 @@ func waitForRequest(ctx context.Context, c pb.TunnelServiceClient) error {
 			continue
 		}
 
-		go func() {
+		labels := pprof.Labels("req.URI", req.URI)
+		go pprof.Do(ctx, labels, func(ctx context.Context) {
+			defer echo.Shutdown(ctx)
 			if err := ep.Instance.ExecuteHTTPRequest(ctx, session.agentID, echo, req); err != nil {
 				logger.Warn(err)
 			}
-			echo.Shutdown(ctx)
-		}()
+		})
 	}
 }
 
@@ -372,6 +375,15 @@ func main() {
 	}
 
 	endpoints = serviceconfig.ConfigureEndpoints(ctx, secretsLoader, agentServiceConfig)
+
+	clientConfig := httputil.ClientConfig{
+		DialTimeout:           4,
+		ResponseHeaderTimeout: 4,
+		MaxIdleConnections:    10,
+		ClientTimeout:         4,
+	}
+	httputil.SetClientConfig(clientConfig)
+	http.DefaultClient = httputil.NewHTTPClient(nil)
 
 	authToken, err := getAuthToken(config.AuthTokenFile)
 	if err != nil {

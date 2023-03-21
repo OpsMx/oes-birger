@@ -44,7 +44,7 @@ type AgentContext struct {
 	LastPing    int64         `json:"lastPing,omitempty"`
 	LastUse     int64         `json:"lastUse,omitempty"`
 
-	out chan serviceRequest
+	requestChan chan serviceRequest
 }
 
 type AgentKey struct {
@@ -81,7 +81,7 @@ func newSessionContext(agentID string, sessionID string, hostname string, versio
 	}
 	session := &AgentContext{
 		AgentKey:    key,
-		out:         make(chan serviceRequest),
+		requestChan: make(chan serviceRequest),
 		LastUse:     now,
 		ConnectedAt: now,
 		Hostname:    hostname,

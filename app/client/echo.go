@@ -84,14 +84,14 @@ func (e *AgentEcho) RunDataSender(ctx context.Context) {
 		case <-ctx.Done():
 			logger.Infof("Run() context done")
 		case msg, more := <-e.msgChan:
-			if !more {
-				return
-			}
 			if msg != nil {
 				err := stream.Send(msg)
 				if err != nil {
 					logger.Errorf("stream.Send(): %v", err)
 				}
+			}
+			if !more {
+				return
 			}
 		}
 	}

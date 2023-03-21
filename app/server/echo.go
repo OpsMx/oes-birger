@@ -19,32 +19,24 @@ package main
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	pb "github.com/opsmx/oes-birger/internal/tunnel"
 )
 
 type ServerEcho struct {
+	sync.Mutex
 	streamID    string
-	state       echoState
 	headersChan chan *pb.TunnelHeaders
 	dataChan    chan []byte
 	doneChan    chan bool
 	failChan    chan int
+	closed      bool
 }
-
-type echoState int
-
-const (
-	stateHeaders echoState = iota
-	stateData
-	stateDone
-	stateCanceled
-)
 
 func MakeIncomingEchoer(ctx context.Context, streamID string) *ServerEcho {
 	e := &ServerEcho{
 		streamID:    streamID,
-		state:       stateHeaders,
 		headersChan: make(chan *pb.TunnelHeaders),
 		dataChan:    make(chan []byte),
 		doneChan:    make(chan bool),
@@ -54,41 +46,61 @@ func MakeIncomingEchoer(ctx context.Context, streamID string) *ServerEcho {
 }
 
 func (e *ServerEcho) Shutdown(ctx context.Context) {
+	e.Lock()
+	defer e.Unlock()
+	e.closed = true
+	close(e.dataChan)
+	close(e.headersChan)
+	close(e.doneChan)
+	close(e.failChan)
 }
 
 func (e *ServerEcho) Headers(ctx context.Context, h *pb.TunnelHeaders) error {
-	if e.state != stateHeaders {
-		return fmt.Errorf("programmer error: Headers called when not in correct state (in %d)", e.state)
+	e.Lock()
+	defer e.Unlock()
+	if e.closed {
+		return fmt.Errorf("session closed")
 	}
-	e.state = stateData
 	e.headersChan <- h
 	return nil
 }
 
 func (e *ServerEcho) Data(ctx context.Context, data []byte) error {
-	if e.state != stateData {
-		return fmt.Errorf("programmer error: Data called when not in correct state (in %d)", e.state)
+	e.Lock()
+	defer e.Unlock()
+	if e.closed {
+		return fmt.Errorf("session closed")
 	}
 	e.dataChan <- data
 	return nil
 }
 
 func (e *ServerEcho) Fail(ctx context.Context, code int, err error) error {
-	e.state = stateDone
+	e.Lock()
+	defer e.Unlock()
+	if e.closed {
+		return fmt.Errorf("session closed")
+	}
 	e.failChan <- code
 	return nil
 }
 
 func (e *ServerEcho) Done(ctx context.Context) error {
-	if e.state != stateData {
-		return fmt.Errorf("programmer error: Done called when not in correct state (in %d)", e.state)
+	e.Lock()
+	defer e.Unlock()
+	if e.closed {
+		return fmt.Errorf("session closed")
 	}
 	e.doneChan <- true
 	return nil
 }
 
 func (e *ServerEcho) Cancel(ctx context.Context) error {
+	e.Lock()
+	defer e.Unlock()
+	if e.closed {
+		return fmt.Errorf("session closed")
+	}
 	e.doneChan <- true
-	e.state = stateCanceled
 	return nil
 }
