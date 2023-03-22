@@ -202,7 +202,9 @@ func connect(ctx context.Context, address string, ta credentials.TransportCreden
 		grpc.WithBlock(),
 		grpc.WithReturnConnectionError(),
 	}
-	conn, err := grpc.Dial(address, gopts...)
+	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	defer cancel()
+	conn, err := grpc.DialContext(ctx, address, gopts...)
 	check(ctx, err)
 	return conn
 }
