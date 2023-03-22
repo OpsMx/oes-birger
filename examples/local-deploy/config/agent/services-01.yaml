@@ -1,6 +1,6 @@
 agentInfo:
   annotations:
-    description: demo agent
+    description: demo agent 01
 outgoingServices:
   - name: whoami
     type: whoami

@@ -1,0 +1,11 @@
+agentInfo:
+  annotations:
+    description: demo agent 02
+outgoingServices:
+  - name: whoami
+    type: whoami
+    enabled: true
+    config:
+      url: https://whoami.svc.rpi.flame.org
+    annotations:
+      description: Whoami on my raspberry pi cluster of doom!
