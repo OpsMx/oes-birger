@@ -19,6 +19,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"sync"
 	"time"
 
@@ -89,16 +90,25 @@ func newSessionContext(agentID string, sessionID string, hostname string, versio
 func (a *AgentSessions) Search(ctx context.Context, spec serviceconfig.SearchSpec) serviceconfig.Destination {
 	a.RLock()
 	defer a.RUnlock()
+
+	possible := []serviceconfig.Destination{}
 	for _, agent := range a.agents {
 		if agent.AgentID == spec.Destination {
 			for _, ep := range agent.ConfiguredEndpoints {
 				if ep.Configured && ep.Name == spec.ServiceName && ep.Type == spec.ServiceType {
-					return agent
+					possible = append(possible, agent)
 				}
 			}
 		}
 	}
-	return nil
+	if len(possible) == 0 {
+		return nil
+	}
+	if len(possible) == 1 {
+		return possible[0]
+	}
+	n := rand.Intn(len(possible))
+	return possible[n]
 }
 
 func (a *AgentSessions) findSession(ctx context.Context) (*AgentContext, error) {
