@@ -6,6 +6,7 @@ require (
 	github.com/OpsMx/go-app-base v0.0.21
 	github.com/go-resty/resty/v2 v2.7.0
 	github.com/google/go-cmp v0.5.9
+	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
 	github.com/lestrrat-go/jwx/v2 v2.0.8
 	github.com/oklog/ulid/v2 v2.1.0
 	github.com/prometheus/client_golang v1.14.0

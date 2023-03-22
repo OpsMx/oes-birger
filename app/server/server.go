@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"github.com/OpsMx/go-app-base/version"
+	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 	"github.com/opsmx/oes-birger/internal/serviceconfig"
 	pb "github.com/opsmx/oes-birger/internal/tunnel"
 	"github.com/opsmx/oes-birger/internal/ulid"
@@ -201,17 +202,24 @@ func runAgentGRPCServer(ctx context.Context, useTLS bool, serverCert *tls.Certif
 		Certificates: []tls.Certificate{*serverCert},
 		MinVersion:   tls.VersionTLS13,
 	})
-	interceptor := NewJWTInterceptor()
+	jwtInterceptor := NewJWTInterceptor()
 	opts := []grpc.ServerOption{
 		grpc.Creds(creds),
 		grpc.KeepaliveEnforcementPolicy(kaep),
 		grpc.KeepaliveParams(kasp),
-		grpc.UnaryInterceptor(interceptor.Unary()),
-		grpc.StreamInterceptor(interceptor.Stream()),
+		grpc.ChainUnaryInterceptor(
+			grpc_prometheus.UnaryServerInterceptor,
+			jwtInterceptor.Unary(),
+		),
+		grpc.ChainStreamInterceptor(
+			grpc_prometheus.StreamServerInterceptor,
+			jwtInterceptor.Stream(),
+		),
 	}
 	grpcServer := grpc.NewServer(opts...)
 	pb.RegisterTunnelServiceServer(grpcServer, s)
 	if err := grpcServer.Serve(lis); err != nil {
 		logger.Fatalw("grpcServer.Serve() failed", "error", err)
 	}
+	grpc_prometheus.Register(grpcServer)
 }

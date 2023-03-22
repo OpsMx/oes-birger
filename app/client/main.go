@@ -38,6 +38,7 @@ import (
 	"github.com/OpsMx/go-app-base/tracer"
 	"github.com/OpsMx/go-app-base/util"
 	"github.com/OpsMx/go-app-base/version"
+	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 	"github.com/opsmx/oes-birger/internal/ca"
 	"github.com/opsmx/oes-birger/internal/logging"
 	"github.com/opsmx/oes-birger/internal/secrets"
@@ -201,11 +202,14 @@ func connect(ctx context.Context, address string, ta credentials.TransportCreden
 		grpc.WithKeepaliveParams(kparams),
 		grpc.WithBlock(),
 		grpc.WithReturnConnectionError(),
+		grpc.WithUnaryInterceptor(grpc_prometheus.UnaryClientInterceptor),
+		grpc.WithStreamInterceptor(grpc_prometheus.StreamClientInterceptor),
 	}
 	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
 	conn, err := grpc.DialContext(ctx, address, gopts...)
 	check(ctx, err)
+
 	return conn
 }
 
