@@ -33,9 +33,16 @@ type ServerSenderEcho struct {
 
 func MakeServerSenderEcho(ctx context.Context) *ServerSenderEcho {
 	e := &ServerSenderEcho{
-		msgChan: make(chan *pb.StreamFlow),
+		msgChan: make(chan *pb.StreamFlow, 10),
 	}
 	return e
+}
+
+func (e *ServerSenderEcho) trySend(msg *pb.StreamFlow) {
+	select {
+	case e.msgChan <- msg:
+	default:
+	}
 }
 
 func (e *ServerSenderEcho) Shutdown(ctx context.Context) {
@@ -43,7 +50,7 @@ func (e *ServerSenderEcho) Shutdown(ctx context.Context) {
 	defer e.Unlock()
 	if !e.closed {
 		e.closed = true
-		e.msgChan <- pb.StreamflowWrapDoneMsg()
+		e.trySend(pb.StreamflowWrapDoneMsg())
 		close(e.msgChan)
 	}
 }
@@ -54,7 +61,7 @@ func (e *ServerSenderEcho) Headers(ctx context.Context, h *pb.TunnelHeaders) err
 	if e.closed {
 		return nil
 	}
-	e.msgChan <- pb.StreamflowWrapHeaderMsg(h)
+	e.trySend(pb.StreamflowWrapHeaderMsg(h))
 	e.headersSent = true
 	return nil
 }
@@ -68,7 +75,7 @@ func (e *ServerSenderEcho) Data(ctx context.Context, data []byte) error {
 	d := &pb.Data{
 		Data: data,
 	}
-	e.msgChan <- pb.StreamflowWrapDataMsg(d)
+	e.trySend(pb.StreamflowWrapDataMsg(d))
 	return nil
 }
 
@@ -83,9 +90,9 @@ func (e *ServerSenderEcho) Fail(ctx context.Context, code int, err error) error 
 			StreamId:   e.streamID,
 			StatusCode: int32(code),
 		}
-		e.msgChan <- pb.StreamflowWrapHeaderMsg(h)
+		e.trySend(pb.StreamflowWrapHeaderMsg(h))
 	}
-	e.msgChan <- pb.StreamflowWrapDoneMsg()
+	e.trySend(pb.StreamflowWrapDoneMsg())
 	e.closed = true
 	close(e.msgChan)
 	return nil
@@ -97,7 +104,7 @@ func (e *ServerSenderEcho) Done(ctx context.Context) error {
 	if e.closed {
 		return nil
 	}
-	e.msgChan <- pb.StreamflowWrapDoneMsg()
+	e.trySend(pb.StreamflowWrapDoneMsg())
 	e.closed = true
 	close(e.msgChan)
 	return nil
@@ -109,7 +116,7 @@ func (e *ServerSenderEcho) Cancel(ctx context.Context) error {
 	if e.closed {
 		return nil
 	}
-	e.msgChan <- pb.StreamflowWrapCancelMsg()
+	e.trySend(pb.StreamflowWrapCancelMsg())
 	e.closed = true
 	close(e.msgChan)
 	return nil
