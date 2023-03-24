@@ -60,6 +60,7 @@ func (s *server) Hello(ctx context.Context, in *pb.HelloRequest) (*pb.HelloRespo
 	return &pb.HelloResponse{
 		InstanceId: session.SessionID,
 		AgentId:    agentID,
+		Endpoints:  serviceconfig.EndpointsToPB(endpoints),
 		Version:    version.VersionString(),
 	}, nil
 }

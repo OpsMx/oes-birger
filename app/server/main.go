@@ -40,6 +40,7 @@ import (
 	"github.com/opsmx/oes-birger/internal/ca"
 	"github.com/opsmx/oes-birger/internal/jwtutil"
 	"github.com/opsmx/oes-birger/internal/logging"
+	"github.com/opsmx/oes-birger/internal/secrets"
 	"github.com/opsmx/oes-birger/internal/serviceconfig"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"google.golang.org/grpc/keepalive"
@@ -67,10 +68,10 @@ var (
 	currentServiceKey string
 	currentAgentKey   string
 	config            *ControllerConfig
-	//secretsLoader     secrets.SecretLoader
-	authority *ca.CA
-	//endpoints         []serviceconfig.ConfiguredEndpoint
-	agents = makeAgentSessions()
+	secretsLoader     secrets.SecretLoader
+	authority         *ca.CA
+	endpoints         []serviceconfig.ConfiguredEndpoint
+	agents            = makeAgentSessions()
 )
 
 var kaep = keepalive.EnforcementPolicy{
@@ -315,6 +316,9 @@ func main() {
 
 	go runAgentGRPCServer(ctx, config.AgentUseTLS, serverCert)
 
+	secretsLoader = makeSecretsLoader(ctx)
+	endpoints = serviceconfig.ConfigureEndpoints(ctx, secretsLoader, &config.ServiceConfig)
+
 	echoManager := &ServerEchoManager{}
 
 	// Always listen on our well-known port, and always use HTTPS for this one.
@@ -322,8 +326,6 @@ func main() {
 		Name: "_services",
 		Port: config.ServiceListenPort,
 	})
-
-	//endpoints = serviceconfig.ConfigureEndpoints(ctx, secretsLoader, &config.ServiceConfig)
 
 	// Now, add all the others defined by our config.
 	for _, service := range config.ServiceConfig.IncomingServices {
@@ -341,6 +343,21 @@ func main() {
 	}
 	<-sigchan
 	logger.Infof("Exiting Cleanly")
+}
+
+func makeSecretsLoader(ctx context.Context) secrets.SecretLoader {
+	logger := logging.WithContext(ctx).Sugar()
+	namespace, ok := os.LookupEnv("POD_NAMESPACE")
+	if !ok {
+		logger.Info("POD_NAMESPACE not set.  Disabling Kubernetes secret handling.")
+		return nil
+	}
+	loader, err := secrets.MakeKubernetesSecretLoader(namespace)
+	if err != nil {
+		logger.Fatalf("loading Kubernetes secrets: %v", err)
+		return nil
+	}
+	return loader
 }
 
 func makeAgentJWTs(ctx context.Context, nameList string) {

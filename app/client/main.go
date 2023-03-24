@@ -343,6 +343,21 @@ func runPrometheusHTTPServer(ctx context.Context, port uint16, profile bool) {
 	logger.Fatal(server.ListenAndServe())
 }
 
+func makeSecretsLoader(ctx context.Context) secrets.SecretLoader {
+	logger := logging.WithContext(ctx).Sugar()
+	namespace, ok := os.LookupEnv("POD_NAMESPACE")
+	if !ok {
+		logger.Info("POD_NAMESPACE not set.  Disabling Kubernetes secret handling.")
+		return nil
+	}
+	loader, err := secrets.MakeKubernetesSecretLoader(namespace)
+	if err != nil {
+		logger.Fatalf("loading Kubernetes secrets: %v", err)
+		return nil
+	}
+	return loader
+}
+
 func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -379,6 +394,7 @@ func main() {
 		logger.Fatalf("loading services config: %v", err)
 	}
 
+	secretsLoader = makeSecretsLoader(ctx)
 	endpoints = serviceconfig.ConfigureEndpoints(ctx, secretsLoader, agentServiceConfig)
 
 	clientConfig := httputil.ClientConfig{
@@ -401,16 +417,6 @@ func main() {
 		logger.Fatal(err)
 	}
 
-	namespace, ok := os.LookupEnv("POD_NAMESPACE")
-	if ok {
-		secretsLoader, err = secrets.MakeKubernetesSecretLoader(namespace)
-		if err != nil {
-			logger.Fatalf("loading Kubernetes secrets: %v", err)
-		}
-	} else {
-		logger.Info("POD_NAMESPACE not set.  Disabling Kubernetes secret handling.")
-	}
-
 	caCertPool := x509.NewCertPool()
 	cacert := loadCACert(ctx)
 	if ok := caCertPool.AppendCertsFromPEM(cacert); !ok {
@@ -429,6 +435,7 @@ func main() {
 	check(ctx, err)
 	session.sessionID = hello.InstanceId
 	session.agentID = hello.AgentId
+	logger.Infow("controller services", "endpoints", hello.Endpoints)
 
 	go func() {
 		err := waitForRequest(ctx, c)
