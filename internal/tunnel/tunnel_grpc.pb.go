@@ -36,9 +36,9 @@ const _ = grpc.SupportPackageIsVersion7
 const (
 	TunnelService_Hello_FullMethodName                     = "/tunnel.TunnelService/Hello"
 	TunnelService_Ping_FullMethodName                      = "/tunnel.TunnelService/Ping"
-	TunnelService_StartTunnel_FullMethodName               = "/tunnel.TunnelService/StartTunnel"
 	TunnelService_WaitForRequest_FullMethodName            = "/tunnel.TunnelService/WaitForRequest"
 	TunnelService_DataFlowAgentToController_FullMethodName = "/tunnel.TunnelService/DataFlowAgentToController"
+	TunnelService_RunRequest_FullMethodName                = "/tunnel.TunnelService/RunRequest"
 )
 
 // TunnelServiceClient is the client API for TunnelService service.
@@ -49,15 +49,15 @@ type TunnelServiceClient interface {
 	Hello(ctx context.Context, in *HelloRequest, opts ...grpc.CallOption) (*HelloResponse, error)
 	// Keep alive, sent from the agent to the controller, on control and data connections.
 	Ping(ctx context.Context, in *PingRequest, opts ...grpc.CallOption) (*PingResponse, error)
-	// The agent will call StartRequest() when it wants the controller to perform
-	// an HTTP fetch.
-	StartTunnel(ctx context.Context, in *TunnelRequest, opts ...grpc.CallOption) (*TunnelHeaders, error)
 	// The agent will perform a long-running call to WaitForRequest() and handle
 	// any HTTP request found.
 	WaitForRequest(ctx context.Context, in *WaitForRequestArgs, opts ...grpc.CallOption) (TunnelService_WaitForRequestClient, error)
 	// DataFlowAgentToController is the conduit for an agent to send and manage the
 	// flow of data for a specific HTTP response.
 	DataFlowAgentToController(ctx context.Context, opts ...grpc.CallOption) (TunnelService_DataFlowAgentToControllerClient, error)
+	// The agent will call RunRequest() when it wants the controller to perform
+	// an HTTP fetch.
+	RunRequest(ctx context.Context, in *TunnelRequest, opts ...grpc.CallOption) (TunnelService_RunRequestClient, error)
 }
 
 type tunnelServiceClient struct {
@@ -80,15 +80,6 @@ func (c *tunnelServiceClient) Hello(ctx context.Context, in *HelloRequest, opts 
 func (c *tunnelServiceClient) Ping(ctx context.Context, in *PingRequest, opts ...grpc.CallOption) (*PingResponse, error) {
 	out := new(PingResponse)
 	err := c.cc.Invoke(ctx, TunnelService_Ping_FullMethodName, in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *tunnelServiceClient) StartTunnel(ctx context.Context, in *TunnelRequest, opts ...grpc.CallOption) (*TunnelHeaders, error) {
-	out := new(TunnelHeaders)
-	err := c.cc.Invoke(ctx, TunnelService_StartTunnel_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -161,6 +152,38 @@ func (x *tunnelServiceDataFlowAgentToControllerClient) CloseAndRecv() (*StreamFl
 	return m, nil
 }
 
+func (c *tunnelServiceClient) RunRequest(ctx context.Context, in *TunnelRequest, opts ...grpc.CallOption) (TunnelService_RunRequestClient, error) {
+	stream, err := c.cc.NewStream(ctx, &TunnelService_ServiceDesc.Streams[2], TunnelService_RunRequest_FullMethodName, opts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &tunnelServiceRunRequestClient{stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+type TunnelService_RunRequestClient interface {
+	Recv() (*StreamFlow, error)
+	grpc.ClientStream
+}
+
+type tunnelServiceRunRequestClient struct {
+	grpc.ClientStream
+}
+
+func (x *tunnelServiceRunRequestClient) Recv() (*StreamFlow, error) {
+	m := new(StreamFlow)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
 // TunnelServiceServer is the server API for TunnelService service.
 // All implementations must embed UnimplementedTunnelServiceServer
 // for forward compatibility
@@ -169,15 +192,15 @@ type TunnelServiceServer interface {
 	Hello(context.Context, *HelloRequest) (*HelloResponse, error)
 	// Keep alive, sent from the agent to the controller, on control and data connections.
 	Ping(context.Context, *PingRequest) (*PingResponse, error)
-	// The agent will call StartRequest() when it wants the controller to perform
-	// an HTTP fetch.
-	StartTunnel(context.Context, *TunnelRequest) (*TunnelHeaders, error)
 	// The agent will perform a long-running call to WaitForRequest() and handle
 	// any HTTP request found.
 	WaitForRequest(*WaitForRequestArgs, TunnelService_WaitForRequestServer) error
 	// DataFlowAgentToController is the conduit for an agent to send and manage the
 	// flow of data for a specific HTTP response.
 	DataFlowAgentToController(TunnelService_DataFlowAgentToControllerServer) error
+	// The agent will call RunRequest() when it wants the controller to perform
+	// an HTTP fetch.
+	RunRequest(*TunnelRequest, TunnelService_RunRequestServer) error
 	mustEmbedUnimplementedTunnelServiceServer()
 }
 
@@ -191,14 +214,14 @@ func (UnimplementedTunnelServiceServer) Hello(context.Context, *HelloRequest) (*
 func (UnimplementedTunnelServiceServer) Ping(context.Context, *PingRequest) (*PingResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Ping not implemented")
 }
-func (UnimplementedTunnelServiceServer) StartTunnel(context.Context, *TunnelRequest) (*TunnelHeaders, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method StartTunnel not implemented")
-}
 func (UnimplementedTunnelServiceServer) WaitForRequest(*WaitForRequestArgs, TunnelService_WaitForRequestServer) error {
 	return status.Errorf(codes.Unimplemented, "method WaitForRequest not implemented")
 }
 func (UnimplementedTunnelServiceServer) DataFlowAgentToController(TunnelService_DataFlowAgentToControllerServer) error {
 	return status.Errorf(codes.Unimplemented, "method DataFlowAgentToController not implemented")
+}
+func (UnimplementedTunnelServiceServer) RunRequest(*TunnelRequest, TunnelService_RunRequestServer) error {
+	return status.Errorf(codes.Unimplemented, "method RunRequest not implemented")
 }
 func (UnimplementedTunnelServiceServer) mustEmbedUnimplementedTunnelServiceServer() {}
 
@@ -245,24 +268,6 @@ func _TunnelService_Ping_Handler(srv interface{}, ctx context.Context, dec func(
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(TunnelServiceServer).Ping(ctx, req.(*PingRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _TunnelService_StartTunnel_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(TunnelRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(TunnelServiceServer).StartTunnel(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: TunnelService_StartTunnel_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(TunnelServiceServer).StartTunnel(ctx, req.(*TunnelRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -314,6 +319,27 @@ func (x *tunnelServiceDataFlowAgentToControllerServer) Recv() (*StreamFlow, erro
 	return m, nil
 }
 
+func _TunnelService_RunRequest_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(TunnelRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(TunnelServiceServer).RunRequest(m, &tunnelServiceRunRequestServer{stream})
+}
+
+type TunnelService_RunRequestServer interface {
+	Send(*StreamFlow) error
+	grpc.ServerStream
+}
+
+type tunnelServiceRunRequestServer struct {
+	grpc.ServerStream
+}
+
+func (x *tunnelServiceRunRequestServer) Send(m *StreamFlow) error {
+	return x.ServerStream.SendMsg(m)
+}
+
 // TunnelService_ServiceDesc is the grpc.ServiceDesc for TunnelService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -329,10 +355,6 @@ var TunnelService_ServiceDesc = grpc.ServiceDesc{
 			MethodName: "Ping",
 			Handler:    _TunnelService_Ping_Handler,
 		},
-		{
-			MethodName: "StartTunnel",
-			Handler:    _TunnelService_StartTunnel_Handler,
-		},
 	},
 	Streams: []grpc.StreamDesc{
 		{
@@ -344,6 +366,11 @@ var TunnelService_ServiceDesc = grpc.ServiceDesc{
 			StreamName:    "DataFlowAgentToController",
 			Handler:       _TunnelService_DataFlowAgentToController_Handler,
 			ClientStreams: true,
+		},
+		{
+			StreamName:    "RunRequest",
+			Handler:       _TunnelService_RunRequest_Handler,
+			ServerStreams: true,
 		},
 	},
 	Metadata: "internal/tunnel/tunnel.proto",

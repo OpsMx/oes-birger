@@ -28,7 +28,7 @@ import (
 	pb "github.com/opsmx/oes-birger/internal/tunnel"
 )
 
-type ServerEcho struct {
+type ServerReceiverEcho struct {
 	sync.Mutex
 	streamID    string
 	ep          serviceconfig.SearchSpec
@@ -39,8 +39,8 @@ type ServerEcho struct {
 	closed      bool
 }
 
-func MakeIncomingEchoer(ctx context.Context, ep serviceconfig.SearchSpec, streamID string) *ServerEcho {
-	e := &ServerEcho{
+func MakeServerReceiverEcho(ctx context.Context, ep serviceconfig.SearchSpec, streamID string) *ServerReceiverEcho {
+	e := &ServerReceiverEcho{
 		streamID:    streamID,
 		ep:          ep,
 		headersChan: make(chan *pb.TunnelHeaders),
@@ -51,7 +51,7 @@ func MakeIncomingEchoer(ctx context.Context, ep serviceconfig.SearchSpec, stream
 	return e
 }
 
-func (e *ServerEcho) Shutdown(ctx context.Context) {
+func (e *ServerReceiverEcho) Shutdown(ctx context.Context) {
 	e.Lock()
 	defer e.Unlock()
 	e.closed = true
@@ -61,7 +61,7 @@ func (e *ServerEcho) Shutdown(ctx context.Context) {
 	close(e.failChan)
 }
 
-func (e *ServerEcho) Headers(ctx context.Context, h *pb.TunnelHeaders) error {
+func (e *ServerReceiverEcho) Headers(ctx context.Context, h *pb.TunnelHeaders) error {
 	e.Lock()
 	defer e.Unlock()
 	if e.closed {
@@ -71,7 +71,7 @@ func (e *ServerEcho) Headers(ctx context.Context, h *pb.TunnelHeaders) error {
 	return nil
 }
 
-func (e *ServerEcho) Data(ctx context.Context, data []byte) error {
+func (e *ServerReceiverEcho) Data(ctx context.Context, data []byte) error {
 	e.Lock()
 	defer e.Unlock()
 	if e.closed {
@@ -81,7 +81,7 @@ func (e *ServerEcho) Data(ctx context.Context, data []byte) error {
 	return nil
 }
 
-func (e *ServerEcho) Fail(ctx context.Context, code int, err error) error {
+func (e *ServerReceiverEcho) Fail(ctx context.Context, code int, err error) error {
 	e.Lock()
 	defer e.Unlock()
 	if e.closed {
@@ -91,7 +91,7 @@ func (e *ServerEcho) Fail(ctx context.Context, code int, err error) error {
 	return nil
 }
 
-func (e *ServerEcho) Done(ctx context.Context) error {
+func (e *ServerReceiverEcho) Done(ctx context.Context) error {
 	e.Lock()
 	defer e.Unlock()
 	if e.closed {
@@ -101,7 +101,7 @@ func (e *ServerEcho) Done(ctx context.Context) error {
 	return nil
 }
 
-func (e *ServerEcho) Cancel(ctx context.Context) error {
+func (e *ServerReceiverEcho) Cancel(ctx context.Context) error {
 	e.Lock()
 	defer e.Unlock()
 	if e.closed {
@@ -111,7 +111,7 @@ func (e *ServerEcho) Cancel(ctx context.Context) error {
 	return nil
 }
 
-func (e *ServerEcho) RunRequest(ctx context.Context, dest serviceconfig.Destination, body []byte, w http.ResponseWriter, r *http.Request) {
+func (e *ServerReceiverEcho) RunRequest(ctx context.Context, dest serviceconfig.Destination, body []byte, w http.ResponseWriter, r *http.Request) {
 	logger := logging.WithContext(ctx).Sugar()
 	headersSent := false
 	flusher := w.(http.Flusher)
@@ -150,7 +150,7 @@ func (e *ServerEcho) RunRequest(ctx context.Context, dest serviceconfig.Destinat
 			logger.Infof("stream timed out")
 			return
 		case <-r.Context().Done():
-			logger.Debugf("client closed, stopping data flow")
+			logger.Infof("client closed, stopping data flow")
 			// TODO: send cancel event over gRPC
 			return
 		case <-e.doneChan:

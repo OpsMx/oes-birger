@@ -25,7 +25,7 @@ import (
 	pb "github.com/opsmx/oes-birger/internal/tunnel"
 )
 
-type AgentEcho struct {
+type AgentSenderEcho struct {
 	sync.Mutex
 	streamID    string
 	c           pb.TunnelServiceClient
@@ -34,8 +34,8 @@ type AgentEcho struct {
 	closed      bool
 }
 
-func MakeEcho(ctx context.Context, c pb.TunnelServiceClient, streamID string, doneChan chan bool) serviceconfig.Echo {
-	e := &AgentEcho{
+func MakeAgentSenderEcho(ctx context.Context, c pb.TunnelServiceClient, streamID string, doneChan chan bool) serviceconfig.Echo {
+	e := &AgentSenderEcho{
 		streamID: streamID,
 		c:        c,
 		msgChan:  make(chan *pb.StreamFlow),
@@ -44,7 +44,7 @@ func MakeEcho(ctx context.Context, c pb.TunnelServiceClient, streamID string, do
 	return e
 }
 
-func (e *AgentEcho) Shutdown(ctx context.Context) {
+func (e *AgentSenderEcho) Shutdown(ctx context.Context) {
 	e.Lock()
 	defer e.Unlock()
 	if !e.closed {
@@ -55,7 +55,7 @@ func (e *AgentEcho) Shutdown(ctx context.Context) {
 }
 
 // TODO: return any errors to "caller"
-func (e *AgentEcho) RunDataSender(ctx context.Context) {
+func (e *AgentSenderEcho) RunDataSender(ctx context.Context) {
 	ctx, logger := loggerFromContext(ctx)
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -97,7 +97,7 @@ func (e *AgentEcho) RunDataSender(ctx context.Context) {
 	}
 }
 
-func (e *AgentEcho) Headers(ctx context.Context, h *pb.TunnelHeaders) error {
+func (e *AgentSenderEcho) Headers(ctx context.Context, h *pb.TunnelHeaders) error {
 	e.Lock()
 	defer e.Unlock()
 	e.msgChan <- pb.StreamflowWrapHeaderMsg(h)
@@ -105,7 +105,7 @@ func (e *AgentEcho) Headers(ctx context.Context, h *pb.TunnelHeaders) error {
 	return nil
 }
 
-func (e *AgentEcho) Data(ctx context.Context, data []byte) error {
+func (e *AgentSenderEcho) Data(ctx context.Context, data []byte) error {
 	d := &pb.Data{
 		Data: data,
 	}
@@ -113,7 +113,7 @@ func (e *AgentEcho) Data(ctx context.Context, data []byte) error {
 	return nil
 }
 
-func (e *AgentEcho) Fail(ctx context.Context, code int, err error) error {
+func (e *AgentSenderEcho) Fail(ctx context.Context, code int, err error) error {
 	e.Lock()
 	defer e.Unlock()
 	if !e.headersSent {
@@ -127,7 +127,7 @@ func (e *AgentEcho) Fail(ctx context.Context, code int, err error) error {
 	return nil
 }
 
-func (e *AgentEcho) Done(ctx context.Context) error {
+func (e *AgentSenderEcho) Done(ctx context.Context) error {
 	e.Lock()
 	defer e.Unlock()
 	if !e.closed {
@@ -138,7 +138,7 @@ func (e *AgentEcho) Done(ctx context.Context) error {
 	return nil
 }
 
-func (e *AgentEcho) Cancel(ctx context.Context) error {
+func (e *AgentSenderEcho) Cancel(ctx context.Context) error {
 	e.Lock()
 	defer e.Unlock()
 	if !e.closed {

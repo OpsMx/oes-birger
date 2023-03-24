@@ -28,6 +28,7 @@ import (
 
 	"github.com/OpsMx/go-app-base/version"
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
+	"github.com/opsmx/oes-birger/internal/logging"
 	"github.com/opsmx/oes-birger/internal/serviceconfig"
 	pb "github.com/opsmx/oes-birger/internal/tunnel"
 	"github.com/opsmx/oes-birger/internal/ulid"
@@ -170,6 +171,75 @@ func (s *server) DataFlowAgentToController(rpcstream pb.TunnelService_DataFlowAg
 			_ = stream.echo.Headers(ctx, event.GetHeaders())
 		case *pb.StreamFlow_Data:
 			_ = stream.echo.Data(ctx, event.GetData().Data)
+		}
+	}
+}
+
+func findEndpoint(ctx context.Context, serviceName string, serviceType string) (*serviceconfig.ConfiguredEndpoint, bool) {
+	for _, ep := range endpoints {
+		if ep.Name == serviceName && ep.Type == serviceType {
+			return &ep, true
+		}
+	}
+	return nil, false
+}
+
+func (s *server) RunRequest(in *pb.TunnelRequest, stream pb.TunnelService_RunRequestServer) error {
+	agentID, sesisonID := IdentityFromContext(stream.Context())
+	ctx := logging.NewContext(stream.Context(),
+		zap.String("streamID", in.StreamId),
+		zap.String("agentID", agentID),
+		zap.String("sessionID", sesisonID),
+		zap.String("serviceName", in.Name),
+		zap.String("serviceType", in.Type),
+	)
+	logger := logging.WithContext(ctx).Sugar()
+	endpoint, found := findEndpoint(stream.Context(), in.Name, in.Type)
+	if !found {
+		err := stream.Send(pb.StreamflowWrapHeaderMsg(
+			&pb.TunnelHeaders{
+				StatusCode: http.StatusBadGateway,
+			}))
+		if err != nil {
+			logger.Warnf("unable to send: %v", err)
+		}
+		return err
+	}
+
+	echo := MakeServerSenderEcho(ctx)
+
+	donechan := make(chan error)
+	// TODO: handle this better...
+	go func() {
+		err := endpoint.Instance.ExecuteHTTPRequest(ctx, "controller", echo, in)
+		if err != nil {
+			logger.Warnw("ExecuteHTTPRequest", "error", err)
+			echo.Shutdown(ctx)
+		}
+		select {
+		case donechan <- err:
+		default:
+		}
+	}()
+
+	for {
+		select {
+		case msg, more := <-echo.msgChan:
+			if !more {
+				return nil
+			}
+			err := stream.Send(msg)
+			if err != nil {
+				logger.Warnw("Send()", "error", err)
+				return err
+			}
+		case <-ctx.Done():
+			return ctx.Err()
+		case err := <-donechan:
+			if err != nil {
+				logger.Infof("HTTP request ended with error: ", err)
+			}
+			return err
 		}
 	}
 }

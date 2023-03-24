@@ -22,8 +22,19 @@ import (
 	"github.com/opsmx/oes-birger/internal/serviceconfig"
 )
 
-type ServerEchoManager struct{}
+type controllerOnlyDestinations struct {
+	endpoints []serviceconfig.ConfiguredEndpoint
+}
 
-func (sem *ServerEchoManager) MakeRequester(ctx context.Context, ep serviceconfig.SearchSpec, streamID string) serviceconfig.EchoRequester {
-	return MakeServerReceiverEcho(ctx, ep, streamID)
+func makeControllerDestination(ctx context.Context, endpoints []serviceconfig.ConfiguredEndpoint) serviceconfig.Destinations {
+	return &controllerOnlyDestinations{endpoints: endpoints}
+}
+
+func (cods *controllerOnlyDestinations) Search(ctx context.Context, spec serviceconfig.SearchSpec) serviceconfig.Destination {
+	for _, ep := range cods.endpoints {
+		if spec.Destination == "controller" && spec.ServiceName == ep.Name && spec.ServiceType == ep.Type {
+			return &spec // dummy value, as it is not used on the agent side
+		}
+	}
+	return nil
 }

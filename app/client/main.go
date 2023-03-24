@@ -146,7 +146,7 @@ func waitForRequest(ctx context.Context, c pb.TunnelServiceClient) error {
 
 		// TODO: implement endpoint search and dispatch request
 		doneChan := make(chan bool)
-		echo := MakeEcho(ctx, c, req.StreamId, doneChan)
+		echo := MakeAgentSenderEcho(ctx, c, req.StreamId, doneChan)
 		ep, found := findEndpoint(ctx, req.Name, req.Type)
 		if !found {
 			if err := echo.Fail(ctx, http.StatusBadGateway, fmt.Errorf("no such service on agent")); err != nil {
@@ -437,6 +437,15 @@ func main() {
 	session.agentID = hello.AgentId
 	logger.Infow("controller services", "endpoints", hello.Endpoints)
 
+	destinations := makeControllerDestination(ctx, endpoints)
+	echoManager := &AgentReceiverEchoManager{
+		client: c,
+	}
+
+	for _, service := range agentServiceConfig.IncomingServices {
+		go serviceconfig.RunHTTPServer(ctx, echoManager, destinations, service)
+	}
+
 	go func() {
 		err := waitForRequest(ctx, c)
 		log.Printf("waitForRequest failed: %v", err)
@@ -452,4 +461,12 @@ func main() {
 	go runPrometheusHTTPServer(ctx, config.PrometheusListenPort, *profile)
 
 	<-session.done
+}
+
+type AgentReceiverEchoManager struct {
+	client pb.TunnelServiceClient
+}
+
+func (sem *AgentReceiverEchoManager) MakeRequester(ctx context.Context, ep serviceconfig.SearchSpec, streamID string) serviceconfig.EchoRequester {
+	return MakeAgentReceiverEcho(ctx, sem.client, ep, streamID)
 }

@@ -20,7 +20,7 @@ services:
       type: whoami
       enabled: true
       config:
-        url: http://localhost:8300
+        url: https://whoami.svc.rpi.flame.org/
   incomingServices:
     - name: agent-whoami
       serviceType: whoami

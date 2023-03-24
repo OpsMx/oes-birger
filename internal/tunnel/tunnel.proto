@@ -119,9 +119,6 @@ service TunnelService {
     // Keep alive, sent from the agent to the controller, on control and data connections.
     rpc Ping(PingRequest) returns (PingResponse) {}
 
-    // The agent will call StartRequest() when it wants the controller to perform
-    // an HTTP fetch.
-    rpc StartTunnel(TunnelRequest) returns (TunnelHeaders) {}
 
     // The agent will perform a long-running call to WaitForRequest() and handle
     // any HTTP request found.
@@ -130,4 +127,8 @@ service TunnelService {
     // DataFlowAgentToController is the conduit for an agent to send and manage the
     // flow of data for a specific HTTP response.
     rpc DataFlowAgentToController(stream StreamFlow) returns (StreamFlowResponse) {}
+
+    // The agent will call RunRequest() when it wants the controller to perform
+    // an HTTP fetch.
+    rpc RunRequest(TunnelRequest) returns (stream StreamFlow) {}
 }
