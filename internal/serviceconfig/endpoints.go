@@ -83,11 +83,11 @@ func ConfigureEndpoints(ctx context.Context, secretsLoader secrets.SecretLoader,
 			}
 			switch service.Type {
 			// TODO: implement kubernetes endpoint again
-			//case "kubernetes":
-			//if secretsLoader == nil {
-			//	zap.S().Fatalf("kuberenetes is disabled, but a kubernetes service is configured.")
-			//}
-			//instance, configured, err = MakeKubernetesEndpoint(service.Name, config)
+			case "kubernetes":
+				if secretsLoader == nil {
+					logger.Fatalf("kuberenetes is disabled, but a kubernetes service is configured.")
+				}
+				instance, configured, err = MakeKubernetesEndpoint(service.Name, config)
 			// TODO: implement aws endpoint again
 			//			case "aws":
 			//				instance, configured, err = MakeAwsEndpoint(service.Name, config, secretsLoader)

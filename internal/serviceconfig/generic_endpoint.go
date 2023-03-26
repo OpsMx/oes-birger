@@ -219,7 +219,6 @@ func (ep *GenericEndpoint) ExecuteHTTPRequest(ctx context.Context, agentName str
 	tr := &http.Transport{
 		MaxIdleConns:    5,
 		IdleConnTimeout: 5 * time.Second,
-		//DisableCompression: true,
 		TLSClientConfig: tlsConfig,
 	}
 	if ep.config.Insecure {
@@ -243,7 +242,6 @@ func (ep *GenericEndpoint) ExecuteHTTPRequest(ctx context.Context, agentName str
 		logger.Error(err)
 		cancel()
 		return echo.Fail(ctx, http.StatusBadGateway, err)
-
 	}
 
 	err = PBHEadersToHTTP(req.Headers, &httpRequest.Header)
