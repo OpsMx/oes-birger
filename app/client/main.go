@@ -225,26 +225,29 @@ func loggerFromContext(ctx context.Context) (context.Context, *zap.SugaredLogger
 	return ctx, logging.WithContext(ctx).Sugar()
 }
 
-func loadCACertPEM(ctx context.Context) []byte {
+func loadCACertPEM(ctx context.Context) ([]byte, bool) {
 	_, logger := loggerFromContext(ctx)
 	cert, err := os.ReadFile(config.CACertFile)
 	if err == nil {
-		return cert
+		return cert, true
 	}
 	if config.CACert64 == "" {
-		logger.Fatal("Unable to load CA certificate from file or from config")
+		logger.Warnf("No CA certificate configured.  Will use OS provided trusted CAs.")
+		return []byte{}, false
 	}
 	cert, err = base64.StdEncoding.DecodeString(config.CACert64)
 	if err != nil {
 		logger.Fatal("Unable to decode CA cert base64 from config")
 	}
-	return cert
+	return cert, true
 }
 
-func loadCACert(ctx context.Context) []byte {
+func loadCACert(ctx context.Context) ([]byte, bool) {
 	_, logger := loggerFromContext(ctx)
-	certPEM := loadCACertPEM(ctx)
-
+	certPEM, found := loadCACertPEM(ctx)
+	if !found {
+		return []byte{}, false
+	}
 	block, _ := pem.Decode([]byte(certPEM))
 	if block == nil {
 		logger.Fatal("failed to parse certificate PEM")
@@ -255,7 +258,7 @@ func loadCACert(ctx context.Context) []byte {
 		logger.Fatalf("Bad CA cert: %v", err)
 	}
 
-	return certPEM
+	return certPEM, true
 }
 
 func getHostname() string {
@@ -417,16 +420,17 @@ func main() {
 		logger.Fatal(err)
 	}
 
-	caCertPool := x509.NewCertPool()
-	cacert := loadCACert(ctx)
-	if ok := caCertPool.AppendCertsFromPEM(cacert); !ok {
-		logger.Fatalf("append certificate to pool: %v", err)
+	tlsConfig := &tls.Config{}
+	cacert, found := loadCACert(ctx)
+	if found {
+		caCertPool := x509.NewCertPool()
+		if ok := caCertPool.AppendCertsFromPEM(cacert); !ok {
+			logger.Fatalf("append certificate to pool: %v", err)
+		}
+		tlsConfig.RootCAs = caCertPool
 	}
 
-	ta := credentials.NewTLS(&tls.Config{
-		RootCAs: caCertPool,
-	})
-
+	ta := credentials.NewTLS(tlsConfig)
 	conn := connect(ctx, config.ControllerHostname, ta)
 	defer conn.Close()
 	c := pb.NewTunnelServiceClient(conn)
