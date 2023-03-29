@@ -427,7 +427,7 @@ func main() {
 		RootCAs: caCertPool,
 	})
 
-	conn := connect(ctx, "localhost:8003", ta)
+	conn := connect(ctx, config.ControllerHostname, ta)
 	defer conn.Close()
 	c := pb.NewTunnelServiceClient(conn)
 
