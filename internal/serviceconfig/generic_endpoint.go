@@ -342,7 +342,6 @@ func RunHTTPRequest(ctx context.Context, cancel context.CancelFunc, client *http
 	}
 
 	// Now, send one or more data packet.
-	buf := make([]byte, 10240)
 	for {
 		select {
 		case <-ctx.Done():
@@ -353,6 +352,7 @@ func RunHTTPRequest(ctx context.Context, cancel context.CancelFunc, client *http
 			}
 		default:
 		}
+		buf := make([]byte, 10240)
 		n, err := httpResponse.Body.Read(buf)
 		if n > 0 {
 			if err2 := echo.Data(ctx, buf[:n]); err2 != nil {
