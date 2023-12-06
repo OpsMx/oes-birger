@@ -1,6 +1,6 @@
 module github.com/opsmx/oes-birger
 
-go 1.20
+go 1.21
 
 require (
 	github.com/OpsMx/go-app-base v0.0.21

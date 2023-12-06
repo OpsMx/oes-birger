@@ -18,7 +18,7 @@
 # Install the latest versions of our mods.  This is done as a separate step
 # so it will pull from an image cache if possible, unless there are changes.
 #
-FROM --platform=${BUILDPLATFORM} golang:1.20-alpine AS buildmod
+FROM --platform=${BUILDPLATFORM} golang:1.21-alpine AS buildmod
 RUN mkdir /build
 WORKDIR /build
 COPY go.mod .
