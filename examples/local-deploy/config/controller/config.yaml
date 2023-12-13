@@ -4,9 +4,6 @@ controlHostname: localhost
 controlListenPort: 8002
 agentHostname: localhost
 agentListenPort: 8003
-caConfig:
-  caCertFile: ca-cert.pem
-  caKeyFile: ca-key.pem
 serviceAuth:
   currentKeyName: key1
   headerMutationKeyName: key2
