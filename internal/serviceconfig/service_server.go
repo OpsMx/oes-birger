@@ -54,33 +54,31 @@ type SearchSpec struct {
 
 // RunHTTPSServer will listen for incoming service requests on a provided port, and
 // currently will use certificates or JWT to identify the destination.
-func RunHTTPSServer(ctx context.Context, em EchoManager, routes Destinations, ca *ca.CA, serverCert tls.Certificate, service IncomingServiceConfig) {
+func RunHTTPSServer(ctx context.Context, em EchoManager, routes Destinations, serverCert *tls.Certificate, service IncomingServiceConfig) {
 	logger := logging.WithContext(ctx).Sugar()
-	logger.Infof("Running service HTTPS listener on port %d", service.Port)
-
-	certPool, err := ca.MakeCertPool()
-	if err != nil {
-		logger.Fatalf("While making certpool: %v", err)
-	}
-
-	tlsConfig := &tls.Config{
-		ClientCAs:    certPool,
-		ClientAuth:   tls.VerifyClientCertIfGiven,
-		Certificates: []tls.Certificate{serverCert},
-		MinVersion:   tls.VersionTLS12,
-	}
 
 	mux := http.NewServeMux()
-
 	mux.HandleFunc("/", secureAPIHandlerMaker(em, routes, service))
 
 	server := &http.Server{
-		Addr:      fmt.Sprintf(":%d", service.Port),
-		TLSConfig: tlsConfig,
-		Handler:   mux,
+		Addr:    fmt.Sprintf(":%d", service.Port),
+		Handler: mux,
 	}
+
 	addDefaults(ctx, server)
-	logger.Fatal(server.ListenAndServeTLS("", ""))
+
+	if serverCert != nil {
+		tlsConfig := &tls.Config{
+			Certificates: []tls.Certificate{*serverCert},
+			MinVersion:   tls.VersionTLS13,
+		}
+		server.TLSConfig = tlsConfig
+		logger.Infof("Running service HTTPS listener on port %d", service.Port)
+		logger.Fatal(server.ListenAndServeTLS("", ""))
+	} else {
+		logger.Infof("Running service HTTP listener on port %d", service.Port)
+		logger.Fatal(server.ListenAndServe())
+	}
 }
 
 // RunHTTPServer will listen on an unencrypted HTTP only port, and will always forward

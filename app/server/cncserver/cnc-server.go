@@ -56,7 +56,6 @@ type cncAgentStatsReporter interface {
 // CNCServer holds the context for a specific instance of a command and control http server.
 type CNCServer struct {
 	cfg           cncConfig
-	authority     cncCertificateAuthority
 	agentReporter cncAgentStatsReporter
 	version       string
 	clock         jwt.Clock
@@ -65,14 +64,12 @@ type CNCServer struct {
 // MakeCNCServer creates a new CNC server from the provided config.
 func MakeCNCServer(
 	config cncConfig,
-	authority cncCertificateAuthority,
 	agents cncAgentStatsReporter,
 	vers string,
 	clock jwt.Clock,
 ) *CNCServer {
 	return &CNCServer{
 		cfg:           config,
-		authority:     authority,
 		agentReporter: agents,
 		version:       vers,
 		clock:         clock,
@@ -176,12 +173,6 @@ func (s *CNCServer) generateAgentManifestComponents() http.HandlerFunc {
 			return
 		}
 
-		ca64, err := s.authority.GetCACert()
-		if err != nil {
-			util.FailRequest(ctx, w, err, http.StatusBadRequest)
-			return
-		}
-
 		jwt, err := jwtutil.MakeAgentJWT(req.AgentName, s.clock)
 		if err != nil {
 			logger.Errorf("MakeAgentJWT failed: %v", err)
@@ -194,7 +185,6 @@ func (s *CNCServer) generateAgentManifestComponents() http.HandlerFunc {
 			ServerPort:     s.cfg.GetAgentAdvertisePort(),
 			AgentVersion:   version.GitBranch(),
 			AgentToken:     jwt,
-			CACert:         ca64,
 		}
 		if version.BuildType() != "release" {
 			ret.AgentVersion = "latest"
@@ -227,13 +217,6 @@ func (s *CNCServer) generateServiceCredentials() http.HandlerFunc {
 			util.FailRequest(ctx, w, err, http.StatusBadRequest)
 			return
 		}
-		// TODO: remove in a future version, once sapor updates to using the proper capitalization.
-		if len(req.Type) == 0 {
-			req.Type = req.OldType
-		}
-		if len(req.Name) == 0 {
-			req.Name = req.OldName
-		}
 
 		err = req.Validate(ctx)
 		if err != nil {
@@ -247,18 +230,11 @@ func (s *CNCServer) generateServiceCredentials() http.HandlerFunc {
 			return
 		}
 
-		cacert, err := s.authority.GetCACert()
-		if err != nil {
-			util.FailRequest(ctx, w, err, http.StatusBadRequest)
-			return
-		}
-
 		ret := fwdapi.ServiceCredentialResponse{
 			AgentName: req.AgentName,
 			Name:      req.Name,
 			Type:      req.Type,
 			URL:       s.cfg.GetServiceURL(),
-			CACert:    cacert,
 		}
 
 		username := fmt.Sprintf("%s.%s", req.Name, req.AgentName)
@@ -312,21 +288,16 @@ func (s *CNCServer) generateControlCredentials() http.HandlerFunc {
 			return
 		}
 
-		name := ca.CertificateName{
-			Name:    req.Name,
-			Purpose: ca.CertificatePurposeAgent,
-		}
-		ca64, user64, key64, err := s.authority.GenerateCertificate(name)
+		token, err := jwtutil.MakeServiceJWT(req.Type, req.Name, req.AgentName, s.clock)
 		if err != nil {
 			util.FailRequest(ctx, w, err, http.StatusBadRequest)
 			return
 		}
+
 		ret := fwdapi.ControlCredentialsResponse{
-			Name:        req.Name,
-			URL:         s.cfg.GetControlURL(),
-			Certificate: user64,
-			Key:         key64,
-			CACert:      ca64,
+			Name:  req.Name,
+			URL:   s.cfg.GetControlURL(),
+			Token: jwt,
 		}
 		json, err := json.Marshal(ret)
 		if err != nil {
@@ -391,31 +362,26 @@ func (s *CNCServer) routes(mux *http.ServeMux) {
 }
 
 // RunServer will start the HTTPS server and serve requests.
-func (s *CNCServer) RunServer(serverCert tls.Certificate) {
-	log.Printf("Running Command and Control API HTTPS listener on port %d",
-		s.cfg.GetControlListenPort())
-
-	certPool, err := s.authority.MakeCertPool()
-	if err != nil {
-		log.Fatalf("While making certpool: %v", err)
-	}
-
-	tlsConfig := &tls.Config{
-		ClientCAs:    certPool,
-		ClientAuth:   tls.RequireAndVerifyClientCert,
-		Certificates: []tls.Certificate{serverCert},
-		MinVersion:   tls.VersionTLS12,
-	}
+func (s *CNCServer) RunServer(serverCert *tls.Certificate) {
 
 	mux := http.NewServeMux()
-
 	s.routes(mux)
 
 	srv := &http.Server{
-		Addr:      fmt.Sprintf(":%d", s.cfg.GetControlListenPort()),
-		TLSConfig: tlsConfig,
-		Handler:   mux,
+		Addr:    fmt.Sprintf(":%d", s.cfg.GetControlListenPort()),
+		Handler: mux,
 	}
 
-	log.Fatal(srv.ListenAndServeTLS("", ""))
+	if serverCert != nil {
+		log.Printf("Running Command and Control API HTTPS listener on port %d", s.cfg.GetControlListenPort())
+		tlsConfig := &tls.Config{
+			Certificates: []tls.Certificate{*serverCert},
+			MinVersion:   tls.VersionTLS13,
+		}
+		srv.TLSConfig = tlsConfig
+		log.Fatal(srv.ListenAndServeTLS("", ""))
+	} else {
+		log.Printf("Running Command and Control API HTTP listener on port %d", s.cfg.GetControlListenPort())
+		log.Fatal(srv.ListenAndServe())
+	}
 }

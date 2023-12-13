@@ -35,12 +35,10 @@ type KubeConfigRequest struct {
 
 // KubeConfigResponse defines the response for the KubeconfigEndpoint
 type KubeConfigResponse struct {
-	AgentName       string `json:"agentName,omitempty"`
-	Name            string `json:"name,omitempty"`
-	ServerURL       string `json:"serverUrl,omitempty"`
-	UserCertificate string `json:"userCertificate,omitempty"`
-	UserKey         string `json:"userKey,omitempty"`
-	CACert          string `json:"caCert,omitempty"`
+	AgentName string `json:"agentName,omitempty"`
+	Name      string `json:"name,omitempty"`
+	ServerURL string `json:"serverUrl,omitempty"`
+	Token     string `json:"token,omitempty"`
 }
 
 // ManifestRequest defines the request for the ManifestEndpoint
@@ -55,7 +53,6 @@ type ManifestResponse struct {
 	ServerPort     uint16 `json:"serverPort,omitempty"`
 	AgentVersion   string `json:"agentVersion,omitempty"`
 	AgentToken     string `json:"agentToken,omitempty"`
-	CACert         string `json:"caCert,omitempty"`
 }
 
 // StatisticsResponse defines the response for the StatisticsEndpoint
@@ -70,8 +67,6 @@ type ServiceCredentialRequest struct {
 	AgentName string `json:"agentName,omitempty"`
 	Type      string `json:"type,omitempty"`
 	Name      string `json:"name,omitempty"`
-	OldType   string `json:"Type,omitempty"` // depricated
-	OldName   string `json:"Name,omitempty"` // depricated
 }
 
 // ServiceCredentialResponse defines the response for the ServiceEndpoint
@@ -82,7 +77,6 @@ type ServiceCredentialResponse struct {
 	CredentialType string      `json:"credentialType,omitempty"`
 	Credential     interface{} `json:"credential,omitempty"`
 	URL            string      `json:"url,omitempty"`
-	CACert         string      `json:"caCert,omitempty"`
 }
 
 // BasicCredentialResponse is the "http basic auth" configuration.
@@ -104,9 +98,7 @@ type ControlCredentialsRequest struct {
 
 // ControlCredentialsResponse defines the response for the ControlEndpoint
 type ControlCredentialsResponse struct {
-	Name        string `json:"name,omitempty"`
-	URL         string `json:"url,omitempty"`
-	Certificate string `json:"userCertificate,omitempty"`
-	Key         string `json:"userKey,omitempty"`
-	CACert      string `json:"caCert,omitempty"`
+	Name  string `json:"name,omitempty" yaml:"name,omitempty"`
+	URL   string `json:"url,omitempty" yaml:"url,omitempty"`
+	Token string `json:"token,omitempty" yaml:"token,omitempty"`
 }

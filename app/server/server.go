@@ -263,12 +263,7 @@ func runAgentGRPCServer(ctx context.Context, useTLS bool, serverCert *tls.Certif
 	defer cleanerCancel()
 	go agents.checkSessionTimeouts(cleanerCtx, s.agentIdleTimeout)
 
-	certPool, err := authority.MakeCertPool()
-	if err != nil {
-		logger.Fatalw("authority.MakeCertPool", "error", err)
-	}
 	creds := credentials.NewTLS(&tls.Config{
-		ClientCAs:    certPool,
 		ClientAuth:   tls.NoClientCert,
 		Certificates: []tls.Certificate{*serverCert},
 		MinVersion:   tls.VersionTLS13,

@@ -64,8 +64,16 @@ func MakeServiceJWT(epType string, epName string, agent string, clock jwt.Clock)
 	return sign(serviceauthRegistryName, claims, clock)
 }
 
-// MakeAgentJWT will return a token with provided type, name, and agent name embedded in the claims.
+// MakeAgentJWT will return a token with provided agent name embedded in the claims.
 func MakeAgentJWT(agent string, clock jwt.Clock) (string, error) {
+	claims := map[string]string{
+		claimOpsmxAgentName: agent,
+	}
+	return sign(agentRegistryName, claims, clock)
+}
+
+// MakeControlJWT will return a token with provided name name embedded in the claims.
+func MakeControlJWT(agent string, clock jwt.Clock) (string, error) {
 	claims := map[string]string{
 		claimOpsmxAgentName: agent,
 	}

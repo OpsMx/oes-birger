@@ -37,7 +37,6 @@ import (
 	"github.com/lestrrat-go/jwx/v2/jwa"
 	"github.com/lestrrat-go/jwx/v2/jwk"
 	"github.com/opsmx/oes-birger/app/server/cncserver"
-	"github.com/opsmx/oes-birger/internal/ca"
 	"github.com/opsmx/oes-birger/internal/jwtutil"
 	"github.com/opsmx/oes-birger/internal/logging"
 	"github.com/opsmx/oes-birger/internal/secrets"
@@ -69,7 +68,6 @@ var (
 	currentAgentKey   string
 	config            *ControllerConfig
 	secretsLoader     secrets.SecretLoader
-	authority         *ca.CA
 	endpoints         []serviceconfig.ConfiguredEndpoint
 	agents            = makeAgentSessions()
 )
@@ -294,27 +292,12 @@ func main() {
 	}
 
 	//
-	// Make a new CA, for our use to generate server and other certificates.
-	//
-	caLocal, err := ca.LoadCAFromFile(config.CAConfig)
-	if err != nil {
-		logger.Fatalf("Cannot create authority: %v", err)
-	}
-	authority = caLocal
-
-	//
 	// Make a server certificate.
 	//
-	logger.Infof("Generating a server certificate...")
-	serverCert, err := authority.MakeServerCert(config.ServerNames)
-	if err != nil {
-		logger.Fatalf("Cannot make server certificate: %v", err)
-	}
+	cnc := cncserver.MakeCNCServer(config, agents, version.GitBranch(), nil)
+	go cnc.RunServer(nil)
 
-	cnc := cncserver.MakeCNCServer(config, authority, agents, version.GitBranch(), nil)
-	go cnc.RunServer(*serverCert)
-
-	go runAgentGRPCServer(ctx, config.AgentUseTLS, serverCert)
+	go runAgentGRPCServer(ctx, config.AgentUseTLS, nil)
 
 	secretsLoader = makeSecretsLoader(ctx)
 	endpoints = serviceconfig.ConfigureEndpoints(ctx, secretsLoader, &config.ServiceConfig)
@@ -322,7 +305,7 @@ func main() {
 	echoManager := &ServerEchoManager{}
 
 	// Always listen on our well-known port, and always use HTTPS for this one.
-	go serviceconfig.RunHTTPSServer(ctx, echoManager, agents, authority, *serverCert, serviceconfig.IncomingServiceConfig{
+	go serviceconfig.RunHTTPSServer(ctx, echoManager, agents, nil, serviceconfig.IncomingServiceConfig{
 		Name: "_services",
 		Port: config.ServiceListenPort,
 	})
@@ -332,7 +315,7 @@ func main() {
 		if service.UseHTTP {
 			go serviceconfig.RunHTTPServer(ctx, echoManager, agents, service)
 		} else {
-			go serviceconfig.RunHTTPSServer(ctx, echoManager, agents, authority, *serverCert, service)
+			go serviceconfig.RunHTTPSServer(ctx, echoManager, agents, nil, service)
 		}
 	}
 
