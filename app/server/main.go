@@ -27,7 +27,6 @@ import (
 	"os/signal"
 	"path/filepath"
 	"runtime"
-	"strings"
 	"syscall"
 	"time"
 
@@ -58,7 +57,6 @@ var (
 	traceRatio     = flag.Float64("traceRatio", 0.01, "ratio of traces to create, if incoming request is not traced")
 	showversion    = flag.Bool("version", false, "show the version and exit")
 	profile        = flag.Bool("profile", false, "enable memory and CPU profiling")
-	jwtAgentNames  = flag.String("jwt-agent-names", "", "Debugging: list of agent names to make JWTs for and log them on startup")
 
 	tracerProvider *tracer.TracerProvider
 
@@ -298,10 +296,10 @@ func main() {
 	//
 	// Make a server certificate.
 	//
-	cnc := cncserver.MakeCNCServer(config, agents, version.GitBranch(), nil)
-	go cnc.RunServer(nil)
+	cnc := cncserver.MakeCNCServer(config, agents, version.GitBranch(), config.ControlTLSPath, nil)
+	go cnc.RunServer()
 
-	go runAgentGRPCServer(ctx, config.AgentUseTLS, nil)
+	go runAgentGRPCServer(ctx, config.AgentTLSPath)
 
 	secretsLoader = makeSecretsLoader(ctx)
 	endpoints = serviceconfig.ConfigureEndpoints(ctx, secretsLoader, &config.ServiceConfig)
@@ -309,7 +307,7 @@ func main() {
 	echoManager := &ServerEchoManager{}
 
 	// Always listen on our well-known port, and always use HTTPS for this one.
-	go serviceconfig.RunHTTPSServer(ctx, echoManager, agents, nil, serviceconfig.IncomingServiceConfig{
+	go serviceconfig.RunHTTPSServer(ctx, echoManager, agents, config.ServiceTLSPath, serviceconfig.IncomingServiceConfig{
 		Name: "_services",
 		Port: config.ServiceListenPort,
 	})
@@ -319,15 +317,12 @@ func main() {
 		if service.UseHTTP {
 			go serviceconfig.RunHTTPServer(ctx, echoManager, agents, service)
 		} else {
-			go serviceconfig.RunHTTPSServer(ctx, echoManager, agents, nil, service)
+			go serviceconfig.RunHTTPSServer(ctx, echoManager, agents, config.ServiceTLSPath, service)
 		}
 	}
 
 	go runPrometheusHTTPServer(ctx, config.PrometheusListenPort, *profile)
 
-	if len(*jwtAgentNames) != 0 {
-		makeAgentJWTs(ctx, *jwtAgentNames)
-	}
 	<-sigchan
 	logger.Infof("Exiting Cleanly")
 }
@@ -345,17 +340,4 @@ func makeSecretsLoader(ctx context.Context) secrets.SecretLoader {
 		return nil
 	}
 	return loader
-}
-
-func makeAgentJWTs(ctx context.Context, nameList string) {
-	logger := logging.WithContext(ctx).Sugar()
-	names := strings.Split(nameList, ",")
-
-	for _, name := range names {
-		agentJWT, err := jwtutil.MakeAgentJWT(name, nil)
-		if err != nil {
-			logger.Fatalf("cannot make sample agent JWT")
-		}
-		logger.Infow("sample agent JWT", "jwt", agentJWT, "name", name)
-	}
 }

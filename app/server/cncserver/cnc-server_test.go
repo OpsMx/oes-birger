@@ -119,7 +119,7 @@ func TestCNCServer_authenticate(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c := MakeCNCServer(nil, nil, "", testclock)
+			c := MakeCNCServer(nil, nil, "", "", testclock)
 			h := handlerTracker{}
 			r := httptest.NewRequest("GET", "https://localhost/statistics", nil)
 			r.Header.Set("authorization", "Bearer "+tt.token)
@@ -188,7 +188,7 @@ func TestCNCServer_generateKubectlComponents(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c := MakeCNCServer(&mockConfig{}, nil, "", testclock)
+			c := MakeCNCServer(&mockConfig{}, nil, "", "", testclock)
 
 			body, err := json.Marshal(tt.request)
 			if err != nil {
@@ -268,7 +268,7 @@ func TestCNCServer_generateAgentManifestComponents(t *testing.T) {
 			if err := jwtutil.RegisterAgentKeyset(keyset, "agentkey1"); err != nil {
 				panic(err)
 			}
-			c := MakeCNCServer(&mockConfig{}, nil, "", testclock)
+			c := MakeCNCServer(&mockConfig{}, nil, "", "", testclock)
 
 			body, err := json.Marshal(tt.request)
 			if err != nil {
@@ -411,7 +411,7 @@ func TestCNCServer_generateServiceCredentials(t *testing.T) {
 			if err := jwtutil.RegisterServiceKeyset(keyset, "key1"); err != nil {
 				panic(err)
 			}
-			c := MakeCNCServer(&mockConfig{}, nil, "", testclock)
+			c := MakeCNCServer(&mockConfig{}, nil, "", "", testclock)
 
 			body, err := json.Marshal(tt.request)
 			if err != nil {
@@ -499,7 +499,7 @@ func TestCNCServer_generateControlCredentials(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c := MakeCNCServer(&mockConfig{}, nil, "", testclock)
+			c := MakeCNCServer(&mockConfig{}, nil, "", "", testclock)
 
 			body, err := json.Marshal(tt.request)
 			if err != nil {
@@ -537,7 +537,7 @@ func TestCNCServer_getStatistics(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("getCredentials", func(t *testing.T) {
-		c := MakeCNCServer(nil, &mockAgents{}, "", testclock)
+		c := MakeCNCServer(nil, &mockAgents{}, "", "", testclock)
 
 		r := httptest.NewRequest("GET", "https://localhost/foo", nil)
 		r.Header.Set("authorization", "Bearer "+goodJWT)

@@ -21,6 +21,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"path"
 
 	"github.com/opsmx/oes-birger/internal/serviceconfig"
 	"gopkg.in/yaml.v3"
@@ -30,21 +31,24 @@ import (
 // configuration file is loaded from disk first, and then any
 // environment variables are applied.
 type ControllerConfig struct {
-	Agents               map[string]*agentConfig     `yaml:"agents,omitempty"`
-	ServiceAuth          serviceAuthConfig           `yaml:"serviceAuth,omitempty"`
-	AgentAuth            agentAuthConfig             `yaml:"agentAuth,omitempty"`
-	Webhook              string                      `yaml:"webhook,omitempty"`
-	ServerNames          []string                    `yaml:"serverNames,omitempty"`
-	PrometheusListenPort uint16                      `yaml:"prometheusListenPort"`
-	ServiceHostname      *string                     `yaml:"serviceHostname"`
-	ServiceListenPort    uint16                      `yaml:"serviceListenPort"`
-	ControlHostname      *string                     `yaml:"controlHostname"`
-	ControlListenPort    uint16                      `yaml:"controlListenPort"`
-	AgentHostname        *string                     `yaml:"agentHostname"`
-	AgentListenPort      uint16                      `yaml:"agentListenPort"`
-	AgentAdvertisePort   uint16                      `yaml:"agentAdvertisePort"`
-	AgentUseTLS          bool                        `yaml:"agentUseTLS"`
-	ServiceConfig        serviceconfig.ServiceConfig `yaml:"services,omitempty"`
+	Agents               map[string]*agentConfig     `yaml:"agents,omitempty" json:"agents,omitempty"`
+	ServiceAuth          serviceAuthConfig           `yaml:"serviceAuth,omitempty" json:"serviceAuth,omitempty"`
+	AgentAuth            agentAuthConfig             `yaml:"agentAuth,omitempty" json:"agentAuth,omitempty"`
+	Webhook              string                      `yaml:"webhook,omitempty" json:"webhook,omitempty"`
+	ServerNames          []string                    `yaml:"serverNames,omitempty" json:"serverNames,omitempty"`
+	PrometheusListenPort uint16                      `yaml:"prometheusListenPort,omitempty" json:"prometheusListenPort,omitempty"`
+	ServiceHostname      *string                     `yaml:"serviceHostname,omitempty" json:"serviceHostname,omitempty"`
+	ServiceListenPort    uint16                      `yaml:"serviceListenPort,omitempty" json:"serviceListenPort,omitempty"`
+	ServiceTLSPath       string                      `json:"serviceTLSPath,omitempty" yaml:"serviceTLSPath,omitempty"`
+	ControlHostname      *string                     `yaml:"controlHostname,omitempty" json:"controlHostname,omitempty"`
+	ControlListenPort    uint16                      `yaml:"controlListenPort,omitempty" json:"controlListenPort,omitempty"`
+	ControlTLSPath       string                      `json:"controlTLSPath,omitempty" yaml:"controlTLSPath,omitempty"`
+	AgentHostname        *string                     `yaml:"agentHostname,omitempty" json:"agentHostname,omitempty"`
+	AgentListenPort      uint16                      `yaml:"agentListenPort,omitempty" json:"agentListenPort,omitempty"`
+	AgentTLSPath         string                      `json:"agentTLSPath,omitempty" yaml:"agentTLSPath,omitempty"`
+	AgentAdvertisePort   uint16                      `yaml:"agentAdvertisePort,omitempty" json:"agentAdvertisePort,omitempty"`
+	AgentUseTLS          bool                        `yaml:"agentUseTLS,omitempty" json:"agentUseTLS,omitempty"`
+	ServiceConfig        serviceconfig.ServiceConfig `yaml:"services,omitempty" json:"serviceConfig,omitempty"`
 }
 
 type agentConfig struct {
@@ -60,6 +64,19 @@ type serviceAuthConfig struct {
 type agentAuthConfig struct {
 	CurrentKeyName string `yaml:"currentKeyName,omitempty"`
 	SecretsPath    string `yaml:"secretsPath,omitempty"`
+}
+
+// Simplistic check to ensure the two files we need exist.  We should likely also
+// check that they are readable, but we will just fail later if needed.  These
+// could be links, so don't assume regular files.
+func checkTLSPath(p string) bool {
+	if _, err := os.Stat(path.Join(p, "tls.crt")); err != nil {
+		return false
+	}
+	if _, err := os.Stat(path.Join(p, "tls.key")); err != nil {
+		return false
+	}
+	return true
 }
 
 // LoadConfig will load YAML configuration from the provided filename,
@@ -111,6 +128,23 @@ func LoadConfig(f io.Reader) (*ControllerConfig, error) {
 
 	if len(config.AgentAuth.SecretsPath) == 0 {
 		config.AgentAuth.SecretsPath = "/app/secrets/agentAuth"
+	}
+
+	// TLS setup
+	if config.AgentTLSPath != "" {
+		if found := checkTLSPath(config.AgentTLSPath); !found {
+			return nil, fmt.Errorf("agentTLSPath doesn't seem to be a directory that contains tls.crt and tls.key")
+		}
+	}
+	if config.ControlTLSPath != "" {
+		if found := checkTLSPath(config.ControlTLSPath); !found {
+			return nil, fmt.Errorf("controlTLSPath doesn't seem to be a directory that contains tls.crt and tls.key")
+		}
+	}
+	if config.ServiceTLSPath != "" {
+		if found := checkTLSPath(config.ServiceTLSPath); !found {
+			return nil, fmt.Errorf("serviceTLSPath doesn't seem to be a directory that contains tls.crt and tls.key")
+		}
 	}
 
 	config.addAllHostnames()

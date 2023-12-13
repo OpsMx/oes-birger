@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"path"
 	"strings"
 
 	"github.com/OpsMx/go-app-base/version"
@@ -58,6 +59,7 @@ type CNCServer struct {
 	cfg           cncConfig
 	agentReporter cncAgentStatsReporter
 	version       string
+	tlsPath       string
 	clock         jwt.Clock
 }
 
@@ -66,19 +68,19 @@ func MakeCNCServer(
 	config cncConfig,
 	agents cncAgentStatsReporter,
 	vers string,
+	tlsPath string,
 	clock jwt.Clock,
 ) *CNCServer {
 	return &CNCServer{
 		cfg:           config,
 		agentReporter: agents,
 		version:       vers,
+		tlsPath:       tlsPath,
 		clock:         clock,
 	}
 }
 
 func extractEndpointFromJWT(r *http.Request) (validated bool) {
-	logger := logging.WithContext(r.Context()).Sugar()
-
 	// First check for our specific header.
 	authPassword := r.Header.Get("X-Opsmx-Token")
 	r.Header.Del("X-Opsmx-Token")
@@ -102,7 +104,6 @@ func extractEndpointFromJWT(r *http.Request) (validated bool) {
 		}
 	}
 
-	logger.Info("found password ", authPassword)
 	_, err := jwtutil.ValidateControlJWT(authPassword, nil)
 	if err != nil {
 		return false
@@ -384,8 +385,7 @@ func (s *CNCServer) routes(mux *http.ServeMux) {
 }
 
 // RunServer will start the HTTPS server and serve requests.
-func (s *CNCServer) RunServer(serverCert *tls.Certificate) {
-
+func (s *CNCServer) RunServer() {
 	mux := http.NewServeMux()
 	s.routes(mux)
 
@@ -394,14 +394,12 @@ func (s *CNCServer) RunServer(serverCert *tls.Certificate) {
 		Handler: mux,
 	}
 
-	if serverCert != nil {
+	if s.tlsPath != "" {
 		log.Printf("Running Command and Control API HTTPS listener on port %d", s.cfg.GetControlListenPort())
-		tlsConfig := &tls.Config{
-			Certificates: []tls.Certificate{*serverCert},
-			MinVersion:   tls.VersionTLS13,
+		srv.TLSConfig = &tls.Config{
+			MinVersion: tls.VersionTLS13,
 		}
-		srv.TLSConfig = tlsConfig
-		log.Fatal(srv.ListenAndServeTLS("", ""))
+		log.Fatal(srv.ListenAndServeTLS(path.Join(s.tlsPath, "tls.crt"), path.Join(s.tlsPath, "tls.key")))
 	} else {
 		log.Printf("Running Command and Control API HTTP listener on port %d", s.cfg.GetControlListenPort())
 		log.Fatal(srv.ListenAndServe())

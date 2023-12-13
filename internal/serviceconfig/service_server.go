@@ -23,6 +23,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"path"
 	"strings"
 	"time"
 
@@ -53,7 +54,7 @@ type SearchSpec struct {
 
 // RunHTTPSServer will listen for incoming service requests on a provided port, and
 // currently will use certificates or JWT to identify the destination.
-func RunHTTPSServer(ctx context.Context, em EchoManager, routes Destinations, serverCert *tls.Certificate, service IncomingServiceConfig) {
+func RunHTTPSServer(ctx context.Context, em EchoManager, routes Destinations, tlsPath string, service IncomingServiceConfig) {
 	logger := logging.WithContext(ctx).Sugar()
 
 	mux := http.NewServeMux()
@@ -66,14 +67,12 @@ func RunHTTPSServer(ctx context.Context, em EchoManager, routes Destinations, se
 
 	addDefaults(ctx, server)
 
-	if serverCert != nil {
-		tlsConfig := &tls.Config{
-			Certificates: []tls.Certificate{*serverCert},
-			MinVersion:   tls.VersionTLS13,
+	if tlsPath != "" {
+		server.TLSConfig = &tls.Config{
+			MinVersion: tls.VersionTLS13,
 		}
-		server.TLSConfig = tlsConfig
 		logger.Infof("Running service HTTPS listener on port %d", service.Port)
-		logger.Fatal(server.ListenAndServeTLS("", ""))
+		logger.Fatal(server.ListenAndServeTLS(path.Join(tlsPath, "tls.crt"), path.Join(tlsPath, "tls.key")))
 	} else {
 		logger.Infof("Running service HTTP listener on port %d", service.Port)
 		logger.Fatal(server.ListenAndServe())
