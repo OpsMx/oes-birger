@@ -48,7 +48,6 @@ RUN go build -ldflags="-X 'github.com/OpsMx/go-app-base/version.buildType=${BUIL
 #
 FROM build-setup AS build-server-binaries
 RUN go build -ldflags="-X 'github.com/OpsMx/go-app-base/version.buildType=${BUILD_TYPE}' -X 'github.com/OpsMx/go-app-base/version.gitHash=${GIT_HASH}' -X 'github.com/OpsMx/go-app-base/version.gitBranch=${GIT_BRANCH}'" -o /out/agent-controller app/server/*.go
-RUN go build -ldflags="-X 'github.com/OpsMx/go-app-base/version.buildType=${BUILD_TYPE}' -X 'github.com/OpsMx/go-app-base/version.gitHash=${GIT_HASH}' -X 'github.com/OpsMx/go-app-base/version.gitBranch=${GIT_BRANCH}'" -o /out/make-ca app/make-ca/*.go
 RUN go build -ldflags="-X 'github.com/OpsMx/go-app-base/version.buildType=${BUILD_TYPE}' -X 'github.com/OpsMx/go-app-base/version.gitHash=${GIT_HASH}' -X 'github.com/OpsMx/go-app-base/version.gitBranch=${GIT_BRANCH}'" -o /out/get-creds app/get-creds/*.go
 
 #
@@ -79,7 +78,6 @@ CMD ["/app/agent-client"]
 FROM base-image AS agent-controller-image
 WORKDIR /app
 COPY --from=build-server-binaries /out/agent-controller /app
-COPY --from=build-server-binaries /out/make-ca /app
 COPY --from=build-server-binaries /out/get-creds /app
 EXPOSE 9001-9002 9102
 CMD ["/app/agent-controller"]

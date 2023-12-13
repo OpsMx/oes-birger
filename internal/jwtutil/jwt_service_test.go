@@ -44,7 +44,7 @@ func TestMakeServiceJWT(t *testing.T) {
 			"bob",
 			"agent1",
 			&jwtregistry.TimeClock{NowTime: 1111},
-			"eyJhbGciOiJIUzI1NiIsImtpZCI6ImtleTEiLCJ0eXAiOiJKV1QifQ.eyJhIjoiYWdlbnQxIiwiaWF0IjoxMTExLCJpc3MiOiJvcHNteCIsIm4iOiJib2IiLCJ0IjoiYXJ0aWZhY3RvcnkifQ.DW4Dj8C94KzKUaZ8tIrMrDnaXc-ipHaEL50N2IcHAoA",
+			"eyJhbGciOiJIUzI1NiIsImtpZCI6ImtleTEiLCJ0eXAiOiJKV1QifQ.eyJhIjoiYWdlbnQxIiwiaWF0IjoxMTExLCJpc3MiOiJvcHNteCIsIm4iOiJib2IiLCJvcHNteC5wdXJwb3NlIjoic2VydmljZSIsInQiOiJhcnRpZmFjdG9yeSJ9.VgAIx8jP_2GCDJLtPOihzXqyqL1fs9VRfH5H9Zb8O1A",
 			false,
 		},
 	}

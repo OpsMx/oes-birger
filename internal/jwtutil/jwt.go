@@ -31,9 +31,13 @@ const (
 	jwtAgentKey             = "a"
 	issuer                  = "opsmx"
 	agentIssuer             = "opsmx-agent-auth"
+	controlIssuer           = "opsmx-control-auth"
 	serviceauthRegistryName = "service-auth"
 	agentRegistryName       = "agent-auth"
+	controlRegistryName     = "control-auth"
 	claimOpsmxAgentName     = "opsmx.agent.name"
+	claimOpsmxPurpose       = "opsmx.purpose"
+	claimOpsmxName          = "opsmx.name"
 )
 
 // RegisterServiceKeyset registers (or re-registers) a new keyset and signing key name.
@@ -54,12 +58,22 @@ func RegisterAgentKeyset(keyset jwk.Set, signingKeyName string) error {
 	)
 }
 
+// RegisterControlKeyset registers (or re-registers) a new keyset and signing key name.
+func RegisterControlKeyset(keyset jwk.Set, signingKeyName string) error {
+	return jwtregistry.Register(controlRegistryName,
+		controlIssuer,
+		jwtregistry.WithKeyset(keyset),
+		jwtregistry.WithSigningKeyName(signingKeyName),
+	)
+}
+
 // MakeServiceJWT will return a token with provided type, name, and agent name embedded in the claims.
 func MakeServiceJWT(epType string, epName string, agent string, clock jwt.Clock) (string, error) {
 	claims := map[string]string{
 		jwtEndpointTypeKey: epType,
 		jwtEndpointNameKey: epName,
 		jwtAgentKey:        agent,
+		claimOpsmxPurpose:  "service",
 	}
 	return sign(serviceauthRegistryName, claims, clock)
 }
@@ -68,16 +82,18 @@ func MakeServiceJWT(epType string, epName string, agent string, clock jwt.Clock)
 func MakeAgentJWT(agent string, clock jwt.Clock) (string, error) {
 	claims := map[string]string{
 		claimOpsmxAgentName: agent,
+		claimOpsmxPurpose:   "agent",
 	}
 	return sign(agentRegistryName, claims, clock)
 }
 
 // MakeControlJWT will return a token with provided name name embedded in the claims.
-func MakeControlJWT(agent string, clock jwt.Clock) (string, error) {
+func MakeControlJWT(name string, clock jwt.Clock) (string, error) {
 	claims := map[string]string{
-		claimOpsmxAgentName: agent,
+		claimOpsmxName:    name,
+		claimOpsmxPurpose: "control",
 	}
-	return sign(agentRegistryName, claims, clock)
+	return sign(controlRegistryName, claims, clock)
 }
 
 func sign(registry string, claims map[string]string, clock jwt.Clock) (string, error) {
@@ -118,4 +134,27 @@ func ValidateAgentJWT(tokenString string, clock jwt.Clock) (string, error) {
 		return agent, nil
 	}
 	return "", fmt.Errorf("no '%s' key in JWT claims", claimOpsmxAgentName)
+}
+
+// ValidateControlJWT will validate and return the enbedded claims.
+func ValidateControlJWT(tokenString string, clock jwt.Clock) (name string, err error) {
+	claims, err := jwtregistry.Validate(controlRegistryName, []byte(tokenString), clock)
+	if err != nil {
+		return
+	}
+	purpose, found := claims[claimOpsmxPurpose]
+	if !found {
+		err = fmt.Errorf("no '%s' key in JWT claims", claimOpsmxPurpose)
+		return
+	}
+	if purpose != "control" {
+		err = fmt.Errorf("expected a control JWT, got a '%s'", purpose)
+		return
+	}
+	name, found = claims[claimOpsmxName]
+	if !found {
+		err = fmt.Errorf("no '%s' key in JWT claims", claimOpsmxName)
+		return
+	}
+	return
 }

@@ -22,7 +22,6 @@ import (
 	"log"
 	"os"
 
-	"github.com/opsmx/oes-birger/internal/ca"
 	"github.com/opsmx/oes-birger/internal/serviceconfig"
 	"gopkg.in/yaml.v3"
 )
@@ -36,7 +35,6 @@ type ControllerConfig struct {
 	AgentAuth            agentAuthConfig             `yaml:"agentAuth,omitempty"`
 	Webhook              string                      `yaml:"webhook,omitempty"`
 	ServerNames          []string                    `yaml:"serverNames,omitempty"`
-	CAConfig             ca.Config                   `yaml:"caConfig,omitempty"`
 	PrometheusListenPort uint16                      `yaml:"prometheusListenPort"`
 	ServiceHostname      *string                     `yaml:"serviceHostname"`
 	ServiceListenPort    uint16                      `yaml:"serviceListenPort"`

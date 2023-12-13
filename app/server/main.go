@@ -284,6 +284,10 @@ func main() {
 	if err = jwtutil.RegisterServiceKeyset(serviceKeyset, config.ServiceAuth.CurrentKeyName); err != nil {
 		logger.Fatal(err)
 	}
+	// TODO: use a different keyset?
+	if err = jwtutil.RegisterControlKeyset(serviceKeyset, config.AgentAuth.CurrentKeyName); err != nil {
+		logger.Fatal(err)
+	}
 	if err = jwtutil.RegisterMutationKeyset(serviceKeyset, config.ServiceAuth.HeaderMutationKeyName); err != nil {
 		logger.Fatal(err)
 	}

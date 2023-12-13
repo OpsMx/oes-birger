@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 
 	"github.com/OpsMx/go-app-base/version"
 	"github.com/lestrrat-go/jwx/v2/jwt"
@@ -37,7 +38,6 @@ import (
 )
 
 type cncCertificateAuthority interface {
-	ca.CertificateIssuer
 	ca.CertPoolGenerator
 }
 
@@ -76,6 +76,41 @@ func MakeCNCServer(
 	}
 }
 
+func extractEndpointFromJWT(r *http.Request) (validated bool) {
+	logger := logging.WithContext(r.Context()).Sugar()
+
+	// First check for our specific header.
+	authPassword := r.Header.Get("X-Opsmx-Token")
+	r.Header.Del("X-Opsmx-Token")
+
+	// First, check Bearer authentication type.
+	if authPassword == "" {
+		authHeader := r.Header.Get("Authorization")
+		items := strings.SplitN(authHeader, " ", 2)
+		if len(items) == 2 {
+			if items[0] == "Bearer" {
+				authPassword = items[1]
+			}
+		}
+	}
+
+	// If that fails, check HTTP Basic (ignoring the username)
+	if authPassword == "" {
+		var ok bool
+		if _, authPassword, ok = r.BasicAuth(); !ok {
+			return false
+		}
+	}
+
+	logger.Info("found password ", authPassword)
+	_, err := jwtutil.ValidateControlJWT(authPassword, nil)
+	if err != nil {
+		return false
+	}
+
+	return true
+}
+
 func (s *CNCServer) authenticate(method string, h http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
@@ -85,14 +120,9 @@ func (s *CNCServer) authenticate(method string, h http.HandlerFunc) http.Handler
 			return
 		}
 
-		names, err := ca.GetCertificateNameFromCert(r.TLS.PeerCertificates[0])
-		if err != nil {
-			util.FailRequest(ctx, w, err, http.StatusForbidden)
-			return
-		}
-		if names.Purpose != ca.CertificatePurposeControl {
-			err := fmt.Errorf("certificate is not authorized for 'control': %s", names.Purpose)
-			util.FailRequest(ctx, w, err, http.StatusForbidden)
+		found := extractEndpointFromJWT(r)
+		if !found {
+			util.FailRequest(ctx, w, fmt.Errorf("not a valid JWT for control"), http.StatusForbidden)
 			return
 		}
 
@@ -118,24 +148,16 @@ func (s *CNCServer) generateKubectlComponents() http.HandlerFunc {
 			return
 		}
 
-		name := ca.CertificateName{
-			Name:    req.Name,
-			Type:    "kubernetes",
-			Agent:   req.AgentName,
-			Purpose: ca.CertificatePurposeService,
-		}
-		ca64, user64, key64, err := s.authority.GenerateCertificate(name)
+		token, err := jwtutil.MakeServiceJWT("kubernetes", req.Name, req.AgentName, s.clock)
 		if err != nil {
-			util.FailRequest(ctx, w, err, http.StatusBadRequest)
-			return
+			util.FailRequest(ctx, w, err, http.StatusInternalServerError)
 		}
+
 		ret := fwdapi.KubeConfigResponse{
-			AgentName:       req.AgentName,
-			Name:            req.Name,
-			ServerURL:       s.cfg.GetServiceURL(),
-			UserCertificate: user64,
-			UserKey:         key64,
-			CACert:          ca64,
+			AgentName: req.AgentName,
+			Name:      req.Name,
+			ServerURL: s.cfg.GetServiceURL(),
+			Token:     token,
 		}
 		json, err := json.Marshal(ret)
 		if err != nil {
@@ -288,7 +310,7 @@ func (s *CNCServer) generateControlCredentials() http.HandlerFunc {
 			return
 		}
 
-		token, err := jwtutil.MakeServiceJWT(req.Type, req.Name, req.AgentName, s.clock)
+		token, err := jwtutil.MakeControlJWT(req.Name, s.clock)
 		if err != nil {
 			util.FailRequest(ctx, w, err, http.StatusBadRequest)
 			return
@@ -297,7 +319,7 @@ func (s *CNCServer) generateControlCredentials() http.HandlerFunc {
 		ret := fwdapi.ControlCredentialsResponse{
 			Name:  req.Name,
 			URL:   s.cfg.GetControlURL(),
-			Token: jwt,
+			Token: token,
 		}
 		json, err := json.Marshal(ret)
 		if err != nil {
