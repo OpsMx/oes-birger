@@ -1,5 +1,4 @@
 controllerHostname: localhost:8003
-caCertFile: ca-cert.pem
 servicesConfigFile: config/agent/services-01.yaml
 authTokenFile: agent-token
 prometheusListenPort: 9103

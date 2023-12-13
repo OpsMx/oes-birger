@@ -271,7 +271,7 @@ func main() {
 	if err != nil {
 		logger.Fatalf("%v", err)
 	}
-	config.Dump()
+	config.Dump(logger)
 
 	//secretsLoader = getSecretsLoader(ctx)
 	loadServiceAuthKeyset(ctx)
@@ -293,11 +293,8 @@ func main() {
 		logger.Fatal(err)
 	}
 
-	//
-	// Make a server certificate.
-	//
 	cnc := cncserver.MakeCNCServer(config, agents, version.GitBranch(), config.ControlTLSPath, nil)
-	go cnc.RunServer()
+	go cnc.RunServer(ctx)
 
 	go runAgentGRPCServer(ctx, config.AgentTLSPath)
 

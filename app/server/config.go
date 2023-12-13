@@ -19,11 +19,11 @@ package main
 import (
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"path"
 
 	"github.com/opsmx/oes-birger/internal/serviceconfig"
+	"go.uber.org/zap"
 	"gopkg.in/yaml.v3"
 )
 
@@ -35,7 +35,6 @@ type ControllerConfig struct {
 	ServiceAuth          serviceAuthConfig           `yaml:"serviceAuth,omitempty" json:"serviceAuth,omitempty"`
 	AgentAuth            agentAuthConfig             `yaml:"agentAuth,omitempty" json:"agentAuth,omitempty"`
 	Webhook              string                      `yaml:"webhook,omitempty" json:"webhook,omitempty"`
-	ServerNames          []string                    `yaml:"serverNames,omitempty" json:"serverNames,omitempty"`
 	PrometheusListenPort uint16                      `yaml:"prometheusListenPort,omitempty" json:"prometheusListenPort,omitempty"`
 	ServiceHostname      *string                     `yaml:"serviceHostname,omitempty" json:"serviceHostname,omitempty"`
 	ServiceListenPort    uint16                      `yaml:"serviceListenPort,omitempty" json:"serviceListenPort,omitempty"`
@@ -147,31 +146,7 @@ func LoadConfig(f io.Reader) (*ControllerConfig, error) {
 		}
 	}
 
-	config.addAllHostnames()
-
 	return config, nil
-}
-
-func (c *ControllerConfig) hasServerName(target string) bool {
-	for _, a := range c.ServerNames {
-		if a == target {
-			return true
-		}
-	}
-	return false
-}
-
-func (c *ControllerConfig) addIfMissing(target *string, reason string) {
-	if target != nil && !c.hasServerName(*target) {
-		c.ServerNames = append(c.ServerNames, *target)
-		log.Printf("Adding %s to ServerNames (for %s configuration setting)", *target, reason)
-	}
-}
-
-func (c *ControllerConfig) addAllHostnames() {
-	c.addIfMissing(c.AgentHostname, "agentHostname")
-	c.addIfMissing(c.ControlHostname, "controlHostname")
-	c.addIfMissing(c.ServiceHostname, "serviceHostname")
 }
 
 // GetServiceURL returns a fullly formatted URL string with hostname and port.
@@ -201,20 +176,11 @@ func (c *ControllerConfig) GetControlListenPort() uint16 {
 }
 
 // Dump will display MOST of the controller's configuration.
-func (c *ControllerConfig) Dump() {
-	log.Println("ControllerConfig:")
-	log.Printf("ServerNames:")
-	for _, n := range c.ServerNames {
-		log.Printf("  %s", n)
-	}
-	log.Printf("Service hostname: %s, port: %d",
-		*c.ServiceHostname, c.ServiceListenPort)
-	log.Printf("URL returned for kubectl components: %s",
-		c.GetServiceURL())
-	log.Printf("Agent hostname: %s, port %d (advertised %d)",
-		*c.AgentHostname, c.AgentListenPort, c.AgentAdvertisePort)
-	log.Printf("Control hostname: %s, port %d",
-		*c.ControlHostname, c.ControlListenPort)
+func (c *ControllerConfig) Dump(logger *zap.SugaredLogger) {
+	logger.Infow("Service config", "hostname", *c.ServiceHostname, "port", c.ServiceListenPort)
+	logger.Infow("URL returned for kubectl components", "url", c.GetServiceURL())
+	logger.Infow("Agent config", "hostname", *c.AgentHostname, "port", c.AgentListenPort, "advertisedPort", c.AgentAdvertisePort)
+	logger.Infow("Control config", "hostname", *c.ControlHostname, "port", c.ControlListenPort)
 }
 
 func parseConfig(filename string) (*ControllerConfig, error) {

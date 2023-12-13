@@ -20,6 +20,7 @@
 package cncserver
 
 import (
+	"context"
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
@@ -36,6 +37,7 @@ import (
 	"github.com/opsmx/oes-birger/internal/jwtutil"
 	"github.com/opsmx/oes-birger/internal/logging"
 	"github.com/opsmx/oes-birger/internal/util"
+	"go.uber.org/zap"
 )
 
 type cncCertificateAuthority interface {
@@ -384,8 +386,14 @@ func (s *CNCServer) routes(mux *http.ServeMux) {
 
 }
 
+func loggerFromContext(ctx context.Context, fields ...zap.Field) (context.Context, *zap.SugaredLogger) {
+	ctx = logging.NewContext(ctx, fields...)
+	return ctx, logging.WithContext(ctx).Sugar()
+}
+
 // RunServer will start the HTTPS server and serve requests.
-func (s *CNCServer) RunServer() {
+func (s *CNCServer) RunServer(ctx context.Context) {
+	_, logger := loggerFromContext(ctx, zap.String("component", "cncServer"))
 	mux := http.NewServeMux()
 	s.routes(mux)
 
@@ -395,13 +403,13 @@ func (s *CNCServer) RunServer() {
 	}
 
 	if s.tlsPath != "" {
-		log.Printf("Running Command and Control API HTTPS listener on port %d", s.cfg.GetControlListenPort())
+		logger.Infow("Running Command and Control API HTTPS listener", "port", s.cfg.GetControlListenPort())
 		srv.TLSConfig = &tls.Config{
 			MinVersion: tls.VersionTLS13,
 		}
-		log.Fatal(srv.ListenAndServeTLS(path.Join(s.tlsPath, "tls.crt"), path.Join(s.tlsPath, "tls.key")))
+		logger.Fatal(srv.ListenAndServeTLS(path.Join(s.tlsPath, "tls.crt"), path.Join(s.tlsPath, "tls.key")))
 	} else {
-		log.Printf("Running Command and Control API HTTP listener on port %d", s.cfg.GetControlListenPort())
-		log.Fatal(srv.ListenAndServe())
+		logger.Infow("Running Command and Control API HTTP listener", "port", s.cfg.GetControlListenPort())
+		logger.Fatal(srv.ListenAndServe())
 	}
 }

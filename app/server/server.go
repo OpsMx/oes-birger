@@ -268,11 +268,6 @@ func runAgentGRPCServer(ctx context.Context, tlsPath string) {
 		logger.Fatalw("failed to listen on agent port", "error", err)
 	}
 
-	creds, err := loadTLSCredentials(tlsPath)
-	if err != nil {
-		logger.Fatalw("failed to load GRPC agent certificates", "error", err)
-	}
-
 	idleTimeout := 60 * time.Second
 
 	s := &server{
@@ -286,7 +281,6 @@ func runAgentGRPCServer(ctx context.Context, tlsPath string) {
 
 	jwtInterceptor := NewJWTInterceptor()
 	opts := []grpc.ServerOption{
-		grpc.Creds(creds),
 		grpc.KeepaliveEnforcementPolicy(kaep),
 		grpc.KeepaliveParams(kasp),
 		grpc.ChainUnaryInterceptor(
@@ -297,6 +291,13 @@ func runAgentGRPCServer(ctx context.Context, tlsPath string) {
 			grpc_prometheus.StreamServerInterceptor,
 			jwtInterceptor.Stream(),
 		),
+	}
+	if tlsPath != "" {
+		creds, err := loadTLSCredentials(tlsPath)
+		if err != nil {
+			logger.Fatalw("failed to load GRPC agent certificates", "error", err)
+		}
+		opts = append(opts, grpc.Creds(creds))
 	}
 	grpcServer := grpc.NewServer(opts...)
 	pb.RegisterTunnelServiceServer(grpcServer, s)
