@@ -21,6 +21,7 @@ import (
 	"flag"
 	"fmt"
 	"io/fs"
+	"log"
 	"net/http"
 	pprofhttp "net/http/pprof"
 	"os"
@@ -37,7 +38,6 @@ import (
 	"github.com/lestrrat-go/jwx/v2/jwa"
 	"github.com/lestrrat-go/jwx/v2/jwk"
 	"github.com/opsmx/oes-birger/app/server/cncserver"
-	"github.com/opsmx/oes-birger/internal/ca"
 	"github.com/opsmx/oes-birger/internal/jwtutil"
 	"github.com/opsmx/oes-birger/internal/logging"
 	"github.com/opsmx/oes-birger/internal/secrets"
@@ -54,12 +54,13 @@ var (
 	configFile = flag.String("configFile", "/app/config/config.yaml", "The file with the controller config")
 
 	// eg, http://localhost:14268/api/traces
-	jaegerEndpoint = flag.String("jaeger-endpoint", "", "Jaeger collector endpoint")
-	traceToStdout  = flag.Bool("traceToStdout", false, "log traces to stdout")
-	traceRatio     = flag.Float64("traceRatio", 0.01, "ratio of traces to create, if incoming request is not traced")
-	showversion    = flag.Bool("version", false, "show the version and exit")
-	profile        = flag.Bool("profile", false, "enable memory and CPU profiling")
-	jwtAgentNames  = flag.String("jwt-agent-names", "", "Debugging: list of agent names to make JWTs for and log them on startup")
+	jaegerEndpoint        = flag.String("jaeger-endpoint", "", "Jaeger collector endpoint")
+	traceToStdout         = flag.Bool("traceToStdout", false, "log traces to stdout")
+	traceRatio            = flag.Float64("traceRatio", 0.01, "ratio of traces to create, if incoming request is not traced")
+	showversion           = flag.Bool("version", false, "show the version and exit")
+	profile               = flag.Bool("profile", false, "enable memory and CPU profiling")
+	generateControlTokens = flag.String("generate-control-tokens", "", "generate control tokens.  Example: ground,mission")
+	generateAgentTokens   = flag.String("generate-agent-tokens", "", "generate agent tokens.  Example: agentsmith,agentbob,alice")
 
 	tracerProvider *tracer.TracerProvider
 
@@ -69,7 +70,6 @@ var (
 	currentAgentKey   string
 	config            *ControllerConfig
 	secretsLoader     secrets.SecretLoader
-	authority         *ca.CA
 	endpoints         []serviceconfig.ConfiguredEndpoint
 	agents            = makeAgentSessions()
 )
@@ -275,7 +275,7 @@ func main() {
 	if err != nil {
 		logger.Fatalf("%v", err)
 	}
-	config.Dump()
+	config.Dump(logger)
 
 	//secretsLoader = getSecretsLoader(ctx)
 	loadServiceAuthKeyset(ctx)
@@ -286,6 +286,10 @@ func main() {
 	if err = jwtutil.RegisterServiceKeyset(serviceKeyset, config.ServiceAuth.CurrentKeyName); err != nil {
 		logger.Fatal(err)
 	}
+	// TODO: use a different keyset?
+	if err = jwtutil.RegisterControlKeyset(serviceKeyset, config.ServiceAuth.CurrentKeyName); err != nil {
+		logger.Fatal(err)
+	}
 	if err = jwtutil.RegisterMutationKeyset(serviceKeyset, config.ServiceAuth.HeaderMutationKeyName); err != nil {
 		logger.Fatal(err)
 	}
@@ -293,28 +297,20 @@ func main() {
 		logger.Fatal(err)
 	}
 
-	//
-	// Make a new CA, for our use to generate server and other certificates.
-	//
-	caLocal, err := ca.LoadCAFromFile(config.CAConfig)
-	if err != nil {
-		logger.Fatalf("Cannot create authority: %v", err)
-	}
-	authority = caLocal
-
-	//
-	// Make a server certificate.
-	//
-	logger.Infof("Generating a server certificate...")
-	serverCert, err := authority.MakeServerCert(config.ServerNames)
-	if err != nil {
-		logger.Fatalf("Cannot make server certificate: %v", err)
+	if *generateAgentTokens != "" {
+		generateSomeAgentTokens(config, *generateAgentTokens)
+		os.Exit(0)
 	}
 
-	cnc := cncserver.MakeCNCServer(config, authority, agents, version.GitBranch(), nil)
-	go cnc.RunServer(*serverCert)
+	if *generateControlTokens != "" {
+		generateSomeControlTokens(config, *generateControlTokens)
+		os.Exit(0)
+	}
 
-	go runAgentGRPCServer(ctx, config.AgentUseTLS, serverCert)
+	cnc := cncserver.MakeCNCServer(config, agents, version.GitBranch(), config.ControlTLSPath, nil)
+	go cnc.RunServer(ctx)
+
+	go runAgentGRPCServer(ctx, config.AgentTLSPath)
 
 	secretsLoader = makeSecretsLoader(ctx)
 	endpoints = serviceconfig.ConfigureEndpoints(ctx, secretsLoader, &config.ServiceConfig)
@@ -322,7 +318,7 @@ func main() {
 	echoManager := &ServerEchoManager{}
 
 	// Always listen on our well-known port, and always use HTTPS for this one.
-	go serviceconfig.RunHTTPSServer(ctx, echoManager, agents, authority, *serverCert, serviceconfig.IncomingServiceConfig{
+	go serviceconfig.RunHTTPSServer(ctx, echoManager, agents, config.ServiceTLSPath, serviceconfig.IncomingServiceConfig{
 		Name: "_services",
 		Port: config.ServiceListenPort,
 	})
@@ -332,15 +328,12 @@ func main() {
 		if service.UseHTTP {
 			go serviceconfig.RunHTTPServer(ctx, echoManager, agents, service)
 		} else {
-			go serviceconfig.RunHTTPSServer(ctx, echoManager, agents, authority, *serverCert, service)
+			go serviceconfig.RunHTTPSServer(ctx, echoManager, agents, config.ServiceTLSPath, service)
 		}
 	}
 
 	go runPrometheusHTTPServer(ctx, config.PrometheusListenPort, *profile)
 
-	if len(*jwtAgentNames) != 0 {
-		makeAgentJWTs(ctx, *jwtAgentNames)
-	}
 	<-sigchan
 	logger.Infof("Exiting Cleanly")
 }
@@ -360,15 +353,26 @@ func makeSecretsLoader(ctx context.Context) secrets.SecretLoader {
 	return loader
 }
 
-func makeAgentJWTs(ctx context.Context, nameList string) {
-	logger := logging.WithContext(ctx).Sugar()
-	names := strings.Split(nameList, ",")
-
-	for _, name := range names {
-		agentJWT, err := jwtutil.MakeAgentJWT(name, nil)
+func generateSomeAgentTokens(c *ControllerConfig, names string) {
+	n := strings.Split(names, ",")
+	for _, name := range n {
+		name = strings.TrimSpace(name)
+		token, err := jwtutil.MakeAgentJWT(name, nil)
 		if err != nil {
-			logger.Fatalf("cannot make sample agent JWT")
+			log.Fatalln(err)
 		}
-		logger.Infow("sample agent JWT", "jwt", agentJWT, "name", name)
+		fmt.Printf("%s\n", token)
+	}
+}
+
+func generateSomeControlTokens(c *ControllerConfig, names string) {
+	n := strings.Split(names, ",")
+	for _, name := range n {
+		name = strings.TrimSpace(name)
+		token, err := jwtutil.MakeControlJWT(name, nil)
+		if err != nil {
+			log.Fatalln(err)
+		}
+		fmt.Printf("%s\n", token)
 	}
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 OpsMx, Inc.
+ * Copyright 2021-2023 OpsMx, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License")
  * you may not use this file except in compliance with the License.
@@ -20,26 +20,24 @@
 package cncserver
 
 import (
+	"context"
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
+	"path"
+	"strings"
 
 	"github.com/OpsMx/go-app-base/version"
 	"github.com/lestrrat-go/jwx/v2/jwt"
 	"github.com/oklog/ulid/v2"
-	"github.com/opsmx/oes-birger/internal/ca"
 	"github.com/opsmx/oes-birger/internal/fwdapi"
 	"github.com/opsmx/oes-birger/internal/jwtutil"
 	"github.com/opsmx/oes-birger/internal/logging"
 	"github.com/opsmx/oes-birger/internal/util"
+	"go.uber.org/zap"
 )
-
-type cncCertificateAuthority interface {
-	ca.CertificateIssuer
-	ca.CertPoolGenerator
-}
 
 type cncConfig interface {
 	GetAgentHostname() string
@@ -56,27 +54,55 @@ type cncAgentStatsReporter interface {
 // CNCServer holds the context for a specific instance of a command and control http server.
 type CNCServer struct {
 	cfg           cncConfig
-	authority     cncCertificateAuthority
 	agentReporter cncAgentStatsReporter
 	version       string
+	tlsPath       string
 	clock         jwt.Clock
 }
 
 // MakeCNCServer creates a new CNC server from the provided config.
 func MakeCNCServer(
 	config cncConfig,
-	authority cncCertificateAuthority,
 	agents cncAgentStatsReporter,
 	vers string,
+	tlsPath string,
 	clock jwt.Clock,
 ) *CNCServer {
 	return &CNCServer{
 		cfg:           config,
-		authority:     authority,
 		agentReporter: agents,
 		version:       vers,
+		tlsPath:       tlsPath,
 		clock:         clock,
 	}
+}
+
+func extractEndpointFromJWT(r *http.Request) (validated bool) {
+	// First check for our specific header.
+	authPassword := r.Header.Get("X-Opsmx-Token")
+	r.Header.Del("X-Opsmx-Token")
+
+	// First, check Bearer authentication type.
+	if authPassword == "" {
+		authHeader := r.Header.Get("Authorization")
+		items := strings.SplitN(authHeader, " ", 2)
+		if len(items) == 2 {
+			if items[0] == "Bearer" {
+				authPassword = items[1]
+			}
+		}
+	}
+
+	// If that fails, check HTTP Basic (ignoring the username)
+	if authPassword == "" {
+		var ok bool
+		if _, authPassword, ok = r.BasicAuth(); !ok {
+			return false
+		}
+	}
+
+	_, err := jwtutil.ValidateControlJWT(authPassword, nil)
+	return err == nil
 }
 
 func (s *CNCServer) authenticate(method string, h http.HandlerFunc) http.HandlerFunc {
@@ -88,14 +114,9 @@ func (s *CNCServer) authenticate(method string, h http.HandlerFunc) http.Handler
 			return
 		}
 
-		names, err := ca.GetCertificateNameFromCert(r.TLS.PeerCertificates[0])
-		if err != nil {
-			util.FailRequest(ctx, w, err, http.StatusForbidden)
-			return
-		}
-		if names.Purpose != ca.CertificatePurposeControl {
-			err := fmt.Errorf("certificate is not authorized for 'control': %s", names.Purpose)
-			util.FailRequest(ctx, w, err, http.StatusForbidden)
+		found := extractEndpointFromJWT(r)
+		if !found {
+			util.FailRequest(ctx, w, fmt.Errorf("not a valid JWT for control"), http.StatusForbidden)
 			return
 		}
 
@@ -121,24 +142,16 @@ func (s *CNCServer) generateKubectlComponents() http.HandlerFunc {
 			return
 		}
 
-		name := ca.CertificateName{
-			Name:    req.Name,
-			Type:    "kubernetes",
-			Agent:   req.AgentName,
-			Purpose: ca.CertificatePurposeService,
-		}
-		ca64, user64, key64, err := s.authority.GenerateCertificate(name)
+		token, err := jwtutil.MakeServiceJWT("kubernetes", req.Name, req.AgentName, s.clock)
 		if err != nil {
-			util.FailRequest(ctx, w, err, http.StatusBadRequest)
-			return
+			util.FailRequest(ctx, w, err, http.StatusInternalServerError)
 		}
+
 		ret := fwdapi.KubeConfigResponse{
-			AgentName:       req.AgentName,
-			Name:            req.Name,
-			ServerURL:       s.cfg.GetServiceURL(),
-			UserCertificate: user64,
-			UserKey:         key64,
-			CACert:          ca64,
+			AgentName: req.AgentName,
+			Name:      req.Name,
+			ServerURL: s.cfg.GetServiceURL(),
+			Token:     token,
 		}
 		json, err := json.Marshal(ret)
 		if err != nil {
@@ -176,12 +189,6 @@ func (s *CNCServer) generateAgentManifestComponents() http.HandlerFunc {
 			return
 		}
 
-		ca64, err := s.authority.GetCACert()
-		if err != nil {
-			util.FailRequest(ctx, w, err, http.StatusBadRequest)
-			return
-		}
-
 		jwt, err := jwtutil.MakeAgentJWT(req.AgentName, s.clock)
 		if err != nil {
 			logger.Errorf("MakeAgentJWT failed: %v", err)
@@ -194,7 +201,6 @@ func (s *CNCServer) generateAgentManifestComponents() http.HandlerFunc {
 			ServerPort:     s.cfg.GetAgentAdvertisePort(),
 			AgentVersion:   version.GitBranch(),
 			AgentToken:     jwt,
-			CACert:         ca64,
 		}
 		if version.BuildType() != "release" {
 			ret.AgentVersion = "latest"
@@ -227,13 +233,6 @@ func (s *CNCServer) generateServiceCredentials() http.HandlerFunc {
 			util.FailRequest(ctx, w, err, http.StatusBadRequest)
 			return
 		}
-		// TODO: remove in a future version, once sapor updates to using the proper capitalization.
-		if len(req.Type) == 0 {
-			req.Type = req.OldType
-		}
-		if len(req.Name) == 0 {
-			req.Name = req.OldName
-		}
 
 		err = req.Validate(ctx)
 		if err != nil {
@@ -247,18 +246,11 @@ func (s *CNCServer) generateServiceCredentials() http.HandlerFunc {
 			return
 		}
 
-		cacert, err := s.authority.GetCACert()
-		if err != nil {
-			util.FailRequest(ctx, w, err, http.StatusBadRequest)
-			return
-		}
-
 		ret := fwdapi.ServiceCredentialResponse{
 			AgentName: req.AgentName,
 			Name:      req.Name,
 			Type:      req.Type,
 			URL:       s.cfg.GetServiceURL(),
-			CACert:    cacert,
 		}
 
 		username := fmt.Sprintf("%s.%s", req.Name, req.AgentName)
@@ -312,21 +304,16 @@ func (s *CNCServer) generateControlCredentials() http.HandlerFunc {
 			return
 		}
 
-		name := ca.CertificateName{
-			Name:    req.Name,
-			Purpose: ca.CertificatePurposeAgent,
-		}
-		ca64, user64, key64, err := s.authority.GenerateCertificate(name)
+		token, err := jwtutil.MakeControlJWT(req.Name, s.clock)
 		if err != nil {
 			util.FailRequest(ctx, w, err, http.StatusBadRequest)
 			return
 		}
+
 		ret := fwdapi.ControlCredentialsResponse{
-			Name:        req.Name,
-			URL:         s.cfg.GetControlURL(),
-			Certificate: user64,
-			Key:         key64,
-			CACert:      ca64,
+			Name:  req.Name,
+			URL:   s.cfg.GetControlURL(),
+			Token: token,
 		}
 		json, err := json.Marshal(ret)
 		if err != nil {
@@ -390,32 +377,30 @@ func (s *CNCServer) routes(mux *http.ServeMux) {
 
 }
 
+func loggerFromContext(ctx context.Context, fields ...zap.Field) (context.Context, *zap.SugaredLogger) {
+	ctx = logging.NewContext(ctx, fields...)
+	return ctx, logging.WithContext(ctx).Sugar()
+}
+
 // RunServer will start the HTTPS server and serve requests.
-func (s *CNCServer) RunServer(serverCert tls.Certificate) {
-	log.Printf("Running Command and Control API HTTPS listener on port %d",
-		s.cfg.GetControlListenPort())
-
-	certPool, err := s.authority.MakeCertPool()
-	if err != nil {
-		log.Fatalf("While making certpool: %v", err)
-	}
-
-	tlsConfig := &tls.Config{
-		ClientCAs:    certPool,
-		ClientAuth:   tls.RequireAndVerifyClientCert,
-		Certificates: []tls.Certificate{serverCert},
-		MinVersion:   tls.VersionTLS12,
-	}
-
+func (s *CNCServer) RunServer(ctx context.Context) {
+	_, logger := loggerFromContext(ctx, zap.String("component", "cncServer"))
 	mux := http.NewServeMux()
-
 	s.routes(mux)
 
 	srv := &http.Server{
-		Addr:      fmt.Sprintf(":%d", s.cfg.GetControlListenPort()),
-		TLSConfig: tlsConfig,
-		Handler:   mux,
+		Addr:    fmt.Sprintf(":%d", s.cfg.GetControlListenPort()),
+		Handler: mux,
 	}
 
-	log.Fatal(srv.ListenAndServeTLS("", ""))
+	if s.tlsPath != "" {
+		logger.Infow("Running Command and Control API HTTPS listener", "port", s.cfg.GetControlListenPort())
+		srv.TLSConfig = &tls.Config{
+			MinVersion: tls.VersionTLS13,
+		}
+		logger.Fatal(srv.ListenAndServeTLS(path.Join(s.tlsPath, "tls.crt"), path.Join(s.tlsPath, "tls.key")))
+	} else {
+		logger.Infow("Running Command and Control API HTTP listener", "port", s.cfg.GetControlListenPort())
+		logger.Fatal(srv.ListenAndServe())
+	}
 }

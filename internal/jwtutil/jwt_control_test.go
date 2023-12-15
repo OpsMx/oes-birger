@@ -25,34 +25,31 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestMakeServiceJWT(t *testing.T) {
+func TestMakeControlJWT(t *testing.T) {
 	keyset := LoadTestKeys(t)
-	err := RegisterServiceKeyset(keyset, "key1")
+	err := RegisterControlKeyset(keyset, "key1")
 	require.NoError(t, err)
+
 	tests := []struct {
 		name    string
-		epType  string
 		epName  string
-		agent   string
 		clock   jwt.Clock
 		want    string
 		wantErr bool
 	}{
 		{
 			"key1",
-			"artifactory",
 			"bob",
-			"agent1",
 			&jwtregistry.TimeClock{NowTime: 1111},
-			"eyJhbGciOiJIUzI1NiIsImtpZCI6ImtleTEiLCJ0eXAiOiJKV1QifQ.eyJhIjoiYWdlbnQxIiwiaWF0IjoxMTExLCJpc3MiOiJvcHNteCIsIm4iOiJib2IiLCJvcHNteC5wdXJwb3NlIjoic2VydmljZSIsInQiOiJhcnRpZmFjdG9yeSJ9.VgAIx8jP_2GCDJLtPOihzXqyqL1fs9VRfH5H9Zb8O1A",
+			"eyJhbGciOiJIUzI1NiIsImtpZCI6ImtleTEiLCJ0eXAiOiJKV1QifQ.eyJpYXQiOjExMTEsImlzcyI6Im9wc214LWNvbnRyb2wtYXV0aCIsIm9wc214Lm5hbWUiOiJib2IiLCJvcHNteC5wdXJwb3NlIjoiY29udHJvbCJ9.rE-Jlbd3Qkh1vW0xU62mGUqVMBgj_2_jH_yEkhdRgNE",
 			false,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := MakeServiceJWT(tt.epType, tt.epName, tt.agent, tt.clock)
+			got, err := MakeControlJWT(tt.epName, tt.clock)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("MakeServiceJWT() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("MakeControlJWT() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			assert.Equal(t, tt.want, got)
@@ -60,24 +57,20 @@ func TestMakeServiceJWT(t *testing.T) {
 	}
 }
 
-func TestMakeServiceJWT_BrokenSigner(t *testing.T) {
+func TestMakeControlJWT_BrokenSigner(t *testing.T) {
 	keyset := LoadTestKeys(t)
-	err := RegisterServiceKeyset(keyset, "not-there")
+	err := RegisterControlKeyset(keyset, "not-there")
 	require.NoError(t, err)
 	tests := []struct {
 		name    string
-		epType  string
 		epName  string
-		agent   string
 		clock   jwt.Clock
 		want    string
 		wantErr bool
 	}{
 		{
 			"key1",
-			"artifactory",
 			"bob",
-			"agent1",
 			&jwtregistry.TimeClock{NowTime: 1111},
 			"",
 			true,
@@ -85,9 +78,9 @@ func TestMakeServiceJWT_BrokenSigner(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := MakeServiceJWT(tt.epType, tt.epName, tt.agent, tt.clock)
+			got, err := MakeControlJWT(tt.epName, tt.clock)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("MakeServiceJWT() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("MakeControlJWT() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			assert.Equal(t, tt.want, got)
@@ -95,76 +88,62 @@ func TestMakeServiceJWT_BrokenSigner(t *testing.T) {
 	}
 }
 
-func TestValidateServiceJWT(t *testing.T) {
+func TestValidateControlJWT(t *testing.T) {
 	keyset := LoadTestKeys(t)
-	err := RegisterServiceKeyset(keyset, "key1")
+	err := RegisterControlKeyset(keyset, "key1")
 	require.NoError(t, err)
 	tests := []struct {
 		name          string
 		token         string
 		clock         jwt.Clock
-		wantType      string
 		wantName      string
-		wantAgent     string
 		wantErrString string
 	}{
 		{
 			"valid",
-			"eyJhbGciOiJIUzI1NiIsImtpZCI6ImtleTEiLCJ0eXAiOiJKV1QifQ.eyJhIjoiYWdlbnQxIiwiaWF0IjoxMTExLCJpc3MiOiJvcHNteCIsIm4iOiJib2IiLCJ0IjoiYXJ0aWZhY3RvcnkifQ.DW4Dj8C94KzKUaZ8tIrMrDnaXc-ipHaEL50N2IcHAoA",
+			"eyJhbGciOiJIUzI1NiIsImtpZCI6ImtleTEiLCJ0eXAiOiJKV1QifQ.eyJpYXQiOjExMTEsImlzcyI6Im9wc214LWNvbnRyb2wtYXV0aCIsIm9wc214Lm5hbWUiOiJib2IiLCJvcHNteC5wdXJwb3NlIjoiY29udHJvbCJ9.rE-Jlbd3Qkh1vW0xU62mGUqVMBgj_2_jH_yEkhdRgNE",
 			&jwtregistry.TimeClock{NowTime: 1111},
-			"artifactory",
 			"bob",
-			"agent1",
 			"",
 		},
 		{
 			"wrong-issuer",
-			"eyJhbGciOiJIUzI1NiIsImtpZCI6ImtleTEiLCJ0eXAiOiJKV1QifQ.eyJhIjoiYWdlbnQxIiwiaWF0IjoxMTExLCJpc3MiOiJub3QtdmFsaWQiLCJuIjoiYm9iIiwidCI6ImFydGlmYWN0b3J5In0.bplIcfd1SlifxrzOKTuXTj5J1VkSkmmRw2PsRWzFymc",
+			"eyJhbGciOiJIUzI1NiIsImtpZCI6ImtleTEiLCJ0eXAiOiJKV1QifQ.eyJpYXQiOjExMTEsImlzcyI6Indyb25nIiwib3BzbXgubmFtZSI6ImJvYiIsIm9wc214LnB1cnBvc2UiOiJjb250cm9sIn0.P7rljWqgFuej2AcP9UGuBAAOxKy_zQoxgAPauWGonwk",
 			&jwtregistry.TimeClock{NowTime: 1111},
-			"",
-			"",
 			"",
 			`"iss" not satisfied: values do not match`,
 		},
 		{
-			"missing-a",
-			"eyJhbGciOiJIUzI1NiIsImtpZCI6ImtleTEiLCJ0eXAiOiJKV1QifQ.eyJheCI6ImFnZW50MSIsImlhdCI6MTExMSwiaXNzIjoib3BzbXgiLCJuIjoiYm9iIiwidCI6ImFydGlmYWN0b3J5In0.9wy-WWMMDTDiDNZ1XF0a7cCgNfvTTlxbyxkag9PKoq4",
+			"wrong-purpose",
+			"eyJhbGciOiJIUzI1NiIsImtpZCI6ImtleTEiLCJ0eXAiOiJKV1QifQ.eyJpYXQiOjExMTEsImlzcyI6Im9wc214LWNvbnRyb2wtYXV0aCIsIm9wc214Lm5hbWUiOiJib2IiLCJvcHNteC5wdXJwb3NlIjoid3JvbmcifQ.0v6aVtbDk62gP-1URP7JHMk0riYABXD3ePu2LTPMRbQ",
 			&jwtregistry.TimeClock{NowTime: 1111},
 			"",
-			"",
-			"",
-			`no 'a' key in JWT claims`,
+			`expected a control JWT, got a 'wrong'`,
 		},
 		{
-			"missing-n",
-			"eyJhbGciOiJIUzI1NiIsImtpZCI6ImtleTEiLCJ0eXAiOiJKV1QifQ.eyJhIjoiYWdlbnQxIiwiaWF0IjoxMTExLCJpc3MiOiJvcHNteCIsIm54IjoiYm9iIiwidCI6ImFydGlmYWN0b3J5In0.LSH68qx5PEkB-lfN5nztFVYFlSZChCU33zJf2NWVxBE",
+			"missing-purpose",
+			"eyJhbGciOiJIUzI1NiIsImtpZCI6ImtleTEiLCJ0eXAiOiJKV1QifQ.eyJpYXQiOjExMTEsImlzcyI6Im9wc214LWNvbnRyb2wtYXV0aCIsIm9wc214Lm5hbWUiOiJib2IifQ.YEKwSTFl9Rg4Ayu8o9z1tPeoXXnzSXvgRmWJy7pALdQ",
 			&jwtregistry.TimeClock{NowTime: 1111},
 			"",
-			"",
-			"",
-			`no 'n' key in JWT claims`,
+			`no 'opsmx.purpose' key in JWT claims`,
 		},
 		{
-			"missing-t",
-			"eyJhbGciOiJIUzI1NiIsImtpZCI6ImtleTEiLCJ0eXAiOiJKV1QifQ.eyJhIjoiYWdlbnQxIiwiaWF0IjoxMTExLCJpc3MiOiJvcHNteCIsIm4iOiJib2IiLCJ0eCI6ImFydGlmYWN0b3J5In0.noL3WZ4ScRylMOSP1ZKjJ0vPLudMSQc5CGB77W6WyFE",
+			"missing-name",
+			"eyJhbGciOiJIUzI1NiIsImtpZCI6ImtleTEiLCJ0eXAiOiJKV1QifQ.eyJpYXQiOjExMTEsImlzcyI6Im9wc214LWNvbnRyb2wtYXV0aCIsIm9wc214LnB1cnBvc2UiOiJjb250cm9sIn0.x3fVYkRhC8Ytyt4WcQVFWqP8haP_HnxQFYDivpXPey0",
 			&jwtregistry.TimeClock{NowTime: 1111},
 			"",
-			"",
-			"",
-			`no 't' key in JWT claims`,
+			`no 'opsmx.name' key in JWT claims`,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotType, gotName, gotAgent, err := ValidateServiceJWT(tt.token, tt.clock)
+			gotName, err := ValidateControlJWT(tt.token, tt.clock)
 			if tt.wantErrString != "" {
 				require.EqualError(t, err, tt.wantErrString)
 				return
 			}
 			require.NoError(t, err)
-			assert.Equal(t, tt.wantAgent, gotAgent)
 			assert.Equal(t, tt.wantName, gotName)
-			assert.Equal(t, tt.wantType, gotType)
 		})
 	}
 }

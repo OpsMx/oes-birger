@@ -23,10 +23,10 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"path"
 	"strings"
 	"time"
 
-	"github.com/opsmx/oes-birger/internal/ca"
 	"github.com/opsmx/oes-birger/internal/jwtutil"
 	"github.com/opsmx/oes-birger/internal/logging"
 	"github.com/opsmx/oes-birger/internal/ulid"
@@ -54,33 +54,29 @@ type SearchSpec struct {
 
 // RunHTTPSServer will listen for incoming service requests on a provided port, and
 // currently will use certificates or JWT to identify the destination.
-func RunHTTPSServer(ctx context.Context, em EchoManager, routes Destinations, ca *ca.CA, serverCert tls.Certificate, service IncomingServiceConfig) {
+func RunHTTPSServer(ctx context.Context, em EchoManager, routes Destinations, tlsPath string, service IncomingServiceConfig) {
 	logger := logging.WithContext(ctx).Sugar()
-	logger.Infof("Running service HTTPS listener on port %d", service.Port)
-
-	certPool, err := ca.MakeCertPool()
-	if err != nil {
-		logger.Fatalf("While making certpool: %v", err)
-	}
-
-	tlsConfig := &tls.Config{
-		ClientCAs:    certPool,
-		ClientAuth:   tls.VerifyClientCertIfGiven,
-		Certificates: []tls.Certificate{serverCert},
-		MinVersion:   tls.VersionTLS12,
-	}
 
 	mux := http.NewServeMux()
-
 	mux.HandleFunc("/", secureAPIHandlerMaker(em, routes, service))
 
 	server := &http.Server{
-		Addr:      fmt.Sprintf(":%d", service.Port),
-		TLSConfig: tlsConfig,
-		Handler:   mux,
+		Addr:    fmt.Sprintf(":%d", service.Port),
+		Handler: mux,
 	}
+
 	addDefaults(ctx, server)
-	logger.Fatal(server.ListenAndServeTLS("", ""))
+
+	if tlsPath != "" {
+		server.TLSConfig = &tls.Config{
+			MinVersion: tls.VersionTLS13,
+		}
+		logger.Infof("Running service HTTPS listener on port %d", service.Port)
+		logger.Fatal(server.ListenAndServeTLS(path.Join(tlsPath, "tls.crt"), path.Join(tlsPath, "tls.key")))
+	} else {
+		logger.Infof("Running service HTTP listener on port %d", service.Port)
+		logger.Fatal(server.ListenAndServe())
+	}
 }
 
 // RunHTTPServer will listen on an unencrypted HTTP only port, and will always forward
@@ -116,26 +112,6 @@ func fixedIdentityAPIHandlerMaker(em EchoManager, routes Destinations, service I
 		}
 		runAPIHandler(em, routes, ep, w, r)
 	}
-}
-
-func extractEndpointFromCert(r *http.Request) (agentIdentity string, endpointType string, endpointName string, validated bool) {
-	logger := logging.WithContext(r.Context()).Sugar()
-
-	if len(r.TLS.PeerCertificates) == 0 {
-		return "", "", "", false
-	}
-
-	names, err := ca.GetCertificateNameFromCert(r.TLS.PeerCertificates[0])
-	if err != nil {
-		logger.Errorf("%v", err)
-		return "", "", "", false
-	}
-
-	if names.Purpose != ca.CertificatePurposeService {
-		return "", "", "", false
-	}
-
-	return names.Agent, names.Type, names.Name, true
 }
 
 func extractEndpointFromJWT(r *http.Request) (agentIdentity string, endpointType string, endpointName string, validated bool) {
@@ -175,19 +151,12 @@ func extractEndpointFromJWT(r *http.Request) (agentIdentity string, endpointType
 
 func extractEndpoint(r *http.Request) (agentIdentity string, endpointType string, endpointName string, err error) {
 	logger := logging.WithContext(r.Context()).Sugar()
-	agentIdentity, endpointType, endpointName, found := extractEndpointFromCert(r)
+	agentIdentity, endpointType, endpointName, found := extractEndpointFromJWT(r)
 	if found {
 		return agentIdentity, endpointType, endpointName, nil
 	}
-
-	agentIdentity, endpointType, endpointName, found = extractEndpointFromJWT(r)
-	if found {
-		return agentIdentity, endpointType, endpointName, nil
-	}
-
 	logger.Warnw("invalid-credentials", "remote", r.RemoteAddr, "url", r.URL)
-
-	return "", "", "", fmt.Errorf("no valid credentials or JWT found")
+	return "", "", "", fmt.Errorf("no valid JWT found")
 }
 
 func secureAPIHandlerMaker(em EchoManager, routes Destinations, service IncomingServiceConfig) func(http.ResponseWriter, *http.Request) {

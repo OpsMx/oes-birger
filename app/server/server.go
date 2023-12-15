@@ -23,6 +23,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"path"
 	"sync"
 	"time"
 
@@ -244,7 +245,22 @@ func (s *server) RunRequest(in *pb.TunnelRequest, stream pb.TunnelService_RunReq
 	}
 }
 
-func runAgentGRPCServer(ctx context.Context, useTLS bool, serverCert *tls.Certificate) {
+func loadTLSCredentials(tlsPath string) (credentials.TransportCredentials, error) {
+	serverCert, err := tls.LoadX509KeyPair(path.Join(tlsPath, "tls.crt"), path.Join(tlsPath, "tls.key"))
+	if err != nil {
+		return nil, err
+	}
+
+	config := &tls.Config{
+		Certificates: []tls.Certificate{serverCert},
+		ClientAuth:   tls.NoClientCert,
+		MinVersion:   tls.VersionTLS13,
+	}
+
+	return credentials.NewTLS(config), nil
+}
+
+func runAgentGRPCServer(ctx context.Context, tlsPath string) {
 	ctx, logger := loggerFromContext(ctx, zap.String("component", "grpcServer"))
 	logger.Infow("starting agent GRPC server", "port", config.AgentListenPort)
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", config.AgentListenPort))
@@ -263,19 +279,8 @@ func runAgentGRPCServer(ctx context.Context, useTLS bool, serverCert *tls.Certif
 	defer cleanerCancel()
 	go agents.checkSessionTimeouts(cleanerCtx, s.agentIdleTimeout)
 
-	certPool, err := authority.MakeCertPool()
-	if err != nil {
-		logger.Fatalw("authority.MakeCertPool", "error", err)
-	}
-	creds := credentials.NewTLS(&tls.Config{
-		ClientCAs:    certPool,
-		ClientAuth:   tls.NoClientCert,
-		Certificates: []tls.Certificate{*serverCert},
-		MinVersion:   tls.VersionTLS13,
-	})
 	jwtInterceptor := NewJWTInterceptor()
 	opts := []grpc.ServerOption{
-		grpc.Creds(creds),
 		grpc.KeepaliveEnforcementPolicy(kaep),
 		grpc.KeepaliveParams(kasp),
 		grpc.ChainUnaryInterceptor(
@@ -286,6 +291,13 @@ func runAgentGRPCServer(ctx context.Context, useTLS bool, serverCert *tls.Certif
 			grpc_prometheus.StreamServerInterceptor,
 			jwtInterceptor.Stream(),
 		),
+	}
+	if tlsPath != "" {
+		creds, err := loadTLSCredentials(tlsPath)
+		if err != nil {
+			logger.Fatalw("failed to load GRPC agent certificates", "error", err)
+		}
+		opts = append(opts, grpc.Creds(creds))
 	}
 	grpcServer := grpc.NewServer(opts...)
 	pb.RegisterTunnelServiceServer(grpcServer, s)
