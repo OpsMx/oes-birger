@@ -1,3 +1,4 @@
 *.pem
 agent-token
+control-token
 controller-secrets.yaml

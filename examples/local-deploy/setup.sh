@@ -2,9 +2,10 @@
 
 set -e
 
-[ -r ca-cert.pem ] && {
-    echo "ca-cert.pem exists.  Run sh clean.sh to reset before running this script."
+[ -r control-token ] && {
+    echo "control-token exists.  Run sh clean.sh to reset before running this script."
     exit 1
 }
 
-../../bin/make-ca --withKubernetes=false --alsoAgentNamed=smith
+../../bin/server --configFile config/controller/config.yaml --generate-agent-tokens smith > agent-token
+../../bin/server --configFile config/controller/config.yaml --generate-control-tokens smith > control-token
