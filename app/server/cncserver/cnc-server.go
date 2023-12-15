@@ -32,17 +32,12 @@ import (
 	"github.com/OpsMx/go-app-base/version"
 	"github.com/lestrrat-go/jwx/v2/jwt"
 	"github.com/oklog/ulid/v2"
-	"github.com/opsmx/oes-birger/internal/ca"
 	"github.com/opsmx/oes-birger/internal/fwdapi"
 	"github.com/opsmx/oes-birger/internal/jwtutil"
 	"github.com/opsmx/oes-birger/internal/logging"
 	"github.com/opsmx/oes-birger/internal/util"
 	"go.uber.org/zap"
 )
-
-type cncCertificateAuthority interface {
-	ca.CertPoolGenerator
-}
 
 type cncConfig interface {
 	GetAgentHostname() string
@@ -107,11 +102,7 @@ func extractEndpointFromJWT(r *http.Request) (validated bool) {
 	}
 
 	_, err := jwtutil.ValidateControlJWT(authPassword, nil)
-	if err != nil {
-		return false
-	}
-
-	return true
+	return err == nil
 }
 
 func (s *CNCServer) authenticate(method string, h http.HandlerFunc) http.HandlerFunc {

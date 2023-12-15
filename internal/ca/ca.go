@@ -19,19 +19,11 @@
 package ca
 
 import (
-	"bytes"
 	"crypto/x509"
-	"encoding/base64"
-	"encoding/pem"
 	"fmt"
 	"time"
 
 	"go.uber.org/zap"
-)
-
-const (
-	defaultTLSCertificatePath = "/app/secrets/ca/tls.crt"
-	defaultTLSKeyPath         = "/app/secrets/ca/tls.key"
 )
 
 // CertificateIssuer implements a generic CA
@@ -64,24 +56,4 @@ func ValidateCACert(certbytes []byte) error {
 		return fmt.Errorf("CA certificate has not started yet (NotBefore %v)", pc.NotBefore)
 	}
 	return nil
-}
-
-func toPEM(data []byte, t string) ([]byte, error) {
-	p := &bytes.Buffer{}
-	err := pem.Encode(p, &pem.Block{
-		Type:  t,
-		Bytes: data,
-	})
-	if err != nil {
-		return []byte{}, nil
-	}
-	return p.Bytes(), nil
-}
-
-func bytesTo64(prefix string, data []byte) (string, error) {
-	p, err := toPEM(data, prefix)
-	if err != nil {
-		return "", err
-	}
-	return base64.StdEncoding.EncodeToString(p), nil
 }
