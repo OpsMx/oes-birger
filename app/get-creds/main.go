@@ -17,11 +17,11 @@ package main
  */
 
 import (
-	"crypto/tls"
 	"flag"
 	"fmt"
 	"log"
 	"os"
+	"strings"
 
 	"github.com/OpsMx/go-app-base/version"
 	"github.com/go-resty/resty/v2"
@@ -29,9 +29,8 @@ import (
 )
 
 var (
-	certFile      = flag.String("certFile", "control-cert.pem", "The file containing the certificate used to connect to the controller")
-	keyFile       = flag.String("keyFile", "control-key.pem", "The file containing the certificate used to connect to the controller")
 	caCertFile    = flag.String("caCertFile", "ca-cert.pem", "The file containing the CA certificate we will use to verify the controller's cert")
+	tokenFile     = flag.String("tokenFile", "control-token", "The file containing the control token")
 	url           = flag.String("url", "https://agent-controller:9003", "The URL of the controller's control endpoint")
 	endpointName  = flag.String("name", "", "Item name")
 	agentIdentity = flag.String("agent", "", "agent name")
@@ -53,14 +52,25 @@ func usage(message string) {
 	os.Exit(-1)
 }
 
+func readToken() (string, error) {
+	contents, err := os.ReadFile(*tokenFile)
+	if err != nil {
+		return "", err
+	}
+	token := strings.TrimSpace(string(contents))
+	return token, err
+}
+
 func makeClient() *resty.Client {
 	client := resty.New()
-	client.SetRootCertificate(*caCertFile)
-	cert, err := tls.LoadX509KeyPair(*certFile, *keyFile)
-	if err != nil {
-		log.Panicf("%v", err)
+	if *caCertFile != "" {
+		client.SetRootCertificate(*caCertFile)
 	}
-	client.SetCertificates(cert)
+	token, err := readToken()
+	if err != nil {
+		log.Panic(err)
+	}
+	client.SetAuthToken(token)
 	return client
 }
 
