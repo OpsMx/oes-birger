@@ -205,6 +205,9 @@ func connect(ctx context.Context, address string, ta credentials.TransportCreden
 		grpc.WithUnaryInterceptor(grpc_prometheus.UnaryClientInterceptor),
 		grpc.WithStreamInterceptor(grpc_prometheus.StreamClientInterceptor),
 	}
+	if config.InsecureControllerConnection {
+		gopts = append(gopts, grpc.WithInsecure())
+	}
 	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
 	conn, err := grpc.DialContext(ctx, address, gopts...)

@@ -1,4 +1,5 @@
 controllerHostname: localhost:8003
+insecureControllerConnection: true
 servicesConfigFile: config/agent/services-01.yaml
 authTokenFile: agent-token
 prometheusListenPort: 9103
