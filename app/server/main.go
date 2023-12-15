@@ -21,12 +21,14 @@ import (
 	"flag"
 	"fmt"
 	"io/fs"
+	"log"
 	"net/http"
 	pprofhttp "net/http/pprof"
 	"os"
 	"os/signal"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"syscall"
 	"time"
 
@@ -52,11 +54,13 @@ var (
 	configFile = flag.String("configFile", "/app/config/config.yaml", "The file with the controller config")
 
 	// eg, http://localhost:14268/api/traces
-	jaegerEndpoint = flag.String("jaeger-endpoint", "", "Jaeger collector endpoint")
-	traceToStdout  = flag.Bool("traceToStdout", false, "log traces to stdout")
-	traceRatio     = flag.Float64("traceRatio", 0.01, "ratio of traces to create, if incoming request is not traced")
-	showversion    = flag.Bool("version", false, "show the version and exit")
-	profile        = flag.Bool("profile", false, "enable memory and CPU profiling")
+	jaegerEndpoint        = flag.String("jaeger-endpoint", "", "Jaeger collector endpoint")
+	traceToStdout         = flag.Bool("traceToStdout", false, "log traces to stdout")
+	traceRatio            = flag.Float64("traceRatio", 0.01, "ratio of traces to create, if incoming request is not traced")
+	showversion           = flag.Bool("version", false, "show the version and exit")
+	profile               = flag.Bool("profile", false, "enable memory and CPU profiling")
+	generateControlTokens = flag.String("generate-control-tokens", "", "generate control tokens.  Example: ground,mission")
+	generateAgentTokens   = flag.String("generate-agent-tokens", "", "generate agent tokens.  Example: agentsmith,agentbob,alice")
 
 	tracerProvider *tracer.TracerProvider
 
@@ -283,7 +287,7 @@ func main() {
 		logger.Fatal(err)
 	}
 	// TODO: use a different keyset?
-	if err = jwtutil.RegisterControlKeyset(serviceKeyset, config.AgentAuth.CurrentKeyName); err != nil {
+	if err = jwtutil.RegisterControlKeyset(serviceKeyset, config.ServiceAuth.CurrentKeyName); err != nil {
 		logger.Fatal(err)
 	}
 	if err = jwtutil.RegisterMutationKeyset(serviceKeyset, config.ServiceAuth.HeaderMutationKeyName); err != nil {
@@ -291,6 +295,16 @@ func main() {
 	}
 	if err = jwtutil.RegisterAgentKeyset(agentKeyset, config.AgentAuth.CurrentKeyName); err != nil {
 		logger.Fatal(err)
+	}
+
+	if *generateAgentTokens != "" {
+		generateSomeAgentTokens(config, *generateAgentTokens)
+		os.Exit(0)
+	}
+
+	if *generateControlTokens != "" {
+		generateSomeControlTokens(config, *generateControlTokens)
+		os.Exit(0)
 	}
 
 	cnc := cncserver.MakeCNCServer(config, agents, version.GitBranch(), config.ControlTLSPath, nil)
@@ -337,4 +351,28 @@ func makeSecretsLoader(ctx context.Context) secrets.SecretLoader {
 		return nil
 	}
 	return loader
+}
+
+func generateSomeAgentTokens(c *ControllerConfig, names string) {
+	n := strings.Split(names, ",")
+	for _, name := range n {
+		name = strings.TrimSpace(name)
+		token, err := jwtutil.MakeAgentJWT(name, nil)
+		if err != nil {
+			log.Fatalln(err)
+		}
+		fmt.Printf("%s\n", token)
+	}
+}
+
+func generateSomeControlTokens(c *ControllerConfig, names string) {
+	n := strings.Split(names, ",")
+	for _, name := range n {
+		name = strings.TrimSpace(name)
+		token, err := jwtutil.MakeControlJWT(name, nil)
+		if err != nil {
+			log.Fatalln(err)
+		}
+		fmt.Printf("%s\n", token)
+	}
 }
