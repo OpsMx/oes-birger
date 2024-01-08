@@ -51,3 +51,11 @@ func StreamflowWrapStreamID(streamID string) *StreamFlow {
 		},
 	}
 }
+
+func StreamflowWrapKeepalive() *StreamFlow {
+	return &StreamFlow{
+		Event: &StreamFlow_Keepalive{
+			Keepalive: "keep-alive",
+		},
+	}
+}

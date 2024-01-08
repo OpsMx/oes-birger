@@ -80,6 +80,7 @@ message TunnelRequest {
     string URI = 6;
     repeated HttpHeader headers = 7;
     bytes body = 8;
+    bool isKeepalive = 9;
 }
 
 message StartTunnelResponse {
@@ -97,6 +98,7 @@ message StreamFlow {
         Data data = 3;
         Cancel cancel = 4;
         Done done = 5;
+        string keepalive = 6;
     }
 }
 
