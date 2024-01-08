@@ -1,0 +1,73 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: controller
+  namespace: agent-test
+spec:
+  replicas: 1
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      app: controller
+  template:
+    metadata:
+      labels:
+        app: controller
+    spec:
+      containers:
+      - env:
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.namespace
+        image: quay.io/opsmxpublic/agent-controller:v5.0.0
+        imagePullPolicy: IfNotPresent
+        name: opsmx-controller-controller1
+        ports:
+        - containerPort: 9001
+          name: agent-grpc
+          protocol: TCP
+        - containerPort: 9002
+          name: service-api
+          protocol: TCP
+        - containerPort: 9003
+          name: control-api
+          protocol: TCP
+        - containerPort: 9004
+          name: remote-command
+          protocol: TCP
+        - containerPort: 9102
+          name: metrics
+          protocol: TCP
+        resources:
+          requests:
+            cpu: 100m
+            memory: 64Mi
+        volumeMounts:
+        - mountPath: /app/config
+          name: config
+          readOnly: true
+        - mountPath: /app/secrets/serviceAuth
+          name: service-jwt-secret
+          readOnly: true
+        - mountPath: /app/secrets/agentAuth
+          name: agent-jwt-secret
+          readOnly: true
+      terminationGracePeriodSeconds: 30
+      volumes:
+      - name: agent-jwt-secret
+        secret:
+          defaultMode: 420
+          secretName: agent-jwt-secret
+      - name: service-jwt-secret
+        secret:
+          defaultMode: 420
+          secretName: service-jwt-secret
+      - configMap:
+          defaultMode: 420
+          items:
+          - key: configFile
+            path: config.yaml
+          name: controller-config
+        name: config

@@ -1,0 +1,88 @@
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: opsmx-services-jan51300-opsmx-agent
+  namespace: agent-test
+stringData:
+  services.yaml: ""
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: opsmx-agent-jan51300-opsmx-agent
+  namespace: agent-test
+  labels:
+    agent.opsmx.com/name: jan51300-opsmx-agent
+    agent.opsmx.com/role: agent
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: opsmx-agent-jan51300-opsmx-agent
+  template:
+    metadata:
+      labels:
+        app: opsmx-agent-jan51300-opsmx-agent
+        agent.opsmx.com/name: jan51300-opsmx-agent
+        agent.opsmx.com/role: agent
+    spec:
+      containers:
+      - name: opsmx-agent-jan51300-opsmx-agent
+        image: quay.io/opsmxpublic/agent-client:v5.0.0
+        volumeMounts:
+        - name: config
+          mountPath: /app/config/config.yaml
+          subPath: config.yaml
+          readOnly: true
+        - name: authtoken
+          mountPath: /app/secrets
+          readOnly: true
+        - name: service-config
+          mountPath: /app/config/services.yaml
+          subPath: services.yaml
+          readOnly: true
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "100m"
+          limits:
+            memory: "128Mi"
+            cpu: "250m"
+      volumes:
+      - name: authtoken
+        secret:
+          secretName: opsmx-agent-jan51300-opsmx-agent-auth
+      - name: config
+        secret:
+          secretName: opsmx-agent-jan51300-opsmx-agent
+          items:
+          - key: "configFile"
+            path: "config.yaml"
+      - name: service-config
+        secret:
+          secretName: opsmx-services-jan51300-opsmx-agent
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: opsmx-agent-jan51300-opsmx-agent
+  namespace: agent-test
+  labels:
+    agent.opsmx.com/name: jan51300-opsmx-agent
+    agent.opsmx.com/role: agent
+stringData:
+  configFile: |
+    controllerHostname: controller.svc.rpi.flame.org:443
+---
+apiVersion: v1
+kind: Secret
+type: Opaque
+metadata:
+  name: opsmx-agent-jan51300-opsmx-agent-auth
+  namespace: agent-test
+  labels:
+    agent.opsmx.com/name: jan51300-opsmx-agent
+    agent.opsmx.com/role: agent
+data:
+  authtoken: ZXlKaGJHY2lPaUpJVXpJMU5pSXNJbXRwWkNJNkltRm5aVzUwUzJWNU1TSXNJblI1Y0NJNklrcFhWQ0o5LmV5SnBZWFFpT2pFM01EUTJPVGd5TkRjc0ltbHpjeUk2SW05d2MyMTRMV0ZuWlc1MExXRjFkR2dpTENKdmNITnRlQzVoWjJWdWRDNXVZVzFsSWpvaVltOWlJaXdpYjNCemJYZ3VjSFZ5Y0c5elpTSTZJbUZuWlc1MEluMC44NGphYXVXUXk2OWx0Y2VLSTlDOG40ZWItVi1Na25qYlliSmZFajc4ME9r
