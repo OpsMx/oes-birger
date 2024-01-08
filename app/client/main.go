@@ -137,6 +137,9 @@ func waitForRequest(ctx context.Context, c pb.TunnelServiceClient) error {
 		if err != nil {
 			return err
 		}
+		if req.IsKeepalive {
+			continue
+		}
 		logger.Debugw("waitForRequest response",
 			"streamID", req.StreamId,
 			"method", req.Method,

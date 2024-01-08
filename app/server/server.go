@@ -93,9 +93,20 @@ func (s *server) WaitForRequest(in *pb.WaitForRequestArgs, stream pb.TunnelServi
 		return status.Error(codes.FailedPrecondition, "Hello must be called first")
 	}
 	defer agents.removeSession(session)
+	t := time.NewTicker(10 * time.Second)
+	defer t.Stop()
 
 	for {
 		select {
+		case <-t.C:
+			keepalive := &pb.TunnelRequest{
+				IsKeepalive: true,
+			}
+			if err := stream.Send(keepalive); err != nil {
+				s.closeAgentSession(ctx, session)
+				logger.Errorw("WaitForRequest stream.Send() failed, dropping agent", "error", err)
+				return status.Error(codes.Canceled, "send failed")
+			}
 		case <-ctx.Done():
 			logger.Infow("closed connection")
 			s.closeAgentSession(ctx, session)
@@ -172,6 +183,8 @@ func (s *server) DataFlowAgentToController(rpcstream pb.TunnelService_DataFlowAg
 			_ = stream.echo.Headers(ctx, event.GetHeaders())
 		case *pb.StreamFlow_Data:
 			_ = stream.echo.Data(ctx, event.GetData().Data)
+		case *pb.StreamFlow_Keepalive:
+			// do nothing
 		}
 	}
 }
