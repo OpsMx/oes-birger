@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: controller-config
+  namespace: agent-test
+data:
+  configFile: |
+    serviceHostname: controller.agent-test.cluster.local
+    agentHostname: controller.svc.rpi.flame.org
+    controlHostname: controller
+    agentAdvertisePort: 443
+    serviceAuth:
+      currentKeyName: "serviceKey1"
+      headerMutationKeyName: "mutationKey1"
+    agentAuth:
+      currentKeyName: agentKey1
+      secretsPath: /app/secrets/agentAuth
