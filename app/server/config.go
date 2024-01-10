@@ -151,12 +151,20 @@ func LoadConfig(f io.Reader) (*ControllerConfig, error) {
 
 // GetServiceURL returns a fullly formatted URL string with hostname and port.
 func (c *ControllerConfig) GetServiceURL() string {
-	return fmt.Sprintf("https://%s:%d", *c.ServiceHostname, c.ServiceListenPort)
+	scheme := "https"
+	if c.ServiceTLSPath == "" {
+		scheme = "http"
+	}
+	return fmt.Sprintf("%s://%s:%d", scheme, *c.ServiceHostname, c.ServiceListenPort)
 }
 
 // GetControlURL returns a fullly formatted URL string with hostname and port.
 func (c *ControllerConfig) GetControlURL() string {
-	return fmt.Sprintf("https://%s:%d", *c.ControlHostname, c.ControlListenPort)
+	scheme := "https"
+	if c.ControlTLSPath == "" {
+		scheme = "http"
+	}
+	return fmt.Sprintf("%s://%s:%d", scheme, *c.ControlHostname, c.ControlListenPort)
 }
 
 // GetAgentAdvertisePort returns the port the CNC server will use to advertise agent
