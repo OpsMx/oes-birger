@@ -7,7 +7,7 @@ require (
 	github.com/go-resty/resty/v2 v2.11.0
 	github.com/google/go-cmp v0.6.0
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
-	github.com/lestrrat-go/jwx/v2 v2.0.18
+	github.com/lestrrat-go/jwx/v2 v2.0.19
 	github.com/oklog/ulid/v2 v2.1.0
 	github.com/prometheus/client_golang v1.18.0
 	github.com/skandragon/jwtregistry/v2 v2.0.0
