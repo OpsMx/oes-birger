@@ -62,12 +62,11 @@ var (
 	tickTime   = flag.Int("tickTime", 10, "Time between sending Ping messages")
 	configFile = flag.String("configFile", "/app/config/config.yaml", "The file with the controller config")
 
-	// eg, http://localhost:14268/api/traces
-	jaegerEndpoint = flag.String("jaeger-endpoint", "", "Jaeger collector endpoint")
-	traceToStdout  = flag.Bool("traceToStdout", false, "log traces to stdout")
-	traceRatio     = flag.Float64("traceRatio", 0.01, "ratio of traces to create, if incoming request is not traced")
-	showversion    = flag.Bool("version", false, "show the version and exit")
-	profile        = flag.Bool("profile", false, "enable memory and CPU profiling")
+	otlpEndpoint  = flag.String("otlp-endpoint", "", "OTLP collector endpoint")
+	traceToStdout = flag.Bool("traceToStdout", false, "log traces to stdout")
+	traceRatio    = flag.Float64("traceRatio", 0.01, "ratio of traces to create, if incoming request is not traced")
+	showversion   = flag.Bool("version", false, "show the version and exit")
+	profile       = flag.Bool("profile", false, "enable memory and CPU profiling")
 
 	hostname = getHostname()
 
@@ -388,7 +387,7 @@ func main() {
 	)
 
 	var err error
-	tracerProvider, err = tracer.NewTracerProvider(*jaegerEndpoint, *traceToStdout, version.GitHash(), appName, *traceRatio)
+	tracerProvider, err = tracer.NewTracerProvider(ctx, *otlpEndpoint, *traceToStdout, version.GitHash(), appName, *traceRatio)
 	util.Check(err)
 	defer tracerProvider.Shutdown(ctx)
 

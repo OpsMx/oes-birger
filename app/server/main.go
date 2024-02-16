@@ -54,7 +54,7 @@ var (
 	configFile = flag.String("configFile", "/app/config/config.yaml", "The file with the controller config")
 
 	// eg, http://localhost:14268/api/traces
-	jaegerEndpoint        = flag.String("jaeger-endpoint", "", "Jaeger collector endpoint")
+	otlpEndpoint          = flag.String("otlp-endpoint", "", "OTLP collector endpoint")
 	traceToStdout         = flag.Bool("traceToStdout", false, "log traces to stdout")
 	traceRatio            = flag.Float64("traceRatio", 0.01, "ratio of traces to create, if incoming request is not traced")
 	showversion           = flag.Bool("version", false, "show the version and exit")
@@ -262,12 +262,12 @@ func main() {
 	sigchan := make(chan os.Signal, 1)
 	signal.Notify(sigchan, syscall.SIGTERM, syscall.SIGINT)
 
-	if *jaegerEndpoint != "" {
-		*jaegerEndpoint = util.GetEnvar("JAEGER_TRACE_URL", "")
+	if *otlpEndpoint != "" {
+		*otlpEndpoint = util.GetEnvar("OTLP_URL", "")
 	}
 
 	var err error
-	tracerProvider, err = tracer.NewTracerProvider(*jaegerEndpoint, *traceToStdout, version.GitHash(), appName, *traceRatio)
+	tracerProvider, err = tracer.NewTracerProvider(ctx, *otlpEndpoint, *traceToStdout, version.GitHash(), appName, *traceRatio)
 	util.Check(err)
 	defer tracerProvider.Shutdown(ctx)
 
