@@ -94,7 +94,7 @@ func LoadConfig(f io.Reader) (*ControllerConfig, error) {
 	}
 
 	if config.AgentListenPort == 0 {
-		config.AgentListenPort = 9001
+		config.AgentListenPort = 443
 	}
 	if config.AgentAdvertisePort == 0 {
 		config.AgentAdvertisePort = config.AgentListenPort
