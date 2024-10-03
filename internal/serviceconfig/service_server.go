@@ -55,6 +55,8 @@ type SearchSpec struct {
 // RunHTTPSServer will listen for incoming service requests on a provided port, and
 // currently will use certificates or JWT to identify the destination.
 func RunHTTPSServer(ctx context.Context, em EchoManager, routes Destinations, tlsPath string, service IncomingServiceConfig) {
+	fmt.Printf("INSIDE RunHTTPSServer FUNCTION")
+
 	logger := logging.WithContext(ctx).Sugar()
 
 	mux := http.NewServeMux()

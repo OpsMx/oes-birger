@@ -384,6 +384,8 @@ func loggerFromContext(ctx context.Context, fields ...zap.Field) (context.Contex
 
 // RunServer will start the HTTPS server and serve requests.
 func (s *CNCServer) RunServer(ctx context.Context) {
+	fmt.Printf("INSIDE RunServer FUNCTION")
+
 	_, logger := loggerFromContext(ctx, zap.String("component", "cncServer"))
 	mux := http.NewServeMux()
 	s.routes(mux)

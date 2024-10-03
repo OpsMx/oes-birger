@@ -100,6 +100,8 @@ func healthcheck(w http.ResponseWriter, r *http.Request) {
 }
 
 func runPrometheusHTTPServer(ctx context.Context, port uint16, profile bool) {
+	fmt.Printf("INSIDE runPrometheusHTTPServer FUNCTION")
+
 	_, logger := loggerFromContext(ctx)
 	logger.Infof("Running HTTP listener for Prometheus on port %d", port)
 
@@ -242,6 +244,8 @@ func loadAgentAuthKeyset(ctx context.Context) {
 //}
 
 func main() {
+	fmt.Printf("INSIDE main FUNCTION")
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	ctx, logger := loggerFromContext(ctx)
@@ -339,6 +343,8 @@ func main() {
 }
 
 func makeSecretsLoader(ctx context.Context) secrets.SecretLoader {
+	fmt.Printf("INSIDE makeSecretsLoader FUNCTION")
+
 	logger := logging.WithContext(ctx).Sugar()
 	namespace, ok := os.LookupEnv("POD_NAMESPACE")
 	if !ok {
@@ -354,6 +360,8 @@ func makeSecretsLoader(ctx context.Context) secrets.SecretLoader {
 }
 
 func generateSomeAgentTokens(c *ControllerConfig, names string) {
+	fmt.Printf("INSIDE generateSomeAgentTokens FUNCTION")
+
 	n := strings.Split(names, ",")
 	for _, name := range n {
 		name = strings.TrimSpace(name)
@@ -366,6 +374,7 @@ func generateSomeAgentTokens(c *ControllerConfig, names string) {
 }
 
 func generateSomeControlTokens(c *ControllerConfig, names string) {
+	fmt.Printf("INSIDE generateSomeControlTokens FUNCTION")
 	n := strings.Split(names, ",")
 	for _, name := range n {
 		name = strings.TrimSpace(name)

@@ -51,6 +51,8 @@ func httpError(err error) []byte {
 // and write to the message body a JSON format error message.  The http.ResponseWriter
 // should not have been used, or be used after calling FailRequest.
 func FailRequest(ctx context.Context, w http.ResponseWriter, err error, code int) {
+	fmt.Printf("INSIDE  FailReqeust  FUNCTION")
+
 	logger := logging.WithContext(ctx).Sugar()
 	w.WriteHeader(code)
 	errmsg := httpError(err)
