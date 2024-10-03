@@ -54,7 +54,7 @@ type serviceRequest struct {
 }
 
 func (s *server) Hello(ctx context.Context, in *pb.HelloRequest) (*pb.HelloResponse, error) {
-	fmt.Printf("INSIDE  Hello  FUNCTION")
+	fmt.Printf("%s\n", "INSIDE  Hello  FUNCTION")
 
 	agentID, _ := IdentityFromContext(ctx)
 	_, logger := loggerFromContext(ctx)
@@ -70,7 +70,7 @@ func (s *server) Hello(ctx context.Context, in *pb.HelloRequest) (*pb.HelloRespo
 }
 
 func (s *server) Ping(ctx context.Context, in *pb.PingRequest) (*pb.PingResponse, error) {
-	fmt.Printf("INSIDE  Ping  FUNCTION")
+	fmt.Printf("%s\n", "INSIDE  Ping  FUNCTION")
 
 	session, err := agents.findSession(ctx)
 	if err != nil {
@@ -86,14 +86,14 @@ func (s *server) Ping(ctx context.Context, in *pb.PingRequest) (*pb.PingResponse
 }
 
 func (s *server) closeAgentSession(ctx context.Context, session *AgentContext) {
-	fmt.Printf("INSIDE  closeAgentSession  FUNCTION")
+	fmt.Printf("%s\n", "INSIDE  closeAgentSession  FUNCTION")
 
 	agents.removeSession(session)
 	s.streamManager.FlushAgent(ctx, session)
 }
 
 func (s *server) WaitForRequest(in *pb.WaitForRequestArgs, stream pb.TunnelService_WaitForRequestServer) error {
-	fmt.Printf("INSIDE  waitForRequest  FUNCTION")
+	fmt.Printf("%s\n", "INSIDE  waitForRequest  FUNCTION")
 
 	ctx, logger := loggerFromContext(stream.Context())
 	session, err := agents.findSession(stream.Context())
@@ -131,7 +131,7 @@ func (s *server) WaitForRequest(in *pb.WaitForRequestArgs, stream pb.TunnelServi
 }
 
 func (s *server) done(ctx context.Context, stream *Stream) {
-	fmt.Printf("INSIDE  done  FUNCTION")
+	fmt.Printf("%s\n", "INSIDE  done  FUNCTION")
 
 	if err := stream.echo.Done(ctx); err != nil {
 		_ = stream.echo.Fail(ctx, http.StatusTeapot, err)
@@ -139,7 +139,7 @@ func (s *server) done(ctx context.Context, stream *Stream) {
 }
 
 func (s *server) getStreamAndID(ctx context.Context, event *pb.StreamFlow) (string, *Stream, error) {
-	fmt.Printf("INSIDE  getStreamAndID  FUNCTION")
+	fmt.Printf("%s\n", "INSIDE  getStreamAndID  FUNCTION")
 	var streamID string
 	if sid, ok := event.Event.(*pb.StreamFlow_StreamId); !ok {
 		return "", nil, status.Error(codes.InvalidArgument, "first message must be streamID")
@@ -154,7 +154,7 @@ func (s *server) getStreamAndID(ctx context.Context, event *pb.StreamFlow) (stri
 }
 
 func (s *server) DataFlowAgentToController(rpcstream pb.TunnelService_DataFlowAgentToControllerServer) error {
-	fmt.Printf("INSIDE  DataFlowAgentToController  FUNCTION ")
+	fmt.Printf("%s\n", "INSIDE  DataFlowAgentToController  FUNCTION ")
 
 	ctx := rpcstream.Context()
 	event, err := rpcstream.Recv()
@@ -203,7 +203,7 @@ func (s *server) DataFlowAgentToController(rpcstream pb.TunnelService_DataFlowAg
 }
 
 func findEndpoint(ctx context.Context, serviceName string, serviceType string) (*serviceconfig.ConfiguredEndpoint, bool) {
-	fmt.Printf("INSIDE  findEndpoint  FUNCTION ")
+	fmt.Printf("%s\n", "INSIDE  findEndpoint  FUNCTION ")
 
 	for _, ep := range endpoints {
 		if ep.Name == serviceName && ep.Type == serviceType {
@@ -214,7 +214,7 @@ func findEndpoint(ctx context.Context, serviceName string, serviceType string) (
 }
 
 func (s *server) RunRequest(in *pb.TunnelRequest, stream pb.TunnelService_RunRequestServer) error {
-	fmt.Printf("INSIDE  RunRequest  FUNCTION ")
+	fmt.Printf("%s\n", "INSIDE  RunRequest  FUNCTION ")
 
 	agentID, sesisonID := IdentityFromContext(stream.Context())
 	ctx := logging.NewContext(stream.Context(),
@@ -276,7 +276,7 @@ func (s *server) RunRequest(in *pb.TunnelRequest, stream pb.TunnelService_RunReq
 }
 
 func loadTLSCredentials(tlsPath string) (credentials.TransportCredentials, error) {
-	fmt.Printf("INSIDE  loadTLSCredentials  FUNCTION ")
+	fmt.Printf("%s\n", "INSIDE  loadTLSCredentials  FUNCTION ")
 	serverCert, err := tls.LoadX509KeyPair(path.Join(tlsPath, "tls.crt"), path.Join(tlsPath, "tls.key"))
 	if err != nil {
 		return nil, err
@@ -292,7 +292,7 @@ func loadTLSCredentials(tlsPath string) (credentials.TransportCredentials, error
 }
 
 func runAgentGRPCServer(ctx context.Context, tlsPath string) {
-	fmt.Printf("INSIDE runAgentGRPCServer FUNCTION")
+	fmt.Printf("%s\n", "INSIDE runAgentGRPCServer FUNCTION")
 
 	ctx, logger := loggerFromContext(ctx, zap.String("component", "grpcServer"))
 	logger.Infow("starting agent GRPC server", "port", config.AgentListenPort)
