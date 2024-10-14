@@ -48,7 +48,7 @@ func (e *ConfiguredEndpoint) String() string {
 // EndpointsToPB builds the protobuf component of the "hello" message to advertise the
 // endpoints we have defined.
 func EndpointsToPB(endpoints []ConfiguredEndpoint) []*pb.EndpointHealth {
-	fmt.Printf("INSIDE  EndpointsToPB  FUNCTION")
+	fmt.Printf("%s\n", "INSIDE  EndpointsToPB  FUNCTION")
 
 	pbEndpoints := make([]*pb.EndpointHealth, len(endpoints))
 	for i, ep := range endpoints {
@@ -71,7 +71,7 @@ func EndpointsToPB(endpoints []ConfiguredEndpoint) []*pb.EndpointHealth {
 // ConfigureEndpoints will load services from the config, attach a processor, and return the configured
 // list.
 func ConfigureEndpoints(ctx context.Context, secretsLoader secrets.SecretLoader, serviceConfig *ServiceConfig) []ConfiguredEndpoint {
-	fmt.Printf("INSIDE  ConfigureEndpoints  FUNCTION")
+	fmt.Printf("%s\n", "INSIDE  ConfigureEndpoints  FUNCTION")
 
 	logger := logging.WithContext(ctx).Sugar()
 	// For each service, if it is enabled, find and create an instance.
