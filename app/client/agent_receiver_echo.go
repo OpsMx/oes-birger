@@ -93,6 +93,7 @@ func (e *AgentReceiverEcho) RunRequest(ctx context.Context, dest serviceconfig.D
 
 	stream, err := e.client.RunRequest(ctx, pbr)
 	if err != nil {
+		logger.Debugw("unable to process request", "error", err)
 		logger.Infow("unable to process request", "error", err)
 		w.WriteHeader(http.StatusBadGateway)
 		return
@@ -102,6 +103,7 @@ func (e *AgentReceiverEcho) RunRequest(ctx context.Context, dest serviceconfig.D
 		// read and process another message
 		msg, err := stream.Recv()
 		if err == io.EOF {
+			logger.Debugw("stream EOF")
 			logger.Infow("stream EOF")
 			if !headersSent {
 				w.WriteHeader(http.StatusBadGateway)
@@ -109,6 +111,7 @@ func (e *AgentReceiverEcho) RunRequest(ctx context.Context, dest serviceconfig.D
 			return
 		}
 		if err != nil {
+			logger.Debugw("error on stream", "error", err)
 			logger.Infow("error on stream", "error", err)
 			if !headersSent {
 				w.WriteHeader(http.StatusBadGateway)
@@ -120,10 +123,12 @@ func (e *AgentReceiverEcho) RunRequest(ctx context.Context, dest serviceconfig.D
 			data := msg.GetData().Data
 			n, err := w.Write(data)
 			if err != nil {
+				logger.Debugf("send to client: %v", err)
 				logger.Warnf("send to client: %v", err)
 				return
 			}
 			if n != len(data) {
+				logger.Debugf("short send to client: wrote %d, wanted to write %d bytes", n, len(data))
 				logger.Warnf("short send to client: wrote %d, wanted to write %d bytes", n, len(data))
 				return
 			}
@@ -142,6 +147,7 @@ func (e *AgentReceiverEcho) RunRequest(ctx context.Context, dest serviceconfig.D
 			w.WriteHeader(int(headers.StatusCode))
 		case *pb.StreamFlow_Cancel:
 			logger.Infow("stream canceled")
+			logger.Debugw("stream canceled")
 			if !headersSent {
 				w.WriteHeader(http.StatusBadGateway)
 			}

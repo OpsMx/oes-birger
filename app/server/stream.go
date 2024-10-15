@@ -18,6 +18,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
 	"github.com/opsmx/oes-birger/internal/serviceconfig"
@@ -50,6 +51,7 @@ func (sm *StreamManager) Register(ctx context.Context, session *AgentContext, st
 		echo:      echo,
 		closechan: closechan,
 	}
+	fmt.Printf("Registered stream: %s for agent %s\n", streamID, session.AgentID)
 }
 
 func (sm *StreamManager) Unregister(ctx context.Context, streamID string) {

@@ -18,6 +18,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
 	pb "github.com/opsmx/oes-birger/internal/tunnel"
@@ -80,6 +81,7 @@ func (e *ServerSenderEcho) Data(ctx context.Context, data []byte) error {
 }
 
 func (e *ServerSenderEcho) Fail(ctx context.Context, code int, err error) error {
+	fmt.Printf("inside Fail function")
 	e.Lock()
 	defer e.Unlock()
 	if e.closed {
@@ -111,6 +113,7 @@ func (e *ServerSenderEcho) Done(ctx context.Context) error {
 }
 
 func (e *ServerSenderEcho) Cancel(ctx context.Context) error {
+	fmt.Printf("inside Cancel function")
 	e.Lock()
 	defer e.Unlock()
 	if e.closed {

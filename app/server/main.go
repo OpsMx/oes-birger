@@ -91,10 +91,12 @@ func healthcheck(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(200)
 	n, err := w.Write([]byte("{}"))
 	if err != nil {
+		logger.Debugf("Error writing healthcheck response: %v", err)
 		logger.Warnf("Error writing healthcheck response: %v", err)
 		return
 	}
 	if n != 2 {
+		logger.Debugf("Failed to write 2 bytes: %d written", n)
 		logger.Warnf("Failed to write 2 bytes: %d written", n)
 	}
 }
@@ -102,6 +104,7 @@ func healthcheck(w http.ResponseWriter, r *http.Request) {
 func runPrometheusHTTPServer(ctx context.Context, port uint16, profile bool) {
 	_, logger := loggerFromContext(ctx)
 	logger.Infof("Running HTTP listener for Prometheus on port %d", port)
+	logger.Debugf("Running HTTP listener for Prometheus on port %d", port)
 
 	mux := http.NewServeMux()
 	mux.Handle("/metrics", promhttp.Handler())
@@ -128,10 +131,13 @@ func loadServiceAuthKeyset(ctx context.Context) {
 
 	if config.ServiceAuth.CurrentKeyName == "" {
 		logger.Fatalf("No primary serviceAuth key name provided")
+		logger.Debugf("No primary serviceAuth key name provided")
+
 	}
 
 	err := filepath.WalkDir(config.ServiceAuth.SecretsPath, func(path string, info fs.DirEntry, err error) error {
 		if err != nil {
+			logger.Fatalf("WalkDir error: %v\n", err)
 			return err
 		}
 		// skip not regular files
@@ -140,10 +146,12 @@ func loadServiceAuthKeyset(ctx context.Context) {
 		}
 		content, err := os.ReadFile(path)
 		if err != nil {
+			logger.Fatalf("ReadFile error: %v\n", err)
 			return err
 		}
 		key, err := jwk.FromRaw(content)
 		if err != nil {
+			logger.Fatalf("FromRaw error: %v\n", err)
 			return err
 		}
 		if err := key.Set(jwk.KeyIDKey, info.Name()); err != nil {
@@ -155,10 +163,12 @@ func loadServiceAuthKeyset(ctx context.Context) {
 		if err := serviceKeyset.AddKey(key); err != nil {
 			return err
 		}
+		logger.Debugf("Loaded service key name %s, length %d", info.Name(), len(content))
 		logger.Infof("Loaded service key name %s, length %d", info.Name(), len(content))
 		return nil
 	})
 	if err != nil {
+		logger.Debugf("cannot load key serviceAuth keys: %v", err)
 		logger.Fatalf("cannot load key serviceAuth keys: %v", err)
 	}
 
@@ -245,6 +255,7 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	ctx, logger := loggerFromContext(ctx)
+	logger.Debugf("%s", version.VersionString())
 
 	logger.Infof("%s", version.VersionString())
 	flag.Parse()
@@ -253,6 +264,13 @@ func main() {
 	}
 
 	logger.Infow("controller starting",
+		"version", version.VersionString(),
+		"os", runtime.GOOS,
+		"arch", runtime.GOARCH,
+		"cores", runtime.NumCPU(),
+	)
+
+	logger.Debugf("controller starting",
 		"version", version.VersionString(),
 		"os", runtime.GOOS,
 		"arch", runtime.GOARCH,
@@ -273,6 +291,7 @@ func main() {
 
 	config, err = parseConfig(*configFile)
 	if err != nil {
+		logger.Debugf("%v", err)
 		logger.Fatalf("%v", err)
 	}
 	config.Dump(logger)

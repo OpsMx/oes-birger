@@ -71,9 +71,12 @@ func RunHTTPSServer(ctx context.Context, em EchoManager, routes Destinations, tl
 		server.TLSConfig = &tls.Config{
 			MinVersion: tls.VersionTLS13,
 		}
+		logger.Debugf("Running service HTTPS listener on port %d", service.Port)
+
 		logger.Infof("Running service HTTPS listener on port %d", service.Port)
 		logger.Fatal(server.ListenAndServeTLS(path.Join(tlsPath, "tls.crt"), path.Join(tlsPath, "tls.key")))
 	} else {
+		logger.Debugf("Running service HTTP listener on port %d", service.Port)
 		logger.Infof("Running service HTTP listener on port %d", service.Port)
 		logger.Fatal(server.ListenAndServe())
 	}
@@ -84,6 +87,7 @@ func RunHTTPSServer(ctx context.Context, em EchoManager, routes Destinations, tl
 func RunHTTPServer(ctx context.Context, em EchoManager, routes Destinations, service IncomingServiceConfig) {
 	logger := logging.WithContext(ctx).Sugar()
 	logger.Infof("Running service HTTP listener on port %d", service.Port)
+	logger.Debugf("Running service HTTP listener on port %d", service.Port)
 
 	mux := http.NewServeMux()
 
@@ -182,6 +186,7 @@ func runAPIHandler(em EchoManager, routes Destinations, ep SearchSpec, w http.Re
 
 	session := routes.Search(ctx, ep)
 	if session == nil {
+		logger.Debugw("no such destination for service request", "destination", ep.Destination, "serviceName", ep.ServiceName, "serviceType", ep.ServiceType)
 		logger.Warnw("no such destination for service request", "destination", ep.Destination, "serviceName", ep.ServiceName, "serviceType", ep.ServiceType)
 		w.WriteHeader(http.StatusBadGateway)
 		return

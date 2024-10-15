@@ -102,9 +102,11 @@ func (a *AgentSessions) Search(ctx context.Context, spec serviceconfig.SearchSpe
 		}
 	}
 	if len(possible) == 0 {
+		fmt.Printf("inside Search function  possible==0")
 		return nil
 	}
 	if len(possible) == 1 {
+		fmt.Printf("inside Search function  possible==1")
 		return possible[0]
 	}
 	n := rand.Intn(len(possible))
@@ -119,6 +121,7 @@ func (a *AgentSessions) findSession(ctx context.Context) (*AgentContext, error) 
 	if session, found := a.agents[key]; found {
 		return session, nil
 	}
+	fmt.Printf("no such agent session connected: %s/%s", agentID, sessionID)
 	return nil, fmt.Errorf("no such agent session connected: %s/%s", agentID, sessionID)
 }
 
@@ -160,8 +163,8 @@ func (a *AgentSessions) touchSession(session *AgentContext, t int64) {
 }
 
 func (a *AgentSessions) checkSessionTimeouts(ctx context.Context, idleTimeout int64) {
+	fmt.Printf("inside checkSessionTimeouts    idleTimeout: %v/", idleTimeout)
 	t := time.NewTicker(10 * time.Second)
-
 	for {
 		select {
 		case <-ctx.Done():
@@ -180,6 +183,7 @@ func (a *AgentSessions) expireOldSessions(ctx context.Context, now int64, idleTi
 
 	for key, session := range a.agents {
 		if session.LastUse+idleTimeout < now {
+			logging.Debugw("disconnecting idle agent", "lastUsed", session.LastUse, "now", now, "agentID", key.AgentID, "sessionID", key.SessionID)
 			logging.Infow("disconnecting idle agent", "lastUsed", session.LastUse, "now", now, "agentID", key.AgentID, "sessionID", key.SessionID)
 			a.removeSessionUnlocked(session)
 		}
@@ -193,6 +197,7 @@ func (a *AgentSessions) GetStatistics() interface{} {
 	for _, ac := range a.agents {
 		ret = append(ret, ac.GetStatistics())
 	}
+	fmt.Printf("inside checkSessionTimeouts    idleTimeout: %v/", ret)
 	return ret
 }
 

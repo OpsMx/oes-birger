@@ -147,9 +147,11 @@ func (e *ServerReceiverEcho) RunRequest(ctx context.Context, dest serviceconfig.
 	for {
 		select {
 		case <-t.C:
+			logger.Debugf("stream timed out")
 			logger.Infof("stream timed out")
 			return
 		case <-r.Context().Done():
+			logger.Debugf("client closed, stopping data flow")
 			logger.Infof("client closed, stopping data flow")
 			// TODO: send cancel event over gRPC
 			return
@@ -165,11 +167,13 @@ func (e *ServerReceiverEcho) RunRequest(ctx context.Context, dest serviceconfig.
 			n, err := w.Write(data)
 			if err != nil {
 				// TODO: send cancel over gRPC
+				logger.Debugf("send to client: %v", err)
 				logger.Warnf("send to client: %v", err)
 				return
 			}
 			if n != len(data) {
 				// TODO: send cancel over gRPC
+				logger.Debugf("short send to client: wrote %d, wanted to write %d bytes", n, len(data))
 				logger.Warnf("short send to client: wrote %d, wanted to write %d bytes", n, len(data))
 				return
 			}

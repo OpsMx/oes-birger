@@ -18,6 +18,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"sync"
 
@@ -69,6 +70,7 @@ func (e *AgentSenderEcho) RunDataSender(ctx context.Context) {
 	defer func() {
 		_, err := stream.CloseAndRecv()
 		if err != nil && err != io.EOF {
+			logger.Debugf("stream.CloseAndRecv error: %v", err)
 			logger.Info("stream.CloseAndRecv error: %v", err)
 		}
 	}()
@@ -114,6 +116,7 @@ func (e *AgentSenderEcho) Data(ctx context.Context, data []byte) error {
 }
 
 func (e *AgentSenderEcho) Fail(ctx context.Context, code int, err error) error {
+	fmt.Printf("inside Fail in Agent sender echo")
 	e.Lock()
 	defer e.Unlock()
 	if !e.headersSent {

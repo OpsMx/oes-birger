@@ -109,6 +109,7 @@ func (s *CNCServer) authenticate(method string, h http.HandlerFunc) http.Handler
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		if r.Method != method {
+			fmt.Printf("only '%s' is accepted (not '%s')", method, r.Method)
 			err := fmt.Errorf("only '%s' is accepted (not '%s')", method, r.Method)
 			util.FailRequest(ctx, w, err, http.StatusMethodNotAllowed)
 			return
@@ -116,6 +117,7 @@ func (s *CNCServer) authenticate(method string, h http.HandlerFunc) http.Handler
 
 		found := extractEndpointFromJWT(r)
 		if !found {
+			fmt.Printf("not a valid JWT for control")
 			util.FailRequest(ctx, w, fmt.Errorf("not a valid JWT for control"), http.StatusForbidden)
 			return
 		}
@@ -132,18 +134,21 @@ func (s *CNCServer) generateKubectlComponents() http.HandlerFunc {
 		var req fwdapi.KubeConfigRequest
 		err := json.NewDecoder(r.Body).Decode(&req)
 		if err != nil {
+			fmt.Printf("generateKubectlComponents:  '%v' ", err)
 			util.FailRequest(ctx, w, err, http.StatusBadRequest)
 			return
 		}
 
 		err = req.Validate()
 		if err != nil {
+			fmt.Printf("generateKubectlComponents Validate:  '%v' ", err)
 			util.FailRequest(ctx, w, err, http.StatusBadRequest)
 			return
 		}
 
 		token, err := jwtutil.MakeServiceJWT("kubernetes", req.Name, req.AgentName, s.clock)
 		if err != nil {
+			fmt.Printf("MakeServiceJWT :  '%v' ", err)
 			util.FailRequest(ctx, w, err, http.StatusInternalServerError)
 		}
 
@@ -155,6 +160,7 @@ func (s *CNCServer) generateKubectlComponents() http.HandlerFunc {
 		}
 		json, err := json.Marshal(ret)
 		if err != nil {
+			fmt.Printf("KubeConfigResponse :  '%v' ", err)
 			util.FailRequest(ctx, w, err, http.StatusBadRequest)
 			return
 		}
@@ -179,19 +185,22 @@ func (s *CNCServer) generateAgentManifestComponents() http.HandlerFunc {
 		var req fwdapi.ManifestRequest
 		err := json.NewDecoder(r.Body).Decode(&req)
 		if err != nil {
+			logger.Debugf("generateAgentManifestComponents ManifestRequest: %v", err)
+
 			util.FailRequest(ctx, w, err, http.StatusBadRequest)
 			return
 		}
 
 		err = req.Validate()
 		if err != nil {
+			logger.Debugf("generateAgentManifestComponents Validate: %v", err)
 			util.FailRequest(ctx, w, err, http.StatusBadRequest)
 			return
 		}
 
 		jwt, err := jwtutil.MakeAgentJWT(req.AgentName, s.clock)
 		if err != nil {
-			logger.Errorf("MakeAgentJWT failed: %v", err)
+			logger.Debugf("MakeAgentJWT failed: %v", err)
 			util.FailRequest(ctx, w, err, http.StatusInternalServerError)
 			return
 		}
@@ -207,6 +216,8 @@ func (s *CNCServer) generateAgentManifestComponents() http.HandlerFunc {
 		}
 		json, err := json.Marshal(ret)
 		if err != nil {
+			logger.Debugf("generateAgentManifestComponents ManifestResponse: %v", err)
+
 			util.FailRequest(ctx, w, err, http.StatusBadRequest)
 			return
 		}
@@ -230,18 +241,21 @@ func (s *CNCServer) generateServiceCredentials() http.HandlerFunc {
 		var req fwdapi.ServiceCredentialRequest
 		err := json.NewDecoder(r.Body).Decode(&req)
 		if err != nil {
+			log.Printf("generateServiceCredentials ServiceCredentialRequest: error while writing: %v", err)
 			util.FailRequest(ctx, w, err, http.StatusBadRequest)
 			return
 		}
 
 		err = req.Validate(ctx)
 		if err != nil {
+			log.Printf("generateServiceCredentials Validate: error while writing: %v", err)
 			util.FailRequest(ctx, w, err, http.StatusBadRequest)
 			return
 		}
 
 		token, err := jwtutil.MakeServiceJWT(req.Type, req.Name, req.AgentName, s.clock)
 		if err != nil {
+			log.Printf("generateServiceCredentials MakeServiceJWT: error while writing: %v", err)
 			util.FailRequest(ctx, w, err, http.StatusBadRequest)
 			return
 		}
@@ -271,6 +285,7 @@ func (s *CNCServer) generateServiceCredentials() http.HandlerFunc {
 		}
 		json, err := json.Marshal(ret)
 		if err != nil {
+			log.Printf("generateServiceCredentials Marshal: error while writing: %v", err)
 			util.FailRequest(ctx, w, err, http.StatusBadRequest)
 			return
 		}
@@ -294,18 +309,21 @@ func (s *CNCServer) generateControlCredentials() http.HandlerFunc {
 		var req fwdapi.ControlCredentialsRequest
 		err := json.NewDecoder(r.Body).Decode(&req)
 		if err != nil {
+			log.Printf("generateControlCredentials: error while writing: %v", err)
 			util.FailRequest(ctx, w, err, http.StatusBadRequest)
 			return
 		}
 
 		err = req.Validate()
 		if err != nil {
+			log.Printf("generateControlCredentials: error while writing: %v", err)
 			util.FailRequest(ctx, w, err, http.StatusBadRequest)
 			return
 		}
 
 		token, err := jwtutil.MakeControlJWT(req.Name, s.clock)
 		if err != nil {
+			log.Printf("generateControlCredentials: error while writing: %v", err)
 			util.FailRequest(ctx, w, err, http.StatusBadRequest)
 			return
 		}
@@ -317,6 +335,7 @@ func (s *CNCServer) generateControlCredentials() http.HandlerFunc {
 		}
 		json, err := json.Marshal(ret)
 		if err != nil {
+			log.Printf("generateControlCredentials: error while writing: %v", err)
 			util.FailRequest(ctx, w, err, http.StatusBadRequest)
 			return
 		}
@@ -344,6 +363,7 @@ func (s *CNCServer) getStatistics() http.HandlerFunc {
 		}
 		json, err := json.Marshal(ret)
 		if err != nil {
+			log.Printf("getStatistics: error while writing: %v", err)
 			util.FailRequest(ctx, w, err, http.StatusBadRequest)
 			return
 		}
@@ -394,12 +414,14 @@ func (s *CNCServer) RunServer(ctx context.Context) {
 	}
 
 	if s.tlsPath != "" {
+		logger.Debugw("Running Command and Control API HTTPS listener", "port", s.cfg.GetControlListenPort())
 		logger.Infow("Running Command and Control API HTTPS listener", "port", s.cfg.GetControlListenPort())
 		srv.TLSConfig = &tls.Config{
 			MinVersion: tls.VersionTLS13,
 		}
 		logger.Fatal(srv.ListenAndServeTLS(path.Join(s.tlsPath, "tls.crt"), path.Join(s.tlsPath, "tls.key")))
 	} else {
+		logger.Debugw("Running Command and Control API HTTP listener", "port", s.cfg.GetControlListenPort())
 		logger.Infow("Running Command and Control API HTTP listener", "port", s.cfg.GetControlListenPort())
 		logger.Fatal(srv.ListenAndServe())
 	}
