@@ -141,8 +141,65 @@ func (s *server) getStreamAndID(ctx context.Context, event *pb.StreamFlow) (stri
 	}
 	return streamID, stream, nil
 }
-
 func (s *server) DataFlowAgentToController(rpcstream pb.TunnelService_DataFlowAgentToControllerServer) error {
+	ctx := rpcstream.Context()
+	event, err := rpcstream.Recv()
+	if err != nil {
+		zap.L().Error("Failed to receive initial event from stream", zap.Error(err))
+		return status.Error(codes.InvalidArgument, "unable to read streamID")
+	}
+	streamID, stream, err := s.getStreamAndID(ctx, event)
+	if err != nil {
+		zap.L().Error("Failed to get stream and streamID", zap.Error(err), zap.String("streamID", streamID))
+		return err
+	}
+	ctx, logger := loggerFromContext(ctx, zap.String("streamID", streamID))
+	defer func() {
+		s.streamManager.Unregister(ctx, streamID)
+		logger.Info("Stream unregistered", zap.String("streamID", streamID))
+	}()
+
+	for {
+		event, err := rpcstream.Recv()
+		if err == io.EOF {
+			logger.Info("End of stream reached", zap.String("streamID", streamID))
+			s.done(ctx, stream)
+			return nil
+		}
+		if err != nil {
+			logger.Error("Error receiving from stream", zap.Error(err), zap.String("streamID", streamID))
+			if serr, ok := status.FromError(err); ok {
+				if serr.Code() == codes.Canceled {
+					logger.Info("Stream canceled by client", zap.String("streamID", streamID))
+					return nil
+				}
+			}
+			_ = stream.echo.Fail(ctx, http.StatusTeapot, err)
+			return err
+		}
+
+		switch event.Event.(type) {
+		case *pb.StreamFlow_Cancel:
+			logger.Info("Received Cancel event", zap.String("streamID", streamID))
+			_ = stream.echo.Cancel(ctx)
+			return nil
+		case *pb.StreamFlow_Done:
+			logger.Info("Received Done event", zap.String("streamID", streamID))
+			_ = stream.echo.Done(ctx)
+			return nil
+		case *pb.StreamFlow_Headers:
+			logger.Info("Received Headers event", zap.String("streamID", streamID), zap.Any("headers", event.GetHeaders()))
+			_ = stream.echo.Headers(ctx, event.GetHeaders())
+		case *pb.StreamFlow_Data:
+			logger.Info("Received Data event", zap.String("streamID", streamID), zap.Int("data_length", len(event.GetData().Data)))
+			_ = stream.echo.Data(ctx, event.GetData().Data)
+		case *pb.StreamFlow_Keepalive:
+			logger.Debug("Received Keepalive event", zap.String("streamID", streamID))
+			// do nothing
+		}
+	}
+}
+func (s *server) DataFlowAgentToControllerOld(rpcstream pb.TunnelService_DataFlowAgentToControllerServer) error {
 	ctx := rpcstream.Context()
 	event, err := rpcstream.Recv()
 	if err != nil {
