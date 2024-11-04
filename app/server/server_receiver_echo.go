@@ -115,8 +115,8 @@ func (e *ServerReceiverEcho) RunRequest(ctx context.Context, dest serviceconfig.
 	logger := logging.WithContext(ctx).Sugar()
 	headersSent := false
 	flusher := w.(http.Flusher)
-	interMessageTime := 30 * time.Second
-	t := time.NewTimer(30 * interMessageTime)
+	interMessageTime := 10 * time.Second
+	t := time.NewTimer(10 * interMessageTime)
 
 	pbh, err := serviceconfig.HTTPHeadersToPB(r.Header)
 	if err != nil {
