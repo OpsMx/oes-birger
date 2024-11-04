@@ -141,7 +141,7 @@ func (s *server) getStreamAndID(ctx context.Context, event *pb.StreamFlow) (stri
 	}
 	return streamID, stream, nil
 }
-func (s *server) DataFlowAgentToController(rpcstream pb.TunnelService_DataFlowAgentToControllerServer) error {
+func (s *server) DataFlowAgentToControllerAddedLogs(rpcstream pb.TunnelService_DataFlowAgentToControllerServer) error {
 	ctx := rpcstream.Context()
 	event, err := rpcstream.Recv()
 	if err != nil {
@@ -199,7 +199,7 @@ func (s *server) DataFlowAgentToController(rpcstream pb.TunnelService_DataFlowAg
 		}
 	}
 }
-func (s *server) DataFlowAgentToControllerOld(rpcstream pb.TunnelService_DataFlowAgentToControllerServer) error {
+func (s *server) DataFlowAgentToController(rpcstream pb.TunnelService_DataFlowAgentToControllerServer) error {
 	ctx := rpcstream.Context()
 	event, err := rpcstream.Recv()
 	if err != nil {
@@ -338,7 +338,7 @@ func runAgentGRPCServer(ctx context.Context, tlsPath string) {
 		logger.Fatalw("failed to listen on agent port", "error", err)
 	}
 
-	idleTimeout := 60 * time.Second
+	idleTimeout := 300 * time.Second
 
 	s := &server{
 		agentIdleTimeout: idleTimeout.Nanoseconds(),
