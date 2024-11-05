@@ -141,7 +141,7 @@ func (s *server) getStreamAndID(ctx context.Context, event *pb.StreamFlow) (stri
 	}
 	return streamID, stream, nil
 }
-func (s *server) DataFlowAgentToController(rpcstream pb.TunnelService_DataFlowAgentToControllerServer) error {
+func (s *server) DataFlowAgentToControllerAddedlogs(rpcstream pb.TunnelService_DataFlowAgentToControllerServer) error {
 	ctx := rpcstream.Context()
 	event, err := rpcstream.Recv()
 	if err != nil {
@@ -171,7 +171,6 @@ func (s *server) DataFlowAgentToController(rpcstream pb.TunnelService_DataFlowAg
 			if serr, ok := status.FromError(err); ok {
 				if serr.Code() == codes.Canceled {
 					logger.Info("Stream canceled by client", zap.String("streamID", streamID))
-					_ = stream.echo.Cancel(ctx)
 					return nil
 				}
 			}
@@ -200,7 +199,7 @@ func (s *server) DataFlowAgentToController(rpcstream pb.TunnelService_DataFlowAg
 		}
 	}
 }
-func (s *server) DataFlowAgentToControllerOld(rpcstream pb.TunnelService_DataFlowAgentToControllerServer) error {
+func (s *server) DataFlowAgentToController(rpcstream pb.TunnelService_DataFlowAgentToControllerServer) error {
 	ctx := rpcstream.Context()
 	event, err := rpcstream.Recv()
 	if err != nil {
@@ -223,6 +222,7 @@ func (s *server) DataFlowAgentToControllerOld(rpcstream pb.TunnelService_DataFlo
 			logger.Infof("stream error: %v", err)
 			if serr, ok := status.FromError(err); ok {
 				if serr.Code() == codes.Canceled {
+					_ = stream.echo.Cancel(ctx)
 					return nil
 				}
 			}
