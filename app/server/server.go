@@ -171,6 +171,7 @@ func (s *server) DataFlowAgentToController(rpcstream pb.TunnelService_DataFlowAg
 			if serr, ok := status.FromError(err); ok {
 				if serr.Code() == codes.Canceled {
 					logger.Info("Stream canceled by client", zap.String("streamID", streamID))
+					_ = stream.echo.Cancel(ctx)
 					return nil
 				}
 			}
