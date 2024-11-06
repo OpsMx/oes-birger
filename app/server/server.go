@@ -167,7 +167,8 @@ func (s *server) DataFlowAgentToController(rpcstream pb.TunnelService_DataFlowAg
 				if serr.Code() == codes.Canceled {
 					logger.Infof("inside  : %v", serr.Code())
 					_ = stream.echo.Cancel(ctx)
-					return nil
+					return s.DataFlowAgentToController(rpcstream)
+					//return nil
 				}
 			}
 			_ = stream.echo.Fail(ctx, http.StatusTeapot, err)
