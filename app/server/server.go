@@ -162,7 +162,7 @@ func (s *server) DataFlowAgentToController(rpcstream pb.TunnelService_DataFlowAg
 			return nil
 		}
 		if err != nil {
-			logger.Infof("stream error: %v", err)
+			logger.Infof("stream error: %v, streamID: %s", err, streamID)
 			if serr, ok := status.FromError(err); ok {
 				if serr.Code() == codes.Canceled {
 					//logger.Infof("inside  : %v", serr.Code())
