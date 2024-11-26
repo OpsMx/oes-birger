@@ -147,7 +147,9 @@ func (e *ServerReceiverEcho) RunRequest(ctx context.Context, dest serviceconfig.
 	for {
 		select {
 		case <-t.C:
-			logger.Infof("stream timed out")
+			//logger.Infof("stream timed out")
+			logger.Infof("stream timed out, stream id %s, service name: %s, service type: %s, method: %s, request uri: %s",
+				e.streamID, e.ep.ServiceName, e.ep.ServiceType, r.Method, r.RequestURI)
 			return
 		case <-r.Context().Done():
 			logger.Infof("client closed, stopping data flow")
