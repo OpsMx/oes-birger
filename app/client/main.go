@@ -138,7 +138,7 @@ func waitForRequest(ctx context.Context, c pb.TunnelServiceClient) error {
 		if req.IsKeepalive {
 			continue
 		}
-		logger.Info("waitForRequest response",
+		logger.Infof("waitForRequest response",
 			"streamID", req.StreamId,
 			"method", req.Method,
 			"serviceName", req.Name,
@@ -444,7 +444,7 @@ func main() {
 	check(ctx, err)
 	session.sessionID = hello.InstanceId
 	session.agentID = hello.AgentId
-	logger.Infow("controller services", "endpoints", hello.Endpoints)
+	logger.Infof("controller services", "endpoints", hello.Endpoints)
 
 	destinations := makeControllerDestination(ctx, endpoints)
 	echoManager := &AgentReceiverEchoManager{
@@ -457,13 +457,13 @@ func main() {
 
 	go func() {
 		err := waitForRequest(ctx, c)
-		logger.Info("waitForRequest failed: %v", err)
+		logger.Infof("waitForRequest failed: %v", err)
 		session.done <- struct{}{}
 	}()
 
 	go func() {
 		err := pinger(ctx, c, *tickTime)
-		logger.Info("pinger failed: %v", err)
+		logger.Infof("pinger failed: %v", err)
 		session.done <- struct{}{}
 	}()
 
