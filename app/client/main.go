@@ -25,7 +25,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	pprofhttp "net/http/pprof"
 	"os"
@@ -139,7 +138,7 @@ func waitForRequest(ctx context.Context, c pb.TunnelServiceClient) error {
 		if req.IsKeepalive {
 			continue
 		}
-		logger.Debugw("waitForRequest response",
+		logger.Info("waitForRequest response",
 			"streamID", req.StreamId,
 			"method", req.Method,
 			"serviceName", req.Name,
@@ -153,7 +152,7 @@ func waitForRequest(ctx context.Context, c pb.TunnelServiceClient) error {
 		ep, found := findEndpoint(ctx, req.Name, req.Type)
 		if !found {
 			if err := echo.Fail(ctx, http.StatusBadGateway, fmt.Errorf("no such service on agent")); err != nil {
-				logger.Warn(err)
+				logger.Info(err)
 			}
 			echo.Shutdown(ctx)
 			continue
@@ -163,7 +162,7 @@ func waitForRequest(ctx context.Context, c pb.TunnelServiceClient) error {
 		go pprof.Do(ctx, labels, func(ctx context.Context) {
 			defer echo.Shutdown(ctx)
 			if err := ep.Instance.ExecuteHTTPRequest(ctx, session.agentID, echo, req); err != nil {
-				logger.Warn(err)
+				logger.Info(err)
 			}
 		})
 	}
@@ -458,13 +457,13 @@ func main() {
 
 	go func() {
 		err := waitForRequest(ctx, c)
-		log.Printf("waitForRequest failed: %v", err)
+		logger.Info("waitForRequest failed: %v", err)
 		session.done <- struct{}{}
 	}()
 
 	go func() {
 		err := pinger(ctx, c, *tickTime)
-		log.Printf("pinger failed: %v", err)
+		logger.Info("pinger failed: %v", err)
 		session.done <- struct{}{}
 	}()
 
