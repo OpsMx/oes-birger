@@ -129,12 +129,14 @@ func waitForRequest(ctx context.Context, c pb.TunnelServiceClient) error {
 	defer cancel()
 	stream, err := c.WaitForRequest(ctx, &pb.WaitForRequestArgs{})
 	if err != nil {
+		log.info("Wait for request grpc action failed")
 		return err
 	}
 	for {
 		req, err := stream.Recv()
 		if err != nil {
-			return err
+			// return err
+			continue
 		}
 		if req.IsKeepalive {
 			continue
