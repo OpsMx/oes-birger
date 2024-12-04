@@ -51,6 +51,7 @@ import (
 	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/metadata"
 	"gopkg.in/yaml.v3"
+	"gorm.io/gorm/logger"
 )
 
 const (
@@ -123,6 +124,9 @@ func getHeaderContext(ctx context.Context, timeout time.Duration) (context.Conte
 }
 
 func waitForRequest(ctx context.Context, c pb.TunnelServiceClient) error {
+	logger.Info("Entered waitForRequest")
+	logger.Infof("Entered waitForRequest")
+	logger.Infow("Entered waitForRequest")
 	ctx, logger := loggerFromContext(ctx)
 	ctx, cancel := getHeaderContext(ctx, 0)
 	defer cancel()
@@ -148,7 +152,13 @@ func waitForRequest(ctx context.Context, c pb.TunnelServiceClient) error {
 			"serviceType", req.Type,
 			"uri", req.URI,
 			"bodyLength", len(req.Body))
-
+		logger.Info("waitForRequest response",
+			"streamID", req.StreamId,
+			"method", req.Method,
+			"serviceName", req.Name,
+			"serviceType", req.Type,
+			"uri", req.URI,
+			"bodyLength", len(req.Body))
 		// TODO: implement endpoint search and dispatch request
 		doneChan := make(chan bool)
 		echo := MakeAgentSenderEcho(ctx, c, req.StreamId, doneChan)
