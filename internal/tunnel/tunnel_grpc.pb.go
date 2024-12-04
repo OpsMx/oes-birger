@@ -26,6 +26,8 @@ import (
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
+	"github.com/opsmx/oes-birger/internal/logging"
+	"go.uber.org/zap"
 )
 
 // This is a compile-time assertion to ensure that this generated file
@@ -86,18 +88,28 @@ func (c *tunnelServiceClient) Ping(ctx context.Context, in *PingRequest, opts ..
 	return out, nil
 }
 
+func loggerFromContext(ctx context.Context) (context.Context, *zap.SugaredLogger) {
+	fields := []zap.Field{}
+	ctx = logging.NewContext(ctx, fields...)
+	return ctx, logging.WithContext(ctx).Sugar()
+}
+
 func (c *tunnelServiceClient) WaitForRequest(ctx context.Context, in *WaitForRequestArgs, opts ...grpc.CallOption) (TunnelService_WaitForRequestClient, error) {
 	stream, err := c.cc.NewStream(ctx, &TunnelService_ServiceDesc.Streams[0], TunnelService_WaitForRequest_FullMethodName, opts...)
+	_ , logger := loggerFromContext(ctx)
 	if err != nil {
 		return nil, err
 	}
+	logger.Info("New Stream created")
 	x := &tunnelServiceWaitForRequestClient{stream}
 	if err := x.ClientStream.SendMsg(in); err != nil {
 		return nil, err
 	}
+	logger.Info("SendMesg() done")
 	if err := x.ClientStream.CloseSend(); err != nil {
 		return nil, err
 	}
+	logger.Info("CloseSend() done")
 	return x, nil
 }
 

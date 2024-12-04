@@ -130,6 +130,7 @@ func waitForRequest(ctx context.Context, c pb.TunnelServiceClient) error {
 	logger.Infow("Entered waitForRequest")
 	defer cancel()
 	stream, err := c.WaitForRequest(ctx, &pb.WaitForRequestArgs{})
+	logger.Info("WaitForRequest successfully returned")
 	if err != nil {
 		logger.Infow("Wait for request grpc action failed", err)
 		return err
@@ -142,6 +143,7 @@ func waitForRequest(ctx context.Context, c pb.TunnelServiceClient) error {
 			continue
 		}
 		if req.IsKeepalive {
+			logger.Info("Keepalive request received")
 			continue
 		}
 		logger.Infow("waitForRequest response",
