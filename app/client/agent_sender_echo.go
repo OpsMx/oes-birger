@@ -23,6 +23,7 @@ import (
 
 	"github.com/opsmx/oes-birger/internal/serviceconfig"
 	pb "github.com/opsmx/oes-birger/internal/tunnel"
+	"go.uber.org/zap"
 )
 
 type AgentSenderEcho struct {
@@ -54,11 +55,16 @@ func (e *AgentSenderEcho) Shutdown(ctx context.Context) {
 	}
 }
 
+func RunDataSenderCancel(ctx context.Context, cl context.CancelFunc, logger *zap.SugaredLogger) {
+	logger.Info("RunDataSenderCancel cancel() called")
+	cl()
+}
+
 // TODO: return any errors to "caller"
 func (e *AgentSenderEcho) RunDataSender(ctx context.Context) {
 	ctx, logger := loggerFromContext(ctx)
 	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
+	defer RunDataSenderCancel(ctx, cancel, logger)
 
 	stream, err := e.c.DataFlowAgentToController(ctx)
 	if err != nil {

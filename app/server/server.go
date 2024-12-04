@@ -289,7 +289,10 @@ func runAgentGRPCServer(ctx context.Context, tlsPath string) {
 	}
 
 	cleanerCtx, cleanerCancel := context.WithCancel(ctx)
-	defer cleanerCancel()
+	defer func() {
+		logger.Info("runAgentGRPSServer cleanerCancel() called")
+		cleanerCancel()
+	}()
 	go agents.checkSessionTimeouts(cleanerCtx, s.agentIdleTimeout)
 
 	jwtInterceptor := NewJWTInterceptor()

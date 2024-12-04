@@ -97,7 +97,11 @@ var session = AgentSession{
 
 func sendHello(ctx context.Context, c pb.TunnelServiceClient, info *pb.AgentInfo, endpoints []serviceconfig.ConfiguredEndpoint, hostname string, version string) (*pb.HelloResponse, error) {
 	ctx, cancel := getHeaderContext(ctx, session.rpcTimeout)
-	defer cancel()
+	ctx, logger := loggerFromContext(ctx)
+	defer func() {
+		logger.Info("sendHello cancel() called")
+		cancel()
+	}()
 
 	req := &pb.HelloRequest{
 		Hostname:  hostname,
@@ -128,7 +132,10 @@ func waitForRequest(ctx context.Context, c pb.TunnelServiceClient) error {
 	logger.Info("Entered waitForRequest")
 	logger.Infof("Entered waitForRequest")
 	logger.Infow("Entered waitForRequest")
-	defer cancel()
+	defer func() {
+		logger.Info("sendWaitForRequest cancel() called")
+		cancel()
+	}()
 	stream, err := c.WaitForRequest(ctx, &pb.WaitForRequestArgs{})
 	logger.Info("WaitForRequest successfully returned")
 	if err != nil {
@@ -138,9 +145,8 @@ func waitForRequest(ctx context.Context, c pb.TunnelServiceClient) error {
 	for {
 		req, err := stream.Recv()
 		if err != nil {
-			// return err
 			logger.Infow("Recieved error on stream.Recv()", err)
-			continue
+			return err
 		}
 		if req.IsKeepalive {
 			logger.Info("Keepalive request received")
@@ -196,7 +202,10 @@ func pinger(ctx context.Context, c pb.TunnelServiceClient, tickTime int) error {
 	for {
 		time.Sleep(time.Duration(tickTime) * time.Second)
 		ctx, cancel := getHeaderContext(ctx, session.rpcTimeout)
-		defer cancel()
+		defer func() {
+			logger.Info("pinger cancel() called")
+			cancel()
+		}()
 		r, err := c.Ping(ctx, &pb.PingRequest{
 			Ts: uint64(time.Now().UnixNano()),
 		})
@@ -208,6 +217,7 @@ func pinger(ctx context.Context, c pb.TunnelServiceClient, tickTime int) error {
 }
 
 func connect(ctx context.Context, address string, ta credentials.TransportCredentials) *grpc.ClientConn {
+	ctx, logger := loggerFromContext(ctx)
 	kparams := keepalive.ClientParameters{
 		Time:                10 * time.Second,
 		Timeout:             5 * time.Second,
@@ -225,7 +235,10 @@ func connect(ctx context.Context, address string, ta credentials.TransportCreden
 		gopts = append(gopts, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	}
 	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
-	defer cancel()
+	defer func() {
+		logger.Info("connect cancel() called")
+		cancel()
+	}()
 	conn, err := grpc.DialContext(ctx, address, gopts...)
 	check(ctx, err)
 
@@ -382,9 +395,12 @@ func makeSecretsLoader(ctx context.Context) secrets.SecretLoader {
 
 func main() {
 	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
 	ctx, logger := loggerFromContext(ctx)
+
+	defer func() {
+		logger.Info("main cancel() called")
+		cancel()
+	}()
 
 	logger.Infof("%s", version.VersionString())
 	flag.Parse()

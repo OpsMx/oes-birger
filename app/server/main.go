@@ -243,8 +243,11 @@ func loadAgentAuthKeyset(ctx context.Context) {
 
 func main() {
 	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	ctx, logger := loggerFromContext(ctx)
+	defer func() {
+		logger.Info("main cancel() called")
+		cancel()
+	}()
 
 	logger.Infof("%s", version.VersionString())
 	flag.Parse()

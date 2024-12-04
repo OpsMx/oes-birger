@@ -24,6 +24,7 @@ import (
 	"github.com/opsmx/oes-birger/internal/logging"
 	"github.com/opsmx/oes-birger/internal/serviceconfig"
 	pb "github.com/opsmx/oes-birger/internal/tunnel"
+	"go.uber.org/zap"
 )
 
 // AgentReceiverEcho takes an agent-side connection and sends the request to the
@@ -67,10 +68,15 @@ func (e *AgentReceiverEcho) Cancel(ctx context.Context) error {
 	return nil
 }
 
+func (e *AgentReceiverEcho) RunRequestCancel(ctx context.Context, cl context.CancelFunc, logger *zap.SugaredLogger) {
+	logger.Info("ReunRequestCancel cancel() called")
+	cl()
+}
+
 func (e *AgentReceiverEcho) RunRequest(ctx context.Context, dest serviceconfig.Destination, body []byte, w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := getHeaderContext(ctx, 0)
-	defer cancel()
 	logger := logging.WithContext(ctx).Sugar()
+	defer e.RunRequestCancel(ctx, cancel, logger)
 	headersSent := false
 	flusher := w.(http.Flusher)
 

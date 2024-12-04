@@ -302,7 +302,10 @@ func makeResponse(id string, response *http.Response) (*pb.TunnelHeaders, error)
 
 func RunHTTPRequest(ctx context.Context, cancel context.CancelFunc, client *http.Client, req *pb.TunnelRequest, httpRequest *http.Request, echo Echo, baseURL string) {
 	logger := logging.WithContext(ctx).Sugar()
-	defer cancel()
+	defer func() {
+		logger.Info("RunHTTPRequest cancel() called")
+		cancel()
+	}()
 
 	requestURI := baseURL + req.URI
 	logger.Debugf("Sending HTTP request: %s to %s", req.Method, requestURI)
