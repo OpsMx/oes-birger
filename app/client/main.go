@@ -128,20 +128,20 @@ func waitForRequest(ctx context.Context, c pb.TunnelServiceClient) error {
 	defer cancel()
 	stream, err := c.WaitForRequest(ctx, &pb.WaitForRequestArgs{})
 	if err != nil {
-		logger.Infof("Wait for request grpc action failed", err)
+		logger.Infow("Wait for request grpc action failed", err)
 		return err
 	}
 	for {
 		req, err := stream.Recv()
 		if err != nil {
 			// return err
-			logger.Infof("Recieved error on stream.Recv()", err)
+			logger.Infow("Recieved error on stream.Recv()", err)
 			continue
 		}
 		if req.IsKeepalive {
 			continue
 		}
-		logger.Infof("waitForRequest response",
+		logger.Infow("waitForRequest response",
 			"streamID", req.StreamId,
 			"method", req.Method,
 			"serviceName", req.Name,
@@ -155,7 +155,7 @@ func waitForRequest(ctx context.Context, c pb.TunnelServiceClient) error {
 		ep, found := findEndpoint(ctx, req.Name, req.Type)
 		if !found {
 			if err := echo.Fail(ctx, http.StatusBadGateway, fmt.Errorf("no such service on agent")); err != nil {
-				logger.Infof("Could not find endpoint", err)
+				logger.Infow("Could not find endpoint", err)
 			}
 			echo.Shutdown(ctx)
 			continue
@@ -460,13 +460,13 @@ func main() {
 
 	go func() {
 		err := waitForRequest(ctx, c)
-		logger.Infof("waitForRequest failed: %v", err)
+		logger.Infow("waitForRequest failed: %v", err)
 		session.done <- struct{}{}
 	}()
 
 	go func() {
 		err := pinger(ctx, c, *tickTime)
-		logger.Infof("pinger failed: %v", err)
+		logger.Infow("pinger failed: %v", err)
 		session.done <- struct{}{}
 	}()
 
