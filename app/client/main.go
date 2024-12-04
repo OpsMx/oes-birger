@@ -51,7 +51,6 @@ import (
 	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/metadata"
 	"gopkg.in/yaml.v3"
-	"gorm.io/gorm/logger"
 )
 
 const (
@@ -124,11 +123,11 @@ func getHeaderContext(ctx context.Context, timeout time.Duration) (context.Conte
 }
 
 func waitForRequest(ctx context.Context, c pb.TunnelServiceClient) error {
+	ctx, logger := loggerFromContext(ctx)
+	ctx, cancel := getHeaderContext(ctx, 0)
 	logger.Info("Entered waitForRequest")
 	logger.Infof("Entered waitForRequest")
 	logger.Infow("Entered waitForRequest")
-	ctx, logger := loggerFromContext(ctx)
-	ctx, cancel := getHeaderContext(ctx, 0)
 	defer cancel()
 	stream, err := c.WaitForRequest(ctx, &pb.WaitForRequestArgs{})
 	if err != nil {
