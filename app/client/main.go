@@ -78,7 +78,7 @@ var (
 func check(ctx context.Context, err error) {
 	_, logger := loggerFromContext(ctx)
 	if err != nil {
-		logger.Infow("Got an error", err)
+		logger.Infow("Got an error", err.Error())
 	}
 }
 
@@ -110,7 +110,7 @@ func sendHello(ctx context.Context, c pb.TunnelServiceClient, info *pb.AgentInfo
 		AgentInfo: info,
 	}
 
-	logger.Infow("Sending Hello request", req)
+	logger.Infow("Sending Hello request", req.String())
 	return c.Hello(ctx, req)
 }
 
@@ -139,13 +139,13 @@ func waitForRequest(ctx context.Context, c pb.TunnelServiceClient) error {
 	stream, err := c.WaitForRequest(ctx, &pb.WaitForRequestArgs{})
 	logger.Info("WaitForRequest successfully returned")
 	if err != nil {
-		logger.Infow("Wait for request grpc action failed, agent wont close!", err)
+		logger.Infow("Wait for request grpc action failed, agent wont close!", err.Error())
 		// return err
 	}
 	for {
 		req, err := stream.Recv()
 		if err != nil {
-			logger.Infow("Recieved error on stream.Recv() , agent wont close!", err)
+			logger.Infow("Recieved error on stream.Recv() , agent wont close!", err.Error())
 			continue
 			// return err
 		}
@@ -164,10 +164,10 @@ func waitForRequest(ctx context.Context, c pb.TunnelServiceClient) error {
 		doneChan := make(chan bool)
 		echo := MakeAgentSenderEcho(ctx, c, req.StreamId, doneChan)
 		ep, found := findEndpoint(ctx, req.Name, req.Type)
-		logger.Infow("Endpoint found", ep, found)
+		logger.Infow("Endpoint found", ep.Name, found)
 		if !found {
 			if err := echo.Fail(ctx, http.StatusBadGateway, fmt.Errorf("no such service on agent")); err != nil {
-				logger.Infow("Could not find endpoint", err)
+				logger.Infow("Could not find endpoint", err.Error())
 			}
 			echo.Shutdown(ctx)
 			continue
@@ -177,7 +177,7 @@ func waitForRequest(ctx context.Context, c pb.TunnelServiceClient) error {
 		go pprof.Do(ctx, labels, func(ctx context.Context) {
 			defer echo.Shutdown(ctx)
 			if err := ep.Instance.ExecuteHTTPRequest(ctx, session.agentID, echo, req); err != nil {
-				logger.Infow("Error in executing request", err)
+				logger.Infow("Error in executing request", err.Error())
 			}
 		})
 	}
@@ -219,7 +219,6 @@ func connect(ctx context.Context, address string, ta credentials.TransportCreden
 		PermitWithoutStream: true,
 	}
 
-	logger.Infow("Keep alive parameters", kparams)
 	gopts := []grpc.DialOption{
 		grpc.WithTransportCredentials(ta),
 		grpc.WithKeepaliveParams(kparams),
@@ -229,11 +228,9 @@ func connect(ctx context.Context, address string, ta credentials.TransportCreden
 		grpc.WithStreamInterceptor(grpc_prometheus.StreamClientInterceptor),
 	}
 
-	logger.Infow("gopts", gopts)
 	if config.InsecureControllerConnection {
 		gopts = append(gopts, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	}
-	logger.Infow("config", config)
 	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer func() {
 		logger.Info("connect cancel() called")
@@ -241,9 +238,9 @@ func connect(ctx context.Context, address string, ta credentials.TransportCreden
 	}()
 	conn, err := grpc.DialContext(ctx, address, gopts...)
 
-	logger.Infow("grpc connection", conn)
+	logger.Infow("grpc connection", conn.GetState().String())
 
-	logger.Infow("grpc error", err)
+	logger.Infow("grpc error", err.Error())
 	check(ctx, err)
 
 	return conn
@@ -426,7 +423,7 @@ func main() {
 	defer tracerProvider.Shutdown(ctx)
 
 	if c, err := loadConfig(*configFile); err != nil {
-		logger.Infow("loading config error: %v", err)
+		logger.Infow("loading config error:", err.Error())
 	} else {
 		config = c
 		logger.Infow("Set config successfully")
@@ -435,7 +432,7 @@ func main() {
 
 	agentServiceConfig, err := serviceconfig.LoadServiceConfig(config.ServicesConfigFile)
 	if err != nil {
-		logger.Infow("Error in loading services config:", err)
+		logger.Infow("Error in loading services config:", err.Error())
 	}
 
 	secretsLoader = makeSecretsLoader(ctx)
@@ -456,14 +453,14 @@ func main() {
 	logger.Infow("Set default deafult http client")
 	authToken, err := getAuthToken(config.AuthTokenFile)
 	if err != nil {
-		logger.Infow("Error in gettign authconfig", err)
+		logger.Infow("Error in gettign authconfig", err.Error())
 	}
 	session.authorization = authToken
 
-	logger.Infow("Session information initialized", session)
+	logger.Infow("Session information initialized ", session.agentID)
 	agentInfo, err := loadAgentInfo(config.ServicesConfigFile)
 	if err != nil {
-		logger.Infow("Error in getting agent Info", err)
+		logger.Infow("Error in getting agent Info", err.Error())
 	}
 
 	logger.Infow("Agent information initialized", agentInfo)
@@ -474,7 +471,7 @@ func main() {
 	if found {
 		caCertPool := x509.NewCertPool()
 		if ok := caCertPool.AppendCertsFromPEM(cacert); !ok {
-			logger.Infow("append certificate to pool: %v", err)
+			logger.Infow("append certificate to pool", err.Error())
 		}
 		tlsConfig.RootCAs = caCertPool
 	}
@@ -487,23 +484,22 @@ func main() {
 	defer conn.Close()
 	c := pb.NewTunnelServiceClient(conn)
 
-	logger.Infow("Tunnel service client", c)
 	hello, err := sendHello(ctx, c, agentInfo, endpoints, hostname, version.VersionString())
 
-	logger.Infow("Hello response", hello)
+	logger.Infow("Hello response", hello.String())
 	check(ctx, err)
 
 	session.sessionID = hello.InstanceId
 	session.agentID = hello.AgentId
 	logger.Infow("controller services", "endpoints", hello.Endpoints)
 
-	logger.Infow("Session set", session)
+	logger.Infow("Session set", session.agentID)
 	destinations := makeControllerDestination(ctx, endpoints)
 	echoManager := &AgentReceiverEchoManager{
 		client: c,
 	}
-	logger.Infow("destinations set", destinations)
-	logger.Infow("echo manager set", echoManager)
+	logger.Infow("destinations set")
+	logger.Infow("echo manager set")
 	for _, service := range agentServiceConfig.IncomingServices {
 		logger.Infow("Running HTTP server for service", service)
 
@@ -512,13 +508,13 @@ func main() {
 
 	go func() {
 		err := waitForRequest(ctx, c)
-		logger.Infow("waitForRequest failed: %v", err)
+		logger.Infow("waitForRequest failed", err.Error())
 		session.done <- struct{}{}
 	}()
 
 	go func() {
 		err := pinger(ctx, c, *tickTime)
-		logger.Infow("pinger failed: %v", err)
+		logger.Infow("pinger failed", err.Error())
 		session.done <- struct{}{}
 	}()
 

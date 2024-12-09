@@ -142,7 +142,7 @@ func (a *AgentSessions) registerSession(agentID string, sessionID string, hostna
 	a.agents[key] = session
 
 	sugar := zap.Must(zap.NewProduction()).Sugar()
-	sugar.Infow("Agent registered / added", session)
+	sugar.Infow("Agent registered / added", session.AgentID)
 	sugar.Infow("New Agent list", a.agents)
 	return session
 }
@@ -157,7 +157,7 @@ func (a *AgentSessions) removeSessionUnlocked(session *AgentContext) {
 	key := AgentKey{AgentID: session.AgentID, SessionID: session.SessionID}
 	delete(a.agents, key)
 	sugar := zap.Must(zap.NewProduction()).Sugar()
-	sugar.Infow("Agent disconnected", session)
+	sugar.Infow("Agent disconnected", session.AgentID)
 	sugar.Infow("New Agent list", a.agents)
 }
 

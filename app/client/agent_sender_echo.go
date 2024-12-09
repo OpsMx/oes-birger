@@ -69,20 +69,20 @@ func (e *AgentSenderEcho) RunDataSender(ctx context.Context) {
 
 	stream, err := e.c.DataFlowAgentToController(ctx)
 	if err != nil {
-		logger.Infow("error e.c.DataFlowAgentToController(): %v", err)
+		logger.Infow("error e.c.DataFlowAgentToController()", err.Error())
 		return
 	}
 
 	defer func() {
 		_, err := stream.CloseAndRecv()
 		if err != nil && err != io.EOF {
-			logger.Infow("stream.CloseAndRecv error: %v", err)
+			logger.Infow("stream.CloseAndRecv error", err.Error())
 		}
 	}()
 
 	err = stream.Send(pb.StreamflowWrapStreamID(e.streamID))
 	if err != nil {
-		logger.Infow("Cannot send stream id: %v", err)
+		logger.Infow("Cannot send stream id", err.Error())
 		return
 	}
 

@@ -128,7 +128,7 @@ func (e *ServerReceiverEcho) RunRequest(ctx context.Context, dest serviceconfig.
 
 	session, ok := dest.(*AgentContext)
 	if !ok {
-		logger.Infow("coding error: expected AgentContext, got %T", dest)
+		logger.Infow("coding error: expected AgentContext, got ", dest)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -169,7 +169,7 @@ func (e *ServerReceiverEcho) RunRequest(ctx context.Context, dest serviceconfig.
 			logger.Infow("Got response", data)
 			if err != nil {
 				// TODO: send cancel over gRPC
-				logger.Infow("send to client: %v", err)
+				logger.Infow("send to client", err.Error())
 				return
 			}
 			if n != len(data) {
@@ -181,7 +181,7 @@ func (e *ServerReceiverEcho) RunRequest(ctx context.Context, dest serviceconfig.
 		case headers := <-e.headersChan:
 			t.Reset(interMessageTime)
 			headersSent = true
-			logger.Infow("Got Headers: %v", headers)
+			logger.Infow("Got Headers")
 			for name := range w.Header() {
 				w.Header().Del(name)
 			}

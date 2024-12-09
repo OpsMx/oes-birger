@@ -100,7 +100,7 @@ func (e *AgentReceiverEcho) RunRequest(ctx context.Context, dest serviceconfig.D
 
 	stream, err := e.client.RunRequest(ctx, pbr)
 	if err != nil {
-		logger.Infow("unable to process request, agent won't close!", "error", err)
+		logger.Infow("unable to process request, agent won't close!", "error", err.Error())
 		w.WriteHeader(http.StatusBadGateway)
 		// return
 	}
@@ -109,7 +109,7 @@ func (e *AgentReceiverEcho) RunRequest(ctx context.Context, dest serviceconfig.D
 		// read and process another message
 		msg, err := stream.Recv()
 		if err == io.EOF {
-			logger.Infow("stream EOF, agent won't close!", err)
+			logger.Infow("stream EOF, agent won't close!", err.Error())
 			if !headersSent {
 				w.WriteHeader(http.StatusBadGateway)
 			}
@@ -117,7 +117,7 @@ func (e *AgentReceiverEcho) RunRequest(ctx context.Context, dest serviceconfig.D
 			// return
 		}
 		if err != nil {
-			logger.Infow("error on stream, agent won't close!", "error", err)
+			logger.Infow("error on stream, agent won't close!", "error", err.Error())
 			if !headersSent {
 				w.WriteHeader(http.StatusBadGateway)
 			}
@@ -130,7 +130,7 @@ func (e *AgentReceiverEcho) RunRequest(ctx context.Context, dest serviceconfig.D
 			n, err := w.Write(data)
 			logger.Infow("Got data on stream", data, err)
 			if err != nil {
-				logger.Infow("send to client: %v, agent won't close!", err)
+				logger.Infow("send to client: %v, agent won't close!", err.Error())
 				continue
 				// return
 			}
@@ -143,7 +143,7 @@ func (e *AgentReceiverEcho) RunRequest(ctx context.Context, dest serviceconfig.D
 		case *pb.StreamFlow_Headers:
 			headers := msg.GetHeaders()
 			headersSent = true
-			logger.Infow("Got Headers: %v", headers)
+			logger.Infow("Got Headers")
 			for name := range w.Header() {
 				w.Header().Del(name)
 			}
@@ -154,14 +154,14 @@ func (e *AgentReceiverEcho) RunRequest(ctx context.Context, dest serviceconfig.D
 			}
 			w.WriteHeader(int(headers.StatusCode))
 		case *pb.StreamFlow_Cancel:
-			logger.Infow("stream canceled, agent wont close!", msg)
+			logger.Infow("stream canceled, agent wont close!", msg.String())
 			if !headersSent {
 				w.WriteHeader(http.StatusBadGateway)
 			}
 			continue
 			// return
 		case *pb.StreamFlow_Done:
-			logger.Infow("stream done, agent wont close!", msg)
+			logger.Infow("stream done, agent wont close!", msg.String())
 			if !headersSent {
 				w.WriteHeader(http.StatusBadGateway)
 			}
