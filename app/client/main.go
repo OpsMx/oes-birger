@@ -240,7 +240,6 @@ func connect(ctx context.Context, address string, ta credentials.TransportCreden
 
 	logger.Infow("grpc connection", conn.GetState().String())
 
-	logger.Infow("grpc error", err.Error())
 	check(ctx, err)
 
 	return conn
