@@ -343,7 +343,7 @@ func (s *CNCServer) getStatistics() http.HandlerFunc {
 			Version:         s.version,
 			ConnectedAgents: s.agentReporter.GetStatistics(),
 		}
-		logger.Infow("Returning response", ret, ret.ConnectedAgents)
+		logger.Infow("Returning response", ret.ConnectedAgents)
 		json, err := json.Marshal(ret)
 		if err != nil {
 			util.FailRequest(ctx, w, err, http.StatusBadRequest)
@@ -351,7 +351,7 @@ func (s *CNCServer) getStatistics() http.HandlerFunc {
 		}
 		n, err := w.Write(json)
 		if err != nil {
-			logger.Infow("getStatistics: error while writing: %v", err)
+			logger.Infow("getStatistics: error while writing", err.Error())
 			return
 		}
 		if n != len(json) {
