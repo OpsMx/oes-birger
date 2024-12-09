@@ -84,7 +84,7 @@ func RunHTTPSServer(ctx context.Context, em EchoManager, routes Destinations, tl
 // incoming requests to the hard-coded configured destination.
 func RunHTTPServer(ctx context.Context, em EchoManager, routes Destinations, service IncomingServiceConfig) {
 	logger := logging.WithContext(ctx).Sugar()
-	logger.Infow("Running service HTTP listener on port %d", service.Port)
+	logger.Infow("Running service HTTP listener on port", service.Port)
 
 	mux := http.NewServeMux()
 
@@ -94,10 +94,10 @@ func RunHTTPServer(ctx context.Context, em EchoManager, routes Destinations, ser
 		Addr:    fmt.Sprintf(":%d", service.Port),
 		Handler: mux,
 	}
-	logger.Infow("Server:", server)
+	// logger.Infow("Server:", server)
 
 	addDefaults(ctx, server)
-	logger.Infow("Server after defaults", server)
+	logger.Infow("Server after defaults")
 
 	logger.Infow("Started Listening with error", server.ListenAndServe())
 }
@@ -116,9 +116,9 @@ func fixedIdentityAPIHandlerMaker(em EchoManager, routes Destinations, service I
 			ServiceType: service.ServiceType,
 			ServiceName: service.DestinationService,
 		}
-		logger.Infow("fixedIdentityAPIHandlerMaker with endpoint", ep)
-		logger.Infow("routes", routes)
-		logger.Infow("http request: ", r)
+		logger.Infow("fixedIdentityAPIHandlerMaker with endpoint", ep.ServiceName)
+		// logger.Infow("routes", routes)
+		logger.Infow("http request: ", r.Body)
 		runAPIHandler(em, routes, ep, w, r)
 	}
 }
@@ -188,9 +188,9 @@ func secureAPIHandlerMaker(em EchoManager, routes Destinations, service Incoming
 func runAPIHandler(em EchoManager, routes Destinations, ep SearchSpec, w http.ResponseWriter, r *http.Request) {
 	ctx := logging.NewContext(r.Context())
 	logger := logging.WithContext(ctx).Sugar()
-	logger.Infow("New request context: ", r.Context())
+	logger.Infow("New request context")
 	session := routes.Search(ctx, ep)
-	logger.Infow("Session: ", session)
+	logger.Infow("Session")
 	if session == nil {
 		logger.Infow("no such destination for service request", "destination", ep.Destination, "serviceName", ep.ServiceName, "serviceType", ep.ServiceType)
 		w.WriteHeader(http.StatusBadGateway)
@@ -208,7 +208,7 @@ func runAPIHandler(em EchoManager, routes Destinations, ep SearchSpec, w http.Re
 
 	streamID := ulid.GlobalContext.Ulid()
 	echo := em.MakeRequester(ctx, ep, streamID)
-	logger.Infow("Run requester made", echo)
+	// logger.Infow("Run requester made", echo)
 	defer echo.Shutdown(ctx)
 	echo.RunRequest(ctx, session, body, w, r)
 }
