@@ -62,6 +62,7 @@ func newSessionContext(agentID string, sessionID string, hostname string, versio
 	key := AgentKey{AgentID: agentID, SessionID: sessionID}
 	now := time.Now().UnixNano()
 	eps := []serviceconfig.Endpoint{}
+
 	for _, ep := range endpoints {
 		annotations := map[string]string{}
 		for _, a := range ep.Annotations {
@@ -139,6 +140,10 @@ func (a *AgentSessions) registerSession(agentID string, sessionID string, hostna
 	defer a.Unlock()
 	session, key := newSessionContext(agentID, sessionID, hostname, version, agentInfo, endpoints)
 	a.agents[key] = session
+
+	sugar := zap.Must(zap.NewProduction()).Sugar()
+	sugar.Infow("Agent registered / added", session)
+	sugar.Infow("New Agent list", a.agents)
 	return session
 }
 
@@ -151,6 +156,9 @@ func (a *AgentSessions) removeSession(session *AgentContext) {
 func (a *AgentSessions) removeSessionUnlocked(session *AgentContext) {
 	key := AgentKey{AgentID: session.AgentID, SessionID: session.SessionID}
 	delete(a.agents, key)
+	sugar := zap.Must(zap.NewProduction()).Sugar()
+	sugar.Infow("Agent disconnected", session)
+	sugar.Infow("New Agent list", a.agents)
 }
 
 func (a *AgentSessions) touchSession(session *AgentContext, t int64) {

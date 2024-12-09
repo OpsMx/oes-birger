@@ -30,6 +30,7 @@ import (
 	"github.com/opsmx/oes-birger/internal/jwtutil"
 	"github.com/opsmx/oes-birger/internal/logging"
 	"github.com/opsmx/oes-birger/internal/ulid"
+	"go.uber.org/zap"
 )
 
 type Endpoint struct {
@@ -83,7 +84,7 @@ func RunHTTPSServer(ctx context.Context, em EchoManager, routes Destinations, tl
 // incoming requests to the hard-coded configured destination.
 func RunHTTPServer(ctx context.Context, em EchoManager, routes Destinations, service IncomingServiceConfig) {
 	logger := logging.WithContext(ctx).Sugar()
-	logger.Infof("Running service HTTP listener on port %d", service.Port)
+	logger.Infow("Running service HTTP listener on port %d", service.Port)
 
 	mux := http.NewServeMux()
 
@@ -93,8 +94,12 @@ func RunHTTPServer(ctx context.Context, em EchoManager, routes Destinations, ser
 		Addr:    fmt.Sprintf(":%d", service.Port),
 		Handler: mux,
 	}
+	logger.Infow("Server:", server)
+
 	addDefaults(ctx, server)
-	logger.Fatal(server.ListenAndServe())
+	logger.Infow("Server after defaults", server)
+
+	logger.Infow("Started Listening with error", server.ListenAndServe())
 }
 
 func addDefaults(ctx context.Context, server *http.Server) {
@@ -105,11 +110,15 @@ func addDefaults(ctx context.Context, server *http.Server) {
 
 func fixedIdentityAPIHandlerMaker(em EchoManager, routes Destinations, service IncomingServiceConfig) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
+		logger := zap.Must(zap.NewDevelopment()).Sugar()
 		ep := SearchSpec{
 			Destination: service.Destination,
 			ServiceType: service.ServiceType,
 			ServiceName: service.DestinationService,
 		}
+		logger.Infow("fixedIdentityAPIHandlerMaker with endpoint", ep)
+		logger.Infow("routes", routes)
+		logger.Infow("http request: ", r)
 		runAPIHandler(em, routes, ep, w, r)
 	}
 }
@@ -179,10 +188,11 @@ func secureAPIHandlerMaker(em EchoManager, routes Destinations, service Incoming
 func runAPIHandler(em EchoManager, routes Destinations, ep SearchSpec, w http.ResponseWriter, r *http.Request) {
 	ctx := logging.NewContext(r.Context())
 	logger := logging.WithContext(ctx).Sugar()
-
+	logger.Infow("New request context: ", r.Context())
 	session := routes.Search(ctx, ep)
+	logger.Infow("Session: ", session)
 	if session == nil {
-		logger.Warnw("no such destination for service request", "destination", ep.Destination, "serviceName", ep.ServiceName, "serviceType", ep.ServiceType)
+		logger.Infow("no such destination for service request", "destination", ep.Destination, "serviceName", ep.ServiceName, "serviceType", ep.ServiceType)
 		w.WriteHeader(http.StatusBadGateway)
 		return
 	}
@@ -190,7 +200,7 @@ func runAPIHandler(em EchoManager, routes Destinations, ep SearchSpec, w http.Re
 	// TODO: read should be limited in size...
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
-		logger.Errorf("unable to read entire message body")
+		logger.Infow("unable to read entire message body")
 		w.WriteHeader(http.StatusServiceUnavailable)
 		return
 	}
@@ -198,7 +208,7 @@ func runAPIHandler(em EchoManager, routes Destinations, ep SearchSpec, w http.Re
 
 	streamID := ulid.GlobalContext.Ulid()
 	echo := em.MakeRequester(ctx, ep, streamID)
-
+	logger.Infow("Run requester made", echo)
 	defer echo.Shutdown(ctx)
 	echo.RunRequest(ctx, session, body, w, r)
 }

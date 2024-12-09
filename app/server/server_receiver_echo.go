@@ -117,17 +117,18 @@ func (e *ServerReceiverEcho) RunRequest(ctx context.Context, dest serviceconfig.
 	flusher := w.(http.Flusher)
 	interMessageTime := 10 * time.Second
 	t := time.NewTimer(10 * interMessageTime)
-
+	logger.Infow("Entered run request of server")
 	pbh, err := serviceconfig.HTTPHeadersToPB(r.Header)
+
 	if err != nil {
-		logger.Errorf("unable to convert headers")
+		logger.Infow("unable to convert headers")
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
 	session, ok := dest.(*AgentContext)
 	if !ok {
-		logger.Errorf("coding error: expected AgentContext, got %T", dest)
+		logger.Infow("coding error: expected AgentContext, got %T", dest)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -150,33 +151,37 @@ func (e *ServerReceiverEcho) RunRequest(ctx context.Context, dest serviceconfig.
 			logger.Infof("stream timed out")
 			return
 		case <-r.Context().Done():
-			logger.Infof("client closed, stopping data flow")
+			logger.Infof("client closed, stopping data flow", ctx.Err())
 			// TODO: send cancel event over gRPC
 			return
 		case <-e.doneChan:
+			logger.Infow("request done")
 			return
 		case code := <-e.failChan:
 			if !headersSent {
 				w.WriteHeader(code)
 			}
+			logger.Infow("request failed", code)
 			return
 		case data := <-e.dataChan:
 			t.Reset(interMessageTime)
 			n, err := w.Write(data)
+			logger.Infow("Got response", data)
 			if err != nil {
 				// TODO: send cancel over gRPC
-				logger.Warnf("send to client: %v", err)
+				logger.Infow("send to client: %v", err)
 				return
 			}
 			if n != len(data) {
 				// TODO: send cancel over gRPC
-				logger.Warnf("short send to client: wrote %d, wanted to write %d bytes", n, len(data))
+				logger.Infow("short send to client: wrote %d, wanted to write %d bytes", n, len(data))
 				return
 			}
 			flusher.Flush()
 		case headers := <-e.headersChan:
 			t.Reset(interMessageTime)
 			headersSent = true
+			logger.Infow("Got Headers: %v", headers)
 			for name := range w.Header() {
 				w.Header().Del(name)
 			}

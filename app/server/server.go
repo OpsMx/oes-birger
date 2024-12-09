@@ -88,11 +88,19 @@ func (s *server) closeAgentSession(ctx context.Context, session *AgentContext) {
 
 func (s *server) WaitForRequest(in *pb.WaitForRequestArgs, stream pb.TunnelService_WaitForRequestServer) error {
 	ctx, logger := loggerFromContext(stream.Context())
+	logger.Infow("Entered WaitForRequest stub callback")
 	session, err := agents.findSession(stream.Context())
+	logger.Infow("Found session", session)
 	if err != nil {
+		logger.Infow("Error in finding session, first call hello", err)
 		return status.Error(codes.FailedPrecondition, "Hello must be called first")
 	}
-	defer agents.removeSession(session)
+	// defer agents.removeSession(session)
+	defer func() {
+		logger.Infow("Removing session since waitforrequest ended")
+		agents.removeSession(session)
+	}()
+
 	t := time.NewTicker(10 * time.Second)
 	defer t.Stop()
 
@@ -104,18 +112,19 @@ func (s *server) WaitForRequest(in *pb.WaitForRequestArgs, stream pb.TunnelServi
 			}
 			if err := stream.Send(keepalive); err != nil {
 				s.closeAgentSession(ctx, session)
-				logger.Errorw("WaitForRequest stream.Send() failed, dropping agent", "error", err)
+				logger.Infow("WaitForRequest stream.Send() failed, dropping agent", "error", err)
 				return status.Error(codes.Canceled, "send failed")
 			}
 		case <-ctx.Done():
-			logger.Infow("closed connection")
+			logger.Infow("closed connection with error: ", ctx.Err())
 			s.closeAgentSession(ctx, session)
 			return status.Error(codes.Canceled, "client closed connection")
 		case sr := <-session.requestChan:
+			logger.Infow("got request from request channel: ", sr)
 			s.streamManager.Register(ctx, session, sr.req.StreamId, sr.closechan, sr.echo)
 			if err := stream.Send(sr.req); err != nil {
 				s.closeAgentSession(ctx, session)
-				logger.Errorw("WaitForRequest stream.Send() failed, dropping agent", "error", err)
+				logger.Infow("WaitForRequest stream.Send() failed, dropping agent", "error", err)
 				return status.Error(codes.Canceled, "send failed")
 			}
 		}
@@ -145,11 +154,16 @@ func (s *server) getStreamAndID(ctx context.Context, event *pb.StreamFlow) (stri
 func (s *server) DataFlowAgentToController(rpcstream pb.TunnelService_DataFlowAgentToControllerServer) error {
 	ctx := rpcstream.Context()
 	event, err := rpcstream.Recv()
+
+	sugar := zap.Must(zap.NewProduction()).Sugar()
+	sugar.Infow("Entered DataFlowAgentToController")
 	if err != nil {
+		sugar.Infow("Error recieving rpc recv()", err)
 		return status.Error(codes.InvalidArgument, "unable to read streamID")
 	}
 	streamID, stream, err := s.getStreamAndID(ctx, event)
 	if err != nil {
+		sugar.Infow("Error getting stream", err)
 		return err
 	}
 	ctx, logger := loggerFromContext(ctx, zap.String("streamID", streamID))
@@ -158,11 +172,12 @@ func (s *server) DataFlowAgentToController(rpcstream pb.TunnelService_DataFlowAg
 	for {
 		event, err := rpcstream.Recv()
 		if err == io.EOF {
+			logger.Infow("received error from stream", err)
 			s.done(ctx, stream)
 			return nil
 		}
 		if err != nil {
-			logger.Infof("stream error: %v", err)
+			logger.Infof("stream error: %v, sending Fail() on echo", err)
 			if serr, ok := status.FromError(err); ok {
 				if serr.Code() == codes.Canceled {
 					return nil
@@ -174,16 +189,25 @@ func (s *server) DataFlowAgentToController(rpcstream pb.TunnelService_DataFlowAg
 
 		switch event.Event.(type) {
 		case *pb.StreamFlow_Cancel:
+			logger.Infow("sending Cancel() for context on stream")
 			_ = stream.echo.Cancel(ctx)
 			return nil
 		case *pb.StreamFlow_Done:
+
+			logger.Infow("sending Done() for context on stream")
 			_ = stream.echo.Done(ctx)
 			return nil
 		case *pb.StreamFlow_Headers:
+
+			logger.Infow("sending Headers() for context on stream", event.GetHeaders())
 			_ = stream.echo.Headers(ctx, event.GetHeaders())
 		case *pb.StreamFlow_Data:
+
+			logger.Infow("sending Data() for context on stream", event.GetData())
 			_ = stream.echo.Data(ctx, event.GetData().Data)
 		case *pb.StreamFlow_Keepalive:
+
+			logger.Infow("Got keep alive for context on stream")
 			// do nothing
 		}
 	}
@@ -209,13 +233,15 @@ func (s *server) RunRequest(in *pb.TunnelRequest, stream pb.TunnelService_RunReq
 	)
 	logger := logging.WithContext(ctx).Sugar()
 	endpoint, found := findEndpoint(stream.Context(), in.Name, in.Type)
+	logger.Infow("Found endpoint", endpoint, found)
 	if !found {
+
 		err := stream.Send(pb.StreamflowWrapHeaderMsg(
 			&pb.TunnelHeaders{
 				StatusCode: http.StatusBadGateway,
 			}))
 		if err != nil {
-			logger.Warnf("unable to send: %v", err)
+			logger.Infow("unable to send: %v", err)
 		}
 		return err
 	}
@@ -227,7 +253,7 @@ func (s *server) RunRequest(in *pb.TunnelRequest, stream pb.TunnelService_RunReq
 	go func() {
 		err := endpoint.Instance.ExecuteHTTPRequest(ctx, "controller", echo, in)
 		if err != nil {
-			logger.Warnw("ExecuteHTTPRequest", "error", err)
+			logger.Infow("ExecuteHTTPRequest", "error", err)
 			echo.Shutdown(ctx)
 		}
 		select {
@@ -244,14 +270,15 @@ func (s *server) RunRequest(in *pb.TunnelRequest, stream pb.TunnelService_RunReq
 			}
 			err := stream.Send(msg)
 			if err != nil {
-				logger.Warnw("Send()", "error", err)
+				logger.Infow("Send()", "error", err)
 				return err
 			}
 		case <-ctx.Done():
+			logger.Infow("Context done() called in Run request", ctx.Err())
 			return ctx.Err()
 		case err := <-donechan:
 			if err != nil {
-				logger.Infof("HTTP request ended with error: ", err)
+				logger.Infow("HTTP request ended with error: ", err)
 			}
 			return err
 		}

@@ -78,7 +78,7 @@ var (
 func check(ctx context.Context, err error) {
 	_, logger := loggerFromContext(ctx)
 	if err != nil {
-		logger.Fatal(err)
+		logger.Infow("Got an error", err)
 	}
 }
 
@@ -109,6 +109,8 @@ func sendHello(ctx context.Context, c pb.TunnelServiceClient, info *pb.AgentInfo
 		Endpoints: serviceconfig.EndpointsToPB(endpoints),
 		AgentInfo: info,
 	}
+
+	logger.Infow("Sending Hello request", req)
 	return c.Hello(ctx, req)
 }
 
@@ -130,8 +132,6 @@ func waitForRequest(ctx context.Context, c pb.TunnelServiceClient) error {
 	ctx, logger := loggerFromContext(ctx)
 	ctx, cancel := getHeaderContext(ctx, 0)
 	logger.Info("Entered waitForRequest")
-	logger.Infof("Entered waitForRequest")
-	logger.Infow("Entered waitForRequest")
 	defer func() {
 		logger.Info("sendWaitForRequest cancel() called")
 		cancel()
@@ -139,14 +139,15 @@ func waitForRequest(ctx context.Context, c pb.TunnelServiceClient) error {
 	stream, err := c.WaitForRequest(ctx, &pb.WaitForRequestArgs{})
 	logger.Info("WaitForRequest successfully returned")
 	if err != nil {
-		logger.Infow("Wait for request grpc action failed", err)
-		return err
+		logger.Infow("Wait for request grpc action failed, agent wont close!", err)
+		// return err
 	}
 	for {
 		req, err := stream.Recv()
 		if err != nil {
-			logger.Infow("Recieved error on stream.Recv()", err)
-			return err
+			logger.Infow("Recieved error on stream.Recv() , agent wont close!", err)
+			continue
+			// return err
 		}
 		if req.IsKeepalive {
 			logger.Info("Keepalive request received")
@@ -159,17 +160,11 @@ func waitForRequest(ctx context.Context, c pb.TunnelServiceClient) error {
 			"serviceType", req.Type,
 			"uri", req.URI,
 			"bodyLength", len(req.Body))
-		logger.Info("waitForRequest response",
-			"streamID", req.StreamId,
-			"method", req.Method,
-			"serviceName", req.Name,
-			"serviceType", req.Type,
-			"uri", req.URI,
-			"bodyLength", len(req.Body))
 		// TODO: implement endpoint search and dispatch request
 		doneChan := make(chan bool)
 		echo := MakeAgentSenderEcho(ctx, c, req.StreamId, doneChan)
 		ep, found := findEndpoint(ctx, req.Name, req.Type)
+		logger.Infow("Endpoint found", ep, found)
 		if !found {
 			if err := echo.Fail(ctx, http.StatusBadGateway, fmt.Errorf("no such service on agent")); err != nil {
 				logger.Infow("Could not find endpoint", err)
@@ -182,7 +177,7 @@ func waitForRequest(ctx context.Context, c pb.TunnelServiceClient) error {
 		go pprof.Do(ctx, labels, func(ctx context.Context) {
 			defer echo.Shutdown(ctx)
 			if err := ep.Instance.ExecuteHTTPRequest(ctx, session.agentID, echo, req); err != nil {
-				logger.Warn(err)
+				logger.Infow("Error in executing request", err)
 			}
 		})
 	}
@@ -223,6 +218,8 @@ func connect(ctx context.Context, address string, ta credentials.TransportCreden
 		Timeout:             5 * time.Second,
 		PermitWithoutStream: true,
 	}
+
+	logger.Infow("Keep alive parameters", kparams)
 	gopts := []grpc.DialOption{
 		grpc.WithTransportCredentials(ta),
 		grpc.WithKeepaliveParams(kparams),
@@ -231,15 +228,22 @@ func connect(ctx context.Context, address string, ta credentials.TransportCreden
 		grpc.WithUnaryInterceptor(grpc_prometheus.UnaryClientInterceptor),
 		grpc.WithStreamInterceptor(grpc_prometheus.StreamClientInterceptor),
 	}
+
+	logger.Infow("gopts", gopts)
 	if config.InsecureControllerConnection {
 		gopts = append(gopts, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	}
+	logger.Infow("config", config)
 	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer func() {
 		logger.Info("connect cancel() called")
 		cancel()
 	}()
 	conn, err := grpc.DialContext(ctx, address, gopts...)
+
+	logger.Infow("grpc connection", conn)
+
+	logger.Infow("grpc error", err)
 	check(ctx, err)
 
 	return conn
@@ -396,6 +400,7 @@ func makeSecretsLoader(ctx context.Context) secrets.SecretLoader {
 func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	ctx, logger := loggerFromContext(ctx)
+	logger.Infow("Created a new Context in main()")
 
 	defer func() {
 		logger.Info("main cancel() called")
@@ -421,19 +426,23 @@ func main() {
 	defer tracerProvider.Shutdown(ctx)
 
 	if c, err := loadConfig(*configFile); err != nil {
-		logger.Fatalf("loading config: %v", err)
+		logger.Infow("loading config error: %v", err)
 	} else {
 		config = c
+		logger.Infow("Set config successfully")
 	}
 	logger.Infow("config", "controllerHostname", config.ControllerHostname)
 
 	agentServiceConfig, err := serviceconfig.LoadServiceConfig(config.ServicesConfigFile)
 	if err != nil {
-		logger.Fatalf("loading services config: %v", err)
+		logger.Infow("Error in loading services config:", err)
 	}
 
 	secretsLoader = makeSecretsLoader(ctx)
+
+	logger.Infow("Set secrets loader")
 	endpoints = serviceconfig.ConfigureEndpoints(ctx, secretsLoader, agentServiceConfig)
+	logger.Infow("Configured endpoints", endpoints)
 
 	clientConfig := httputil.ClientConfig{
 		DialTimeout:           4,
@@ -444,44 +453,60 @@ func main() {
 	httputil.SetClientConfig(clientConfig)
 	http.DefaultClient = httputil.NewHTTPClient(nil)
 
+	logger.Infow("Set default deafult http client")
 	authToken, err := getAuthToken(config.AuthTokenFile)
 	if err != nil {
-		logger.Fatal(err)
+		logger.Infow("Error in gettign authconfig", err)
 	}
 	session.authorization = authToken
 
+	logger.Infow("Session information initialized", session)
 	agentInfo, err := loadAgentInfo(config.ServicesConfigFile)
 	if err != nil {
-		logger.Fatal(err)
+		logger.Infow("Error in getting agent Info", err)
 	}
 
+	logger.Infow("Agent information initialized", agentInfo)
 	tlsConfig := &tls.Config{}
 	cacert, found := loadCACert(ctx)
+
+	logger.Infow("CA certificate found", cacert, found)
 	if found {
 		caCertPool := x509.NewCertPool()
 		if ok := caCertPool.AppendCertsFromPEM(cacert); !ok {
-			logger.Fatalf("append certificate to pool: %v", err)
+			logger.Infow("append certificate to pool: %v", err)
 		}
 		tlsConfig.RootCAs = caCertPool
 	}
 
+	logger.Infow("TLS config", tlsConfig)
 	ta := credentials.NewTLS(tlsConfig)
+
+	logger.Infow("TA", ta)
 	conn := connect(ctx, config.ControllerHostname, ta)
 	defer conn.Close()
 	c := pb.NewTunnelServiceClient(conn)
 
+	logger.Infow("Tunnel service client", c)
 	hello, err := sendHello(ctx, c, agentInfo, endpoints, hostname, version.VersionString())
+
+	logger.Infow("Hello response", hello)
 	check(ctx, err)
+
 	session.sessionID = hello.InstanceId
 	session.agentID = hello.AgentId
 	logger.Infow("controller services", "endpoints", hello.Endpoints)
 
+	logger.Infow("Session set", session)
 	destinations := makeControllerDestination(ctx, endpoints)
 	echoManager := &AgentReceiverEchoManager{
 		client: c,
 	}
-
+	logger.Infow("destinations set", destinations)
+	logger.Infow("echo manager set", echoManager)
 	for _, service := range agentServiceConfig.IncomingServices {
+		logger.Infow("Running HTTP server for service", service)
+
 		go serviceconfig.RunHTTPServer(ctx, echoManager, destinations, service)
 	}
 

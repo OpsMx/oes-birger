@@ -64,31 +64,32 @@ func RunDataSenderCancel(ctx context.Context, cl context.CancelFunc, logger *zap
 func (e *AgentSenderEcho) RunDataSender(ctx context.Context) {
 	ctx, logger := loggerFromContext(ctx)
 	ctx, cancel := context.WithCancel(ctx)
+	logger.Infow("Entered run data sender")
 	defer RunDataSenderCancel(ctx, cancel, logger)
 
 	stream, err := e.c.DataFlowAgentToController(ctx)
 	if err != nil {
-		logger.Errorf("e.c.DataFlowAgentToController(): %v", err)
+		logger.Infow("error e.c.DataFlowAgentToController(): %v", err)
 		return
 	}
 
 	defer func() {
 		_, err := stream.CloseAndRecv()
 		if err != nil && err != io.EOF {
-			logger.Info("stream.CloseAndRecv error: %v", err)
+			logger.Infow("stream.CloseAndRecv error: %v", err)
 		}
 	}()
 
 	err = stream.Send(pb.StreamflowWrapStreamID(e.streamID))
 	if err != nil {
-		logger.Errorf("Cannot send stream id: %v", err)
+		logger.Infow("Cannot send stream id: %v", err)
 		return
 	}
 
 	for {
 		select {
 		case <-ctx.Done():
-			logger.Infof("Run() context done")
+			logger.Infof("Run() context done with reason:", ctx.Err())
 		case msg, more := <-e.msgChan:
 			if msg != nil {
 				err := stream.Send(msg)

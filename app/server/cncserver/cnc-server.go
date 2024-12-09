@@ -336,12 +336,14 @@ func (s *CNCServer) getStatistics() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		w.Header().Set("content-type", "application/json")
-
+		logger := logging.WithContext(ctx).Sugar()
+		logger.Infow("Entered getStatistics /api/v1/getAgentStatistics")
 		ret := fwdapi.StatisticsResponse{
 			ServerTime:      ulid.Now(),
 			Version:         s.version,
 			ConnectedAgents: s.agentReporter.GetStatistics(),
 		}
+		logger.Infow("Returning response", ret, ret.ConnectedAgents)
 		json, err := json.Marshal(ret)
 		if err != nil {
 			util.FailRequest(ctx, w, err, http.StatusBadRequest)
@@ -349,11 +351,11 @@ func (s *CNCServer) getStatistics() http.HandlerFunc {
 		}
 		n, err := w.Write(json)
 		if err != nil {
-			log.Printf("getStatistics: error while writing: %v", err)
+			logger.Infow("getStatistics: error while writing: %v", err)
 			return
 		}
 		if n != len(json) {
-			log.Printf("getStatistics: failed to write entire message: %d of %d written", n, len(json))
+			logger.Infow("getStatistics: failed to write entire message: %d of %d written", n, len(json))
 			return
 		}
 	}
