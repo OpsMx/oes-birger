@@ -62,10 +62,10 @@ var (
 	configFile = flag.String("configFile", "/app/config/config.yaml", "The file with the controller config")
 
 	otlpEndpoint  = flag.String("otlp-endpoint", "", "OTLP collector endpoint")
-	traceToStdout = flag.Bool("traceToStdout", false, "log traces to stdout")
+	traceToStdout = flag.Bool("traceToStdout", true, "log traces to stdout")
 	traceRatio    = flag.Float64("traceRatio", 0.01, "ratio of traces to create, if incoming request is not traced")
 	showversion   = flag.Bool("version", false, "show the version and exit")
-	profile       = flag.Bool("profile", false, "enable memory and CPU profiling")
+	profile       = flag.Bool("profile", true, "enable memory and CPU profiling")
 
 	hostname = getHostname()
 

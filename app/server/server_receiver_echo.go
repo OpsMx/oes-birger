@@ -166,7 +166,7 @@ func (e *ServerReceiverEcho) RunRequest(ctx context.Context, dest serviceconfig.
 		case data := <-e.dataChan:
 			t.Reset(interMessageTime)
 			n, err := w.Write(data)
-			logger.Infow("Got response", data)
+			logger.Infow("Got response")
 			if err != nil {
 				// TODO: send cancel over gRPC
 				logger.Infow("send to client", err.Error())

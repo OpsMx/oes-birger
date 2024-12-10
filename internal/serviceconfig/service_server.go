@@ -117,6 +117,7 @@ func fixedIdentityAPIHandlerMaker(em EchoManager, routes Destinations, service I
 			ServiceName: service.DestinationService,
 		}
 		logger.Infow("fixedIdentityAPIHandlerMaker with endpoint", ep.ServiceName)
+		logger.Infow("Entered fixedIdentity with request url", r.RequestURI)
 		// logger.Infow("routes", routes)
 		logger.Infow("http request: ", r.Body)
 		runAPIHandler(em, routes, ep, w, r)
@@ -176,6 +177,9 @@ func secureAPIHandlerMaker(em EchoManager, routes Destinations, service Incoming
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
+		ctx := logging.NewContext(r.Context())
+		logger := logging.WithContext(ctx).Sugar()
+		logger.Infow("Entered secureApihandler with request url", r.RequestURI)
 		ep := SearchSpec{
 			Destination: agentIdentity,
 			ServiceType: endpointType,

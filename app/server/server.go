@@ -58,7 +58,9 @@ func (s *server) Hello(ctx context.Context, in *pb.HelloRequest) (*pb.HelloRespo
 	_, logger := loggerFromContext(ctx)
 	sessionID := ulid.GlobalContext.Ulid()
 	logger.Infow("Hello", "endpoints", in.Endpoints, "agentInfo.annotations", in.AgentInfo.Annotations, "sessionID", sessionID)
+
 	session := agents.registerSession(agentID, sessionID, in.Hostname, in.Version, in.AgentInfo, in.Endpoints)
+	
 	return &pb.HelloResponse{
 		InstanceId: session.SessionID,
 		AgentId:    agentID,
