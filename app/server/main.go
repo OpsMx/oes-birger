@@ -325,6 +325,7 @@ func main() {
 
 	// Now, add all the others defined by our config.
 	for _, service := range config.ServiceConfig.IncomingServices {
+		logger.Infow("Service name for which starting HTTP(S) server is", service.Name," Type is",service.ServiceType)
 		if service.UseHTTP {
 			go serviceconfig.RunHTTPServer(ctx, echoManager, agents, service)
 		} else {

@@ -56,7 +56,7 @@ type SearchSpec struct {
 // currently will use certificates or JWT to identify the destination.
 func RunHTTPSServer(ctx context.Context, em EchoManager, routes Destinations, tlsPath string, service IncomingServiceConfig) {
 	logger := logging.WithContext(ctx).Sugar()
-
+	logger.Infow("Entered RunHTTPSServer")
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", secureAPIHandlerMaker(em, routes, service))
 
@@ -105,6 +105,8 @@ func addDefaults(ctx context.Context, server *http.Server) {
 
 func fixedIdentityAPIHandlerMaker(em EchoManager, routes Destinations, service IncomingServiceConfig) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
+		logger := logging.WithContext(r.Context()).Sugar()
+		logger.Infow("Entered fixedIdentityAPIHandlerMaker with request uri", r.URL.String())
 		ep := SearchSpec{
 			Destination: service.Destination,
 			ServiceType: service.ServiceType,
@@ -161,6 +163,8 @@ func extractEndpoint(r *http.Request) (agentIdentity string, endpointType string
 
 func secureAPIHandlerMaker(em EchoManager, routes Destinations, service IncomingServiceConfig) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
+		logger := logging.WithContext(r.Context()).Sugar()
+		logger.Infow("Entered secureAPIHandlerMaker with request uri", r.URL.String())
 		agentIdentity, endpointType, endpointName, err := extractEndpoint(r)
 		if err != nil {
 			r.Body.Close()
@@ -179,7 +183,7 @@ func secureAPIHandlerMaker(em EchoManager, routes Destinations, service Incoming
 func runAPIHandler(em EchoManager, routes Destinations, ep SearchSpec, w http.ResponseWriter, r *http.Request) {
 	ctx := logging.NewContext(r.Context())
 	logger := logging.WithContext(ctx).Sugar()
-
+	logger.Infow("Entered runAPIHandler with request uri", r.URL.String())
 	session := routes.Search(ctx, ep)
 	if session == nil {
 		logger.Warnw("no such destination for service request", "destination", ep.Destination, "serviceName", ep.ServiceName, "serviceType", ep.ServiceType)

@@ -1,9 +1,9 @@
 module github.com/opsmx/oes-birger
 
-go 1.21
+go 1.23.4
 
 require (
-	github.com/OpsMx/go-app-base v0.0.23
+	github.com/OpsMx/go-app-base v0.0.24
 	github.com/go-resty/resty/v2 v2.11.0
 	github.com/google/go-cmp v0.6.0
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
