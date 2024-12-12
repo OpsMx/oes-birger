@@ -64,7 +64,11 @@ func RunHTTPSServer(ctx context.Context, em EchoManager, routes Destinations, tl
 		Addr:    fmt.Sprintf(":%d", service.Port),
 		Handler: mux,
 	}
-
+	defer func() {
+		logger.infoW("RunHTTPSServer Server stopped! with service",service.Name)
+		logger.infoW("Restarting it!")
+		RunHTTPSServer(ctx, em, routes, tlsPath, service)
+	}()
 	addDefaults(ctx, server)
 
 	if tlsPath != "" {
@@ -88,7 +92,11 @@ func RunHTTPServer(ctx context.Context, em EchoManager, routes Destinations, ser
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/", fixedIdentityAPIHandlerMaker(em, routes, service))
-
+	defer func() {
+		logger.infoW("RunHTTPServer Server stopped! with service",service.Name)
+		logger.infoW("Restarting it!")
+		RunHTTPServer(ctx, em, routes, tlsPath, service)
+	}()
 	server := &http.Server{
 		Addr:    fmt.Sprintf(":%d", service.Port),
 		Handler: mux,
