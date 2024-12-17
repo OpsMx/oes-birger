@@ -336,19 +336,7 @@ func main() {
 	go runPrometheusHTTPServer(ctx, config.PrometheusListenPort, *profile)
 
 	<-sigchan
-	// logger.Infof("Exiting Cleanly")
-	logger.Infof("Received signal: %v. Initiating graceful shutdown...\n", sig)
-
-	// Create a context with timeout for the shutdown process
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	// Shutdown the server gracefully
-	if err := server.Shutdown(ctx); err != nil {
-		logger.Infof("Server shutdown failed: %v\n", err)
-	} else {
-		logger.Infof("Server shutdown completed successfully.")
-	}
+	logger.Infof("Exiting Cleanly")
 }
 
 func makeSecretsLoader(ctx context.Context) secrets.SecretLoader {

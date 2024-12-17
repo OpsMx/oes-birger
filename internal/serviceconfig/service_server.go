@@ -86,16 +86,33 @@ func RunHTTPSServer(ctx context.Context, em EchoManager, routes Destinations, tl
 		// logger.Fatal(server.ListenAndServeTLS(path.Join(tlsPath, "tls.crt"), path.Join(tlsPath, "tls.key")))
 		if err := server.ListenAndServeTLS(path.Join(tlsPath, "tls.crt"), path.Join(tlsPath, "tls.key")); err != null && !errors.Is(err, http.ErrServerClosed){
 			logger.Errorf("Error received on server: %v", err)
-			sigchan <- syscall.SIGTERM
+			gracefulShutdown(server)
 		}
 	} else {
 		logger.Infof("Running service HTTP listener on port %d", service.Port)
 		// logger.Fatal(server.ListenAndServe())
 		if err := server.ListenAndServe(); err != null && !errors.Is(err, http.ErrServerClosed){
 			logger.Errorf("Error received on server: %v", err)
-			sigchan <- syscall.SIGTERM
+			gracefulShutdown(server)
 		}
 	}
+}
+
+func gracefulShutdown(server *http.Server){
+	logger.Infof("Received signal: %v. Initiating graceful shutdown...\n")
+
+	// Create a context with timeout for the shutdown process
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Shutdown the server gracefully
+	if err := server.Shutdown(ctx); err != nil {
+		logger.Infof("Server shutdown failed: %v\n", err)
+	} else {
+		logger.Infof("Server shutdown completed successfully.")
+	}
+
+	sigchan <- syscall.SIGTERM
 }
 
 // RunHTTPServer will listen on an unencrypted HTTP only port, and will always forward
@@ -118,7 +135,7 @@ func RunHTTPServer(ctx context.Context, em EchoManager, routes Destinations, ser
 	// logger.Fatal(server.ListenAndServe())
 	if err := server.ListenAndServe(); err != null && !errors.Is(err, http.ErrServerClosed){
 		logger.Errorf("Error received on server: %v", err)
-		sigchan <- syscall.SIGTERM
+		gracefulShutdown(server)
 	}
 	defer func() {
 		logger.Infow("RunHTTPSServer Server stopped! with service",service.Name)
