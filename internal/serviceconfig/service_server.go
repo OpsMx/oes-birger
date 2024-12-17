@@ -257,8 +257,8 @@ func runAPIHandler(em EchoManager, routes Destinations, ep SearchSpec, w http.Re
 	if err != nil {
 		logger.Errorf("unable to read entire message body")
 		w.WriteHeader(http.StatusServiceUnavailable)
-		return
 		cancel()
+		return
 	}
 	r.Body.Close()
 
