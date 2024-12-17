@@ -27,7 +27,6 @@ import (
 	"strings"
 	"time"
 	"os"
-	"os/signal"
 	"syscall"
 
 	"github.com/opsmx/oes-birger/internal/jwtutil"
@@ -86,19 +85,20 @@ func RunHTTPSServer(ctx context.Context, em EchoManager, routes Destinations, tl
 		// logger.Fatal(server.ListenAndServeTLS(path.Join(tlsPath, "tls.crt"), path.Join(tlsPath, "tls.key")))
 		if err := server.ListenAndServeTLS(path.Join(tlsPath, "tls.crt"), path.Join(tlsPath, "tls.key")); err != nil && err != http.ErrServerClosed { 
 			logger.Errorf("Error received on server: %v", err)
-			gracefulShutdown(server)
+			gracefulShutdown(server, ctx)
 		}
 	} else {
 		logger.Infof("Running service HTTP listener on port %d", service.Port)
 		// logger.Fatal(server.ListenAndServe())
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			logger.Errorf("Error received on server: %v", err)
-			gracefulShutdown(server)
+			gracefulShutdown(server, ctx)
 		}
 	}
 }
 
-func gracefulShutdown(server *http.Server){
+func gracefulShutdown(server *http.Server, ctx context.Context){
+	logger, := logger.WithContext(ctx).Sugar()
 	logger.Infof("Received signal: %v. Initiating graceful shutdown...\n")
 
 	// Create a context with timeout for the shutdown process
@@ -112,7 +112,8 @@ func gracefulShutdown(server *http.Server){
 		logger.Infof("Server shutdown completed successfully.")
 	}
 
-	sigchan <- syscall.SIGTERM
+	// sigchan <- syscall.SIGTERM
+	os.exit(0)
 }
 
 // RunHTTPServer will listen on an unencrypted HTTP only port, and will always forward
@@ -161,7 +162,7 @@ func fixedIdentityAPIHandlerMaker(em EchoManager, routes Destinations, service I
 		}
 		defer func() {
             if err := recover(); err != nil {
-                log.Printf("Recovered from panic: %v", err)
+                logger.Errorf("Recovered from panic: %v", err)
                 http.Error(w, "Internal Server Error", http.StatusInternalServerError)
             }
         }()
@@ -232,7 +233,7 @@ func secureAPIHandlerMaker(em EchoManager, routes Destinations, service Incoming
 		runAPIHandler(em, routes, ep, w, r)
 		defer func() {
             if err := recover(); err != nil {
-                log.Printf("Recovered from panic: %v", err)
+                logger.Errorf("Recovered from panic: %v", err)
                 http.Error(w, "Internal Server Error", http.StatusInternalServerError)
             }
         }()
@@ -240,8 +241,8 @@ func secureAPIHandlerMaker(em EchoManager, routes Destinations, service Incoming
 }
 
 func runAPIHandler(em EchoManager, routes Destinations, ep SearchSpec, w http.ResponseWriter, r *http.Request) {
-	ctx, cancel := ctx.WithTimeout(r.Context(), 5*time.Second)
-	// ctx := logging.NewContext(ctx)
+	ctx := logging.NewContext(r.Context())
+	ctx, cancel := ctx.WithTimeout(ctx, 5*time.Second)
 	logger := logging.WithContext(ctx).Sugar()
 	logger.Infow("Entered runAPIHandler with request uri", r.URL.String())
 	session := routes.Search(ctx, ep)
