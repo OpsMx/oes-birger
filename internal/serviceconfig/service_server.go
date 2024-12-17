@@ -56,6 +56,7 @@ type SearchSpec struct {
 // currently will use certificates or JWT to identify the destination.
 func RunHTTPSServer(ctx context.Context, em EchoManager, routes Destinations, tlsPath string, service IncomingServiceConfig) {
 	logger := logging.WithContext(ctx).Sugar()
+
 	logger.Infow("Entered RunHTTPSServer")
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", secureAPIHandlerMaker(em, routes, service))
@@ -63,11 +64,14 @@ func RunHTTPSServer(ctx context.Context, em EchoManager, routes Destinations, tl
 	server := &http.Server{
 		Addr:    fmt.Sprintf(":%d", service.Port),
 		Handler: mux,
+		ReadTimeout:  5 * time.Second,
+		WriteTimeout: 10 * time.Second,
+		IdleTimeout:  120 * time.Second,
 	}
 	defer func() {
 		logger.Infow("RunHTTPSServer Server stopped! with service",service.Name)
-		logger.Infow("Restarting it!")
-		RunHTTPSServer(ctx, em, routes, tlsPath, service)
+		// logger.Infow("Restarting it!")
+		// RunHTTPSServer(ctx, em, routes, tlsPath, service)
 	}()
 	addDefaults(ctx, server)
 
@@ -76,10 +80,18 @@ func RunHTTPSServer(ctx context.Context, em EchoManager, routes Destinations, tl
 			MinVersion: tls.VersionTLS13,
 		}
 		logger.Infof("Running service HTTPS listener on port %d", service.Port)
-		logger.Fatal(server.ListenAndServeTLS(path.Join(tlsPath, "tls.crt"), path.Join(tlsPath, "tls.key")))
+		// logger.Fatal(server.ListenAndServeTLS(path.Join(tlsPath, "tls.crt"), path.Join(tlsPath, "tls.key")))
+		if err := server.ListenAndServeTLS(path.Join(tlsPath, "tls.crt"), path.Join(tlsPath, "tls.key")); err != null && !errors.Is(err, http.ErrServerClosed){
+			logger.Errorf("Error received on server: %v", err)
+			sigchan <- syscall.SIGTERM
+		}
 	} else {
 		logger.Infof("Running service HTTP listener on port %d", service.Port)
-		logger.Fatal(server.ListenAndServe())
+		// logger.Fatal(server.ListenAndServe())
+		if err := server.ListenAndServe(); err != null && !errors.Is(err, http.ErrServerClosed){
+			logger.Errorf("Error received on server: %v", err)
+			sigchan <- syscall.SIGTERM
+		}
 	}
 }
 
@@ -92,17 +104,24 @@ func RunHTTPServer(ctx context.Context, em EchoManager, routes Destinations, ser
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/", fixedIdentityAPIHandlerMaker(em, routes, service))
-	defer func() {
-		logger.Infow("RunHTTPServer Server stopped! with service",service.Name)
-		logger.Infow("Restarting it!")
-		RunHTTPServer(ctx, em, routes, service)
-	}()
 	server := &http.Server{
 		Addr:    fmt.Sprintf(":%d", service.Port),
 		Handler: mux,
+		ReadTimeout:  10 * time.Second,
+		WriteTimeout: 10 * time.Second,
+		IdleTimeout:  120 * time.Second,
 	}
 	addDefaults(ctx, server)
-	logger.Fatal(server.ListenAndServe())
+	// logger.Fatal(server.ListenAndServe())
+	if err := server.ListenAndServe(); err != null && !errors.Is(err, http.ErrServerClosed){
+		logger.Errorf("Error received on server: %v", err)
+		sigchan <- syscall.SIGTERM
+	}
+	defer func() {
+		logger.Infow("RunHTTPSServer Server stopped! with service",service.Name)
+		// logger.Infow("Restarting it!")
+		// RunHTTPSServer(ctx, em, routes, tlsPath, service)
+	}()
 }
 
 func addDefaults(ctx context.Context, server *http.Server) {
@@ -120,6 +139,12 @@ func fixedIdentityAPIHandlerMaker(em EchoManager, routes Destinations, service I
 			ServiceType: service.ServiceType,
 			ServiceName: service.DestinationService,
 		}
+		defer func() {
+            if err := recover(); err != nil {
+                log.Printf("Recovered from panic: %v", err)
+                http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+            }
+        }()
 		runAPIHandler(em, routes, ep, w, r)
 	}
 }
@@ -185,11 +210,18 @@ func secureAPIHandlerMaker(em EchoManager, routes Destinations, service Incoming
 			ServiceName: endpointName,
 		}
 		runAPIHandler(em, routes, ep, w, r)
+		defer func() {
+            if err := recover(); err != nil {
+                log.Printf("Recovered from panic: %v", err)
+                http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+            }
+        }()
 	}
 }
 
 func runAPIHandler(em EchoManager, routes Destinations, ep SearchSpec, w http.ResponseWriter, r *http.Request) {
-	ctx := logging.NewContext(r.Context())
+	ctx, cancel := ctx.WithTimeout(r.Context(), 5*time.Second)
+	// ctx := logging.NewContext(ctx)
 	logger := logging.WithContext(ctx).Sugar()
 	logger.Infow("Entered runAPIHandler with request uri", r.URL.String())
 	session := routes.Search(ctx, ep)
@@ -211,6 +243,9 @@ func runAPIHandler(em EchoManager, routes Destinations, ep SearchSpec, w http.Re
 	streamID := ulid.GlobalContext.Ulid()
 	echo := em.MakeRequester(ctx, ep, streamID)
 
-	defer echo.Shutdown(ctx)
+	defer func() {
+		cancel()
+		echo.Shutdown(ctx)
+		}()
 	echo.RunRequest(ctx, session, body, w, r)
 }
