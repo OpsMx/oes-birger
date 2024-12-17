@@ -248,6 +248,7 @@ func runAPIHandler(em EchoManager, routes Destinations, ep SearchSpec, w http.Re
 	if session == nil {
 		logger.Warnw("no such destination for service request", "destination", ep.Destination, "serviceName", ep.ServiceName, "serviceType", ep.ServiceType)
 		w.WriteHeader(http.StatusBadGateway)
+		cancel()
 		return
 	}
 
@@ -257,6 +258,7 @@ func runAPIHandler(em EchoManager, routes Destinations, ep SearchSpec, w http.Re
 		logger.Errorf("unable to read entire message body")
 		w.WriteHeader(http.StatusServiceUnavailable)
 		return
+		cancel()
 	}
 	r.Body.Close()
 
