@@ -27,7 +27,6 @@ import (
 	"strings"
 	"time"
 	"os"
-	"syscall"
 
 	"github.com/opsmx/oes-birger/internal/jwtutil"
 	"github.com/opsmx/oes-birger/internal/logging"
@@ -98,7 +97,7 @@ func RunHTTPSServer(ctx context.Context, em EchoManager, routes Destinations, tl
 }
 
 func gracefulShutdown(server *http.Server, ctx context.Context){
-	logger := logger.WithContext(ctx).Sugar()
+	logger := logging.WithContext(ctx).Sugar()
 	logger.Infof("Received signal: %v. Initiating graceful shutdown...\n")
 
 	// Create a context with timeout for the shutdown process
@@ -113,7 +112,7 @@ func gracefulShutdown(server *http.Server, ctx context.Context){
 	}
 
 	// sigchan <- syscall.SIGTERM
-	os.exit(0)
+	os.Exit(0)
 }
 
 // RunHTTPServer will listen on an unencrypted HTTP only port, and will always forward
@@ -136,7 +135,7 @@ func RunHTTPServer(ctx context.Context, em EchoManager, routes Destinations, ser
 	// logger.Fatal(server.ListenAndServe())
 	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		logger.Errorf("Error received on server: %v", err)
-		gracefulShutdown(server)
+		gracefulShutdown(server, ctx)
 	}
 	defer func() {
 		logger.Infow("RunHTTPSServer Server stopped! with service",service.Name)
