@@ -84,14 +84,14 @@ func RunHTTPSServer(ctx context.Context, em EchoManager, routes Destinations, tl
 		}
 		logger.Infof("Running service HTTPS listener on port %d", service.Port)
 		// logger.Fatal(server.ListenAndServeTLS(path.Join(tlsPath, "tls.crt"), path.Join(tlsPath, "tls.key")))
-		if err := server.ListenAndServeTLS(path.Join(tlsPath, "tls.crt"), path.Join(tlsPath, "tls.key")); err != null && !errors.Is(err, http.ErrServerClosed){
+		if err := server.ListenAndServeTLS(path.Join(tlsPath, "tls.crt"), path.Join(tlsPath, "tls.key")); err != nil && err != http.ErrServerClosed { 
 			logger.Errorf("Error received on server: %v", err)
 			gracefulShutdown(server)
 		}
 	} else {
 		logger.Infof("Running service HTTP listener on port %d", service.Port)
 		// logger.Fatal(server.ListenAndServe())
-		if err := server.ListenAndServe(); err != null && !errors.Is(err, http.ErrServerClosed){
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			logger.Errorf("Error received on server: %v", err)
 			gracefulShutdown(server)
 		}
@@ -133,7 +133,7 @@ func RunHTTPServer(ctx context.Context, em EchoManager, routes Destinations, ser
 	}
 	addDefaults(ctx, server)
 	// logger.Fatal(server.ListenAndServe())
-	if err := server.ListenAndServe(); err != null && !errors.Is(err, http.ErrServerClosed){
+	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		logger.Errorf("Error received on server: %v", err)
 		gracefulShutdown(server)
 	}
