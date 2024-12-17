@@ -26,6 +26,9 @@ import (
 	"path"
 	"strings"
 	"time"
+	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/opsmx/oes-birger/internal/jwtutil"
 	"github.com/opsmx/oes-birger/internal/logging"
