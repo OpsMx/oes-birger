@@ -98,7 +98,7 @@ func RunHTTPSServer(ctx context.Context, em EchoManager, routes Destinations, tl
 }
 
 func gracefulShutdown(server *http.Server, ctx context.Context){
-	logger, := logger.WithContext(ctx).Sugar()
+	logger := logger.WithContext(ctx).Sugar()
 	logger.Infof("Received signal: %v. Initiating graceful shutdown...\n")
 
 	// Create a context with timeout for the shutdown process
