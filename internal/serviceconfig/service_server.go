@@ -240,8 +240,8 @@ func secureAPIHandlerMaker(em EchoManager, routes Destinations, service Incoming
 }
 
 func runAPIHandler(em EchoManager, routes Destinations, ep SearchSpec, w http.ResponseWriter, r *http.Request) {
-	ctx := logging.NewContext(r.Context())
-	ctx, cancel := ctx.WithTimeout(ctx, 5*time.Second)
+	// ctx := logging.NewContext(r.Context())
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	logger := logging.WithContext(ctx).Sugar()
 	logger.Infow("Entered runAPIHandler with request uri", r.URL.String())
 	session := routes.Search(ctx, ep)
