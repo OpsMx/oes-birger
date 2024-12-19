@@ -69,11 +69,11 @@ func RunHTTPSServer(ctx context.Context, em EchoManager, routes Destinations, tl
 		WriteTimeout: 10 * time.Second,
 		IdleTimeout:  120 * time.Second,
 	}
-	defer func() {
-		logger.Infow("RunHTTPSServer Server stopped! with service",service.Name)
+	// defer func() {
+		// logger.Infow("RunHTTPSServer Server stopped! with service",service.Name)
 		// logger.Infow("Restarting it!")
 		// RunHTTPSServer(ctx, em, routes, tlsPath, service)
-	}()
+	// }()
 	addDefaults(ctx, server)
 
 	if tlsPath != "" {
@@ -83,33 +83,35 @@ func RunHTTPSServer(ctx context.Context, em EchoManager, routes Destinations, tl
 		logger.Infof("Running service HTTPS listener on port %d", service.Port)
 		// logger.Fatal(server.ListenAndServeTLS(path.Join(tlsPath, "tls.crt"), path.Join(tlsPath, "tls.key")))
 		if err := server.ListenAndServeTLS(path.Join(tlsPath, "tls.crt"), path.Join(tlsPath, "tls.key")); err != nil && err != http.ErrServerClosed { 
-			logger.Errorf("Error received on server: %v", err)
+			// logger.Errorf("Error received on server: %v", err)
 			gracefulShutdown(server, ctx)
 		}
 	} else {
 		logger.Infof("Running service HTTP listener on port %d", service.Port)
 		// logger.Fatal(server.ListenAndServe())
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			logger.Errorf("Error received on server: %v", err)
+			// logger.Errorf("Error received on server: %v", err)
 			gracefulShutdown(server, ctx)
 		}
 	}
+	go RunHTTPSServer(ctx, em, routes, tlsPath, service)
 }
 
 func gracefulShutdown(server *http.Server, ctx context.Context){
 	logger := logging.WithContext(ctx).Sugar()
-	logger.Infof("Received signal: %v. Initiating graceful shutdown...\n")
+	// logger.Infof("Received signal: %v. Initiating graceful shutdown...\n")
 
 	// Create a context with timeout for the shutdown process
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	// Shutdown the server gracefully
-	if err := server.Shutdown(ctx); err != nil {
-		logger.Infof("Server shutdown failed: %v\n", err)
-	} else {
-		logger.Infof("Server shutdown completed successfully.")
-	}
+	server.Shutdown(ctx)
+	// if err := server.Shutdown(ctx); err != nil {
+	// 	logger.Infof("Server shutdown failed: %v\n", err)
+	// } else {
+	// 	logger.Infof("Server shutdown completed successfully.")
+	// }
 
 	// sigchan <- syscall.SIGTERM
 	os.Exit(0)
@@ -134,14 +136,15 @@ func RunHTTPServer(ctx context.Context, em EchoManager, routes Destinations, ser
 	addDefaults(ctx, server)
 	// logger.Fatal(server.ListenAndServe())
 	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-		logger.Errorf("Error received on server: %v", err)
+		// logger.Errorf("Error received on server: %v", err)
 		gracefulShutdown(server, ctx)
 	}
-	defer func() {
-		logger.Infow("RunHTTPSServer Server stopped! with service",service.Name)
+	// defer func() {
+		// logger.Infow("RunHTTPSServer Server stopped! with service",service.Name)
 		// logger.Infow("Restarting it!")
 		// RunHTTPSServer(ctx, em, routes, tlsPath, service)
-	}()
+	// }()
+	go RunHTTPServer(ctx, em, routes, service)
 }
 
 func addDefaults(ctx context.Context, server *http.Server) {
