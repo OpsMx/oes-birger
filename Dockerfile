@@ -79,5 +79,6 @@ FROM base-image AS agent-controller-image
 WORKDIR /app
 COPY --from=build-server-binaries /out/agent-controller /app
 COPY --from=build-server-binaries /out/get-creds /app
-EXPOSE 9001-9002 9102
+EXPOSE 9001-9002
+EXPOSE 9102
 CMD ["/app/agent-controller"]
