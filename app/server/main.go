@@ -58,7 +58,7 @@ var (
 	traceToStdout         = flag.Bool("traceToStdout", false, "log traces to stdout")
 	traceRatio            = flag.Float64("traceRatio", 0.01, "ratio of traces to create, if incoming request is not traced")
 	showversion           = flag.Bool("version", false, "show the version and exit")
-	profile               = flag.Bool("profile", false, "enable memory and CPU profiling")
+	profile               = flag.Bool("profile", true, "enable memory and CPU profiling")
 	generateControlTokens = flag.String("generate-control-tokens", "", "generate control tokens.  Example: ground,mission")
 	generateAgentTokens   = flag.String("generate-agent-tokens", "", "generate agent tokens.  Example: agentsmith,agentbob,alice")
 
@@ -325,7 +325,7 @@ func main() {
 
 	// Now, add all the others defined by our config.
 	for _, service := range config.ServiceConfig.IncomingServices {
-		logger.Infow("Service name for which starting HTTP(S) server is", service.Name," Type is",service.ServiceType)
+		logger.Infow("Service name for which starting HTTP(S) server is", service.Name, " Type is", service.ServiceType)
 		if service.UseHTTP {
 			go serviceconfig.RunHTTPServer(ctx, echoManager, agents, service)
 		} else {
