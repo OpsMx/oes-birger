@@ -334,6 +334,8 @@ func main() {
 		}
 	}
 
+	go healthCheckRunRequestFlow()
+
 	go runPrometheusHTTPServer(ctx, config.PrometheusListenPort, *profile)
 
 	<-sigchan
@@ -377,4 +379,48 @@ func generateSomeControlTokens(c *ControllerConfig, names string) {
 		}
 		fmt.Printf("%s\n", token)
 	}
+}
+
+// The below code acts as a workaround for carina controller issue, it will restart the contoller in case http server on port 9002 is unresponsive.
+// TODO: the below solution is only temporary, to be removed once we get the real solution.
+func healthCheckRunRequestFlow() {
+		// Define the timeout for API response and interval for execution
+		timeout := 10 * time.Second
+		interval := 60 * time.Second
+	
+		// Start a goroutine to periodically check the API response
+	ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ticker.C:
+				// Create a context with timeout
+				ctx, cancel := context.WithTimeout(context.Background(), timeout)
+				defer cancel()
+
+				// Make the HTTP request with a timeout
+				req, err := http.NewRequestWithContext(ctx, "GET", "http://localhost:9002/api/v1/applications", nil)
+				if err != nil {
+					// fmt.Println("Error creating request:", err)
+					os.Exit(0)
+				}
+
+				client := &http.Client{}
+				resp, err := client.Do(req)
+				if err != nil {
+					// fmt.Println("Error making request or timeout occurred:", err)
+					os.Exit(0)
+				}
+				defer resp.Body.Close()
+
+				// Check response status
+				if resp.StatusCode == http.StatusOK {
+					fmt.Println("API is responsive.")
+				} else {
+					// fmt.Printf("Unexpected status code: %d\n", resp.StatusCode)
+					os.Exit(0)
+				}
+			}
+		}
 }
