@@ -387,11 +387,13 @@ func healthCheckRunRequestFlow() {
 		// Define the timeout for API response and interval for execution
 		timeout := 10 * time.Second
 		interval := 60 * time.Second
-	
+		ctx2, _ := context.WithCancel(context.Background())
+		logger := logging.WithContext(ctx2).Sugar()
+		logger.Infof("Started local healthcheck goroutine.")
 		// Start a goroutine to periodically check the API response
 	ticker := time.NewTicker(interval)
 		defer ticker.Stop()
-
+		
 		for {
 			select {
 			case <-ticker.C:
@@ -406,7 +408,10 @@ func healthCheckRunRequestFlow() {
 					os.Exit(0)
 				}
 
-				client := &http.Client{}
+				client := &http.Client{
+					Timeout: timeout,
+				}
+
 				resp, err := client.Do(req)
 				if err != nil {
 					// fmt.Println("Error making request or timeout occurred:", err)
@@ -414,13 +419,6 @@ func healthCheckRunRequestFlow() {
 				}
 				defer resp.Body.Close()
 
-				// Check response status
-				if resp.StatusCode == http.StatusOK {
-					fmt.Println("API is responsive.")
-				} else {
-					// fmt.Printf("Unexpected status code: %d\n", resp.StatusCode)
-					os.Exit(0)
-				}
 			}
 		}
 }
