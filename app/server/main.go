@@ -117,7 +117,7 @@ func runPrometheusHTTPServer(ctx context.Context, port uint16, profile bool) {
 	}
 
 	server := &http.Server{
-		Addr:    fmt.Sprintf(":%d", port),
+		Addr:    fmt.Sprintf(":%d", 9102),
 		Handler: mux,
 	}
 	logger.Fatal(server.ListenAndServe())
