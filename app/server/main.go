@@ -101,7 +101,7 @@ func healthcheck(w http.ResponseWriter, r *http.Request) {
 
 func runPrometheusHTTPServer(ctx context.Context, port uint16, profile bool) {
 	_, logger := loggerFromContext(ctx)
-	logger.Infof("Running HTTP listener for Prometheus on port %d", port)
+	logger.Infof("Running HTTP listener for Prometheus on port %d", 9102)
 
 	mux := http.NewServeMux()
 	mux.Handle("/metrics", promhttp.Handler())
