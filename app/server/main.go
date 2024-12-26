@@ -107,17 +107,18 @@ func runPrometheusHTTPServer(ctx context.Context, port uint16, profile bool) {
 	mux.Handle("/metrics", promhttp.Handler())
 	mux.HandleFunc("/", healthcheck)
 	mux.HandleFunc("/health", healthcheck)
-	if profile {
+	// if profile {
 		logger.Infof("Prometheus handler includes /debug/pprof endpoints")
 		mux.HandleFunc("/debug/pprof/", pprofhttp.Index)
 		mux.HandleFunc("/debug/pprof/cmdline", pprofhttp.Cmdline)
 		mux.HandleFunc("/debug/pprof/profile", pprofhttp.Profile)
 		mux.HandleFunc("/debug/pprof/symbol", pprofhttp.Symbol)
 		mux.HandleFunc("/debug/pprof/trace", pprofhttp.Trace)
-	}
+	// }
 
 	server := &http.Server{
-		Addr:    fmt.Sprintf(":%d", 9102),
+		// Addr:    fmt.Sprintf(":%d", 9102),
+		Addr: ":9102",
 		Handler: mux,
 	}
 	logger.Fatal(server.ListenAndServe())
