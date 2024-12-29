@@ -108,17 +108,17 @@ func runPrometheusHTTPServer(ctx context.Context, port uint16, profile bool) {
 	mux.HandleFunc("/", healthcheck)
 	mux.HandleFunc("/health", healthcheck)
 	// if profile {
-		logger.Infof("Prometheus handler includes /debug/pprof endpoints")
-		mux.HandleFunc("/debug/pprof/", pprofhttp.Index)
-		mux.HandleFunc("/debug/pprof/cmdline", pprofhttp.Cmdline)
-		mux.HandleFunc("/debug/pprof/profile", pprofhttp.Profile)
-		mux.HandleFunc("/debug/pprof/symbol", pprofhttp.Symbol)
-		mux.HandleFunc("/debug/pprof/trace", pprofhttp.Trace)
+	logger.Infof("Prometheus handler includes /debug/pprof endpoints")
+	mux.HandleFunc("/debug/pprof/", pprofhttp.Index)
+	mux.HandleFunc("/debug/pprof/cmdline", pprofhttp.Cmdline)
+	mux.HandleFunc("/debug/pprof/profile", pprofhttp.Profile)
+	mux.HandleFunc("/debug/pprof/symbol", pprofhttp.Symbol)
+	mux.HandleFunc("/debug/pprof/trace", pprofhttp.Trace)
 	// }
 
 	server := &http.Server{
 		// Addr:    fmt.Sprintf(":%d", 9102),
-		Addr: ":9102",
+		Addr:    ":9102",
 		Handler: mux,
 	}
 	logger.Fatal(server.ListenAndServe())
@@ -383,42 +383,42 @@ func generateSomeControlTokens(c *ControllerConfig, names string) {
 
 // The below code acts as a workaround for carina controller issue, it will restart the contoller in case http server on port 9002 is unresponsive.
 // TODO: the below solution is only temporary, to be removed once we get the real solution.
-func healthCheckRunRequestFlow() {
-		// Define the timeout for API response and interval for execution
-		timeout := 10 * time.Second
-		interval := 60 * time.Second
-		ctx2, _ := context.WithCancel(context.Background())
-		logger := logging.WithContext(ctx2).Sugar()
-		logger.Infof("Started local healthcheck goroutine.")
-		// Start a goroutine to periodically check the API response
-	ticker := time.NewTicker(interval)
-		defer ticker.Stop()
-		
-		for {
-			select {
-			case <-ticker.C:
-				// Create a context with timeout
-				ctx, cancel := context.WithTimeout(context.Background(), timeout)
-				defer cancel()
+// func healthCheckRunRequestFlow() {
+// 		// Define the timeout for API response and interval for execution
+// 		timeout := 10 * time.Second
+// 		interval := 60 * time.Second
+// 		ctx2, _ := context.WithCancel(context.Background())
+// 		logger := logging.WithContext(ctx2).Sugar()
+// 		logger.Infof("Started local healthcheck goroutine.")
+// 		// Start a goroutine to periodically check the API response
+// 	ticker := time.NewTicker(interval)
+// 		defer ticker.Stop()
 
-				// Make the HTTP request with a timeout
-				req, err := http.NewRequestWithContext(ctx, "GET", "http://localhost:9002/api/v1/applications", nil)
-				if err != nil {
-					// fmt.Println("Error creating request:", err)
-					os.Exit(0)
-				}
+// 		for {
+// 			select {
+// 			case <-ticker.C:
+// 				// Create a context with timeout
+// 				ctx, cancel := context.WithTimeout(context.Background(), timeout)
+// 				defer cancel()
 
-				client := &http.Client{
-					Timeout: timeout,
-				}
+// 				// Make the HTTP request with a timeout
+// 				req, err := http.NewRequestWithContext(ctx, "GET", "http://localhost:9002/api/v1/applications", nil)
+// 				if err != nil {
+// 					// fmt.Println("Error creating request:", err)
+// 					os.Exit(0)
+// 				}
 
-				resp, err := client.Do(req)
-				if err != nil {
-					// fmt.Println("Error making request or timeout occurred:", err)
-					os.Exit(0)
-				}
-				defer resp.Body.Close()
+// 				client := &http.Client{
+// 					Timeout: timeout,
+// 				}
 
-			}
-		}
-}
+// 				resp, err := client.Do(req)
+// 				if err != nil {
+// 					// fmt.Println("Error making request or timeout occurred:", err)
+// 					os.Exit(0)
+// 				}
+// 				defer resp.Body.Close()
+
+// 			}
+// 		}
+// }

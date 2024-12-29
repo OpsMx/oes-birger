@@ -65,9 +65,9 @@ func RunHTTPSServer(ctx context.Context, em EchoManager, routes Destinations, tl
 	server := &http.Server{
 		Addr:    fmt.Sprintf(":%d", service.Port),
 		Handler: mux,
-		ReadTimeout:  5 * time.Second,
-		WriteTimeout: 10 * time.Second,
-		IdleTimeout:  120 * time.Second,
+		// ReadTimeout:  5 * time.Second,
+		// WriteTimeout: 10 * time.Second,
+		// IdleTimeout:  120 * time.Second,
 	}
 	// defer func() {
 		// logger.Infow("RunHTTPSServer Server stopped! with service",service.Name)
@@ -269,9 +269,9 @@ func runAPIHandler(em EchoManager, routes Destinations, ep SearchSpec, w http.Re
 	streamID := ulid.GlobalContext.Ulid()
 	echo := em.MakeRequester(ctx, ep, streamID)
 
-	defer func() {
+	go func() {
+		echo.RunRequest(ctx, session, body, w, r)
 		cancel()
 		echo.Shutdown(ctx)
 		}()
-	echo.RunRequest(ctx, session, body, w, r)
 }
