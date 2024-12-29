@@ -185,6 +185,7 @@ func secureAPIHandlerMaker(em EchoManager, routes Destinations, service Incoming
 func runAPIHandler(em EchoManager, routes Destinations, ep SearchSpec, w http.ResponseWriter, r *http.Request) {
 	// ctx := logging.NewContext(r.Context())
 	ctx, _ := context.WithCancel(context.Background())
+	r = r.WithContext(ctx)
 	logger := logging.WithContext(ctx).Sugar()
 	logger.Infof("Entered runAPIHandler")
 	session := routes.Search(ctx, ep)
