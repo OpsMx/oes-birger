@@ -113,7 +113,7 @@ func fixedIdentityAPIHandlerMaker(em EchoManager, routes Destinations, service I
 			ServiceType: service.ServiceType,
 			ServiceName: service.DestinationService,
 		}
-		runAPIHandler(em, routes, ep, w, r)
+		go runAPIHandler(em, routes, ep, w, r)
 		// }()
 	}
 }
@@ -177,13 +177,14 @@ func secureAPIHandlerMaker(em EchoManager, routes Destinations, service Incoming
 			ServiceType: endpointType,
 			ServiceName: endpointName,
 		}
-		runAPIHandler(em, routes, ep, w, r)
+		go runAPIHandler(em, routes, ep, w, r)
 		// }()
 	}
 }
 
 func runAPIHandler(em EchoManager, routes Destinations, ep SearchSpec, w http.ResponseWriter, r *http.Request) {
-	ctx := logging.NewContext(r.Context())
+	// ctx := logging.NewContext(r.Context())
+	ctx, _ := context.WithCancel(context.Background())
 	logger := logging.WithContext(ctx).Sugar()
 	logger.Infof("Entered runAPIHandler")
 	session := routes.Search(ctx, ep)
