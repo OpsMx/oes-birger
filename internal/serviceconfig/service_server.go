@@ -112,7 +112,7 @@ func fixedIdentityAPIHandlerMaker(em EchoManager, routes Destinations, service I
 			ServiceType: service.ServiceType,
 			ServiceName: service.DestinationService,
 		}
-		runAPIHandler(em, routes, ep, w, r)
+		go runAPIHandler(em, routes, ep, w, r)
 	}
 }
 
