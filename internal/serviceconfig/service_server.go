@@ -61,8 +61,10 @@ func RunHTTPSServer(ctx context.Context, em EchoManager, routes Destinations, tl
 	mux.HandleFunc("/", secureAPIHandlerMaker(em, routes, service))
 
 	server := &http.Server{
-		Addr:    fmt.Sprintf(":%d", service.Port),
-		Handler: mux,
+		Addr:         fmt.Sprintf(":%d", service.Port),
+		Handler:      mux,
+		ReadTimeout:  5 * time.Second,
+		WriteTimeout: 5 * time.Second,
 	}
 
 	addDefaults(ctx, server)
@@ -172,14 +174,14 @@ func secureAPIHandlerMaker(em EchoManager, routes Destinations, service Incoming
 			ServiceType: endpointType,
 			ServiceName: endpointName,
 		}
-		runAPIHandler(em, routes, ep, w, r)
+		go runAPIHandler(em, routes, ep, w, r)
 	}
 }
 
 func runAPIHandler(em EchoManager, routes Destinations, ep SearchSpec, w http.ResponseWriter, r *http.Request) {
 	ctx := logging.NewContext(r.Context())
 	logger := logging.WithContext(ctx).Sugar()
-
+	logger.Infof("Entered runAPIHandler")
 	session := routes.Search(ctx, ep)
 	if session == nil {
 		logger.Warnw("no such destination for service request", "destination", ep.Destination, "serviceName", ep.ServiceName, "serviceType", ep.ServiceType)
