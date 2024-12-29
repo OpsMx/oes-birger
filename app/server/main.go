@@ -334,7 +334,7 @@ func main() {
 		}
 	}
 
-	go healthCheckRunRequestFlow()
+	// go healthCheckRunRequestFlow()
 
 	go runPrometheusHTTPServer(ctx, config.PrometheusListenPort, *profile)
 
