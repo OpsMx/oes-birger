@@ -107,14 +107,14 @@ func addDefaults(ctx context.Context, server *http.Server) {
 
 func fixedIdentityAPIHandlerMaker(em EchoManager, routes Destinations, service IncomingServiceConfig) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
-		go func() {
-			ep := SearchSpec{
-				Destination: service.Destination,
-				ServiceType: service.ServiceType,
-				ServiceName: service.DestinationService,
-			}
-			go runAPIHandler(em, routes, ep, w, r)
-		}()
+		// go func() {
+		ep := SearchSpec{
+			Destination: service.Destination,
+			ServiceType: service.ServiceType,
+			ServiceName: service.DestinationService,
+		}
+		runAPIHandler(em, routes, ep, w, r)
+		// }()
 	}
 }
 
@@ -165,20 +165,20 @@ func extractEndpoint(r *http.Request) (agentIdentity string, endpointType string
 
 func secureAPIHandlerMaker(em EchoManager, routes Destinations, service IncomingServiceConfig) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
-		go func() {
-			agentIdentity, endpointType, endpointName, err := extractEndpoint(r)
-			if err != nil {
-				r.Body.Close()
-				w.WriteHeader(http.StatusBadRequest)
-				return
-			}
-			ep := SearchSpec{
-				Destination: agentIdentity,
-				ServiceType: endpointType,
-				ServiceName: endpointName,
-			}
-			runAPIHandler(em, routes, ep, w, r)
-		}()
+		// go func() {
+		agentIdentity, endpointType, endpointName, err := extractEndpoint(r)
+		if err != nil {
+			r.Body.Close()
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		ep := SearchSpec{
+			Destination: agentIdentity,
+			ServiceType: endpointType,
+			ServiceName: endpointName,
+		}
+		runAPIHandler(em, routes, ep, w, r)
+		// }()
 	}
 }
 

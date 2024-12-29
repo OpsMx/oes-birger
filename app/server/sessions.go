@@ -76,7 +76,7 @@ func newSessionContext(agentID string, sessionID string, hostname string, versio
 	}
 	session := &AgentContext{
 		AgentKey:            key,
-		requestChan:         make(chan serviceRequest),
+		requestChan:         make(chan serviceRequest, 100),
 		LastUse:             now,
 		ConnectedAt:         now,
 		Hostname:            hostname,
