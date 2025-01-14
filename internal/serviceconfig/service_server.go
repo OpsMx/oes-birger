@@ -101,6 +101,8 @@ func addDefaults(ctx context.Context, server *http.Server) {
 	server.BaseContext = func(net.Listener) context.Context { return ctx }
 	server.IdleTimeout = 4 * time.Second
 	server.ReadHeaderTimeout = 4 * time.Second
+	server.ReadTimeout = 4 * time.Second
+	server.WriteTimeout = 8 * time.Second
 }
 
 func fixedIdentityAPIHandlerMaker(em EchoManager, routes Destinations, service IncomingServiceConfig) func(http.ResponseWriter, *http.Request) {
