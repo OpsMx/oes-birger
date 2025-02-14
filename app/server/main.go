@@ -55,10 +55,10 @@ var (
 
 	// eg, http://localhost:14268/api/traces
 	otlpEndpoint          = flag.String("otlp-endpoint", "", "OTLP collector endpoint")
-	traceToStdout         = flag.Bool("traceToStdout", false, "log traces to stdout")
+	traceToStdout         = flag.Bool("traceToStdout", true, "log traces to stdout")
 	traceRatio            = flag.Float64("traceRatio", 0.01, "ratio of traces to create, if incoming request is not traced")
-	showversion           = flag.Bool("version", false, "show the version and exit")
-	profile               = flag.Bool("profile", false, "enable memory and CPU profiling")
+	showversion           = flag.Bool("version", true, "show the version and exit")
+	profile               = flag.Bool("profile", true, "enable memory and CPU profiling")
 	generateControlTokens = flag.String("generate-control-tokens", "", "generate control tokens.  Example: ground,mission")
 	generateAgentTokens   = flag.String("generate-agent-tokens", "", "generate agent tokens.  Example: agentsmith,agentbob,alice")
 
